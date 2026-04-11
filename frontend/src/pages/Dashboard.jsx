@@ -5,6 +5,7 @@ import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
+import { getStudentNotifications, markStudentNotifsRead } from '../interviewRequests';
 
 const SKILLS = [
   { label: 'Data Architecture', pct: 92, color: '#c3c0ff' },
@@ -30,6 +31,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [studentNotifs, setStudentNotifs] = useState([]);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -53,6 +56,16 @@ export default function Dashboard() {
 
   if (!user) return <Navigate to="/" replace />;
   const firstName = user.name ? user.name.split(' ')[0] : user.role;
+
+  // Poll student notifications every 3s
+  useEffect(() => {
+    const load = () => setStudentNotifs(getStudentNotifications(user.name));
+    load();
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
+  }, [user.name]);
+
+  const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
   const CIRC = 2 * Math.PI * 70;
   const offset = CIRC * (1 - 0.8);
 
@@ -251,6 +264,51 @@ export default function Dashboard() {
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search alumni..." style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 220, outline: 'none' }} />
               </div>
             )}
+
+            {/* Student notification bell */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => { setShowNotifs(v => !v); setShowProfile(false); if (!showNotifs) markStudentNotifsRead(user.name); }} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: showNotifs ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifs ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
+                {unreadNotifCount > 0 && (
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
+                )}
+              </button>
+              {showNotifs && (
+                <>
+                  <div onClick={() => setShowNotifs(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, width: 340, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Notifications</span>
+                      <span style={{ fontSize: '0.65rem', color: '#c7c4d8' }}>{studentNotifs.length} total</span>
+                    </div>
+                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                      {studentNotifs.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
+                          <p style={{ fontSize: '0.875rem' }}>No notifications yet</p>
+                        </div>
+                      ) : studentNotifs.map((n, i) => (
+                        <div key={n.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: !n.read ? 'rgba(195,192,255,0.04)' : 'transparent' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'slot_booked' ? 'rgba(78,222,163,0.12)' : n.type === 'accepted' ? 'rgba(195,192,255,0.12)' : 'rgba(255,180,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'slot_booked' ? '#4edea3' : n.type === 'accepted' ? '#c3c0ff' : '#ffb4ab', fontVariationSettings: "'FILL' 1" }}>
+                              {n.type === 'slot_booked' ? 'event_available' : n.type === 'accepted' ? 'check_circle' : 'cancel'}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: 3, color: !n.read ? '#dae2fd' : '#c7c4d8' }}>{n.title}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.5 }}>{n.message}</div>
+                            <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
+                              {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0, marginTop: 6 }} />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Profile avatar button */}
             <div style={{ position: 'relative' }}>

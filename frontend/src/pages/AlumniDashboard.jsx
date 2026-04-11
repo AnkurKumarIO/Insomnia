@@ -1,71 +1,290 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import { getRequests, acceptRequest, declineRequest, formatScheduledTime } from '../interviewRequests';
+import { getRequests, acceptRequestOnly, bookSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import SettingsPage from './SettingsPage';
 
-// Modal to accept a request and pick a scheduled time
-function AcceptModal({ request, onClose, onAccepted }) {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 0, 0, 0);
-  const defaultDate = tomorrow.toISOString().slice(0, 10);
-  const defaultTime = '10:00';
-
-  const [date, setDate] = useState(defaultDate);
-  const [time, setTime] = useState(defaultTime);
+// ── Student Detail + Accept Modal ────────────────────────────────────────────
+function StudentDetailModal({ request, onClose, onAccept }) {
+  const p = request.studentProfile || {};
+  const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
 
   const handleAccept = () => {
-    const scheduledTime = new Date(`${date}T${time}`).toISOString();
-    const updated = acceptRequest(request.id, scheduledTime);
-    setDone(true);
-    setTimeout(() => { onAccepted(updated); onClose(); }, 1500);
+    setAccepting(true);
+    setTimeout(() => {
+      acceptRequestOnly(request.id);
+      setDone(true);
+      setTimeout(() => { onAccept(); onClose(); }, 1400);
+    }, 600);
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 420, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 560, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '1.5rem 1.5rem 1rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Interview Request</div>
+            <h3 style={{ fontWeight: 700, fontSize: '1.2rem', color: '#dae2fd', marginBottom: 2 }}>{request.studentName}</h3>
+            <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{request.topic}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
         {done ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✅</div>
-            <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Session Scheduled!</h3>
-            <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
-              {request.studentName} will be notified of the scheduled time.
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
+            <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Accepted!</h3>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified. Click "Book Slot" to schedule the interview.</p>
+          </div>
+        ) : (
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {/* Student basic info */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '1rem' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700, color: '#1d00a5', flexShrink: 0 }}>{request.studentName[0]}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{p.name || request.studentName}</div>
+                  {p.college && <div style={{ fontSize: '0.78rem', color: '#c7c4d8', marginTop: 2 }}>{p.college}</div>}
+                  {(p.department || p.year) && (
+                    <div style={{ fontSize: '0.72rem', color: '#c3c0ff', marginTop: 2 }}>
+                      {[p.department, p.year].filter(Boolean).join(' • ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {p.cgpa && (
+                  <div style={{ background: '#131b2e', borderRadius: 10, padding: '0.6rem 0.875rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>CGPA</div>
+                    <div style={{ fontWeight: 700, color: '#4edea3' }}>{p.cgpa} / 10</div>
+                  </div>
+                )}
+                {p.skills?.length > 0 && (
+                  <div style={{ background: '#131b2e', borderRadius: 10, padding: '0.6rem 0.875rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>Top Skills</div>
+                    <div style={{ fontSize: '0.72rem', color: '#dae2fd', fontWeight: 600 }}>{p.skills.slice(0, 3).join(', ')}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {p.bio && (
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 6 }}>About</div>
+                <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6 }}>{p.bio}</p>
+              </div>
+            )}
+
+            {/* Links */}
+            {(p.linkedin || p.github || p.resumeName) && (
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 10 }}>Links & Documents</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {p.linkedin && (
+                    <a href={p.linkedin.startsWith('http') ? p.linkedin : `https://${p.linkedin}`} target="_blank" rel="noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.3)', borderRadius: 8, color: '#60a5fa', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>link</span> LinkedIn
+                    </a>
+                  )}
+                  {p.github && (
+                    <a href={p.github.startsWith('http') ? p.github : `https://${p.github}`} target="_blank" rel="noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>code</span> GitHub
+                    </a>
+                  )}
+                  {p.resumeName && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, color: '#4edea3', fontSize: '0.75rem', fontWeight: 600 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>description</span> {p.resumeName}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Student's message */}
+            {request.message && (
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 6 }}>Student's Message</div>
+                <div style={{ background: 'rgba(45,52,73,0.5)', borderLeft: '2px solid #c3c0ff', borderRadius: 8, padding: '0.75rem 1rem' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(218,226,253,0.85)', fontStyle: 'italic', lineHeight: 1.6 }}>"{request.message}"</p>
+                </div>
+              </div>
+            )}
+
+            {/* Skills tags */}
+            {p.skills?.length > 0 && (
+              <div style={{ padding: '1rem 1.5rem' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Skills</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {p.skills.map(s => (
+                    <span key={s} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.7rem', fontWeight: 600, color: '#c7c4d8' }}>{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer actions */}
+        {!done && (
+          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(70,69,85,0.2)', display: 'flex', gap: 10, flexShrink: 0 }}>
+            <button onClick={() => { declineRequest(request.id); onClose(); }} style={{ flex: 1, padding: '0.75rem', background: '#222a3d', color: '#c7c4d8', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+              Decline
+            </button>
+            <button onClick={handleAccept} disabled={accepting} style={{ flex: 2, padding: '0.75rem', background: accepting ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: accepting ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: accepting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {accepting ? (
+                <><div style={{ width: 14, height: 14, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Accepting...</>
+              ) : (
+                <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span> Accept Request</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// ── Book Slot Calendar Modal ──────────────────────────────────────────────────
+function BookSlotModal({ request, onClose, onBooked }) {
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [viewYear, setViewYear]   = useState(today.getFullYear());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState('10:00');
+  const [step, setStep] = useState('calendar'); // calendar | confirm | done
+
+  const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayStr = today.toDateString();
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const isPast = (day) => new Date(viewYear, viewMonth, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const handleBook = () => {
+    const scheduledTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${selectedTime}`).toISOString();
+    bookSlot(request.id, scheduledTime);
+    setStep('done');
+    setTimeout(() => { onBooked(scheduledTime); onClose(); }, 1800);
+  };
+
+  const formattedSelected = selectedDate
+    ? new Date(viewYear, viewMonth, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+
+        {step === 'done' ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>📅</div>
+            <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Slot Booked!</h3>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>
+              {request.studentName} has been notified with the interview date and time.
             </p>
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Accept & Schedule</div>
-                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{request.studentName}</h3>
-                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{request.topic}</p>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Book Interview Slot</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>with {request.studentName}</h3>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            {request.message && (
-              <div style={{ background: 'rgba(45,52,73,0.5)', borderLeft: '2px solid #c3c0ff', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-                <p style={{ fontSize: '0.78rem', color: '#c7c4d8', fontStyle: 'italic', lineHeight: 1.5 }}>"{request.message}"</p>
+
+            <div style={{ padding: '1.25rem 1.5rem' }}>
+              {/* Month navigation */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
+                </button>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
+                </button>
               </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().slice(0,10)} style={{ width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.6rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }} />
+
+              {/* Day headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
+                {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#c7c4d8', padding: '0.25rem 0' }}>{d}</div>)}
               </div>
-              <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Time</label>
-                <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.6rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }} />
+
+              {/* Calendar grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.25rem' }}>
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                  const past = isPast(day);
+                  const isToday = new Date(viewYear, viewMonth, day).toDateString() === todayStr;
+                  const selected = selectedDate === day;
+                  return (
+                    <button key={day} onClick={() => !past && setSelectedDate(day)} disabled={past}
+                      style={{ aspectRatio: '1', borderRadius: 8, border: 'none', cursor: past ? 'not-allowed' : 'pointer', fontWeight: selected ? 700 : 500, fontSize: '0.8rem', transition: 'all 0.15s',
+                        background: selected ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : isToday ? 'rgba(78,222,163,0.15)' : 'transparent',
+                        color: selected ? '#1d00a5' : past ? 'rgba(199,196,216,0.25)' : isToday ? '#4edea3' : '#dae2fd',
+                        outline: isToday && !selected ? '1px solid rgba(78,222,163,0.4)' : 'none',
+                      }}>
+                      {day}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem' }}>
-              <button onClick={onClose} style={{ flex: 1, padding: '0.75rem', background: '#222a3d', color: '#c7c4d8', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleAccept} disabled={!date || !time} style={{ flex: 2, padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}>
-                Confirm Schedule
-              </button>
+
+              {/* Time slot picker */}
+              {selectedDate && (
+                <>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>
+                    Select Time — {formattedSelected}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
+                    {TIME_SLOTS.map(t => (
+                      <button key={t} onClick={() => setSelectedTime(t)}
+                        style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, transition: 'all 0.15s',
+                          background: selectedTime === t ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d',
+                          color: selectedTime === t ? '#1d00a5' : '#c7c4d8',
+                        }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Confirm summary */}
+                  <div style={{ background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: 4 }}>Scheduled Slot</div>
+                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {selectedTime}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#c7c4d8', marginTop: 3 }}>A notification will be sent to {request.studentName}</div>
+                  </div>
+
+                  <button onClick={handleBook} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_available</span>
+                    Confirm & Notify Student
+                  </button>
+                </>
+              )}
+
+              {!selectedDate && (
+                <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>
+                  Select a date to choose a time slot
+                </div>
+              )}
             </div>
           </>
         )}
@@ -134,8 +353,9 @@ export default function AlumniDashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [extraSlots, setExtraSlots] = useState([]);
-  const [acceptingRequest, setAcceptingRequest] = useState(null);
-  const [liveRequests, setLiveRequests] = useState([]);
+  const [viewingRequest, setViewingRequest] = useState(null);   // StudentDetailModal
+  const [bookingRequest, setBookingRequest] = useState(null);   // BookSlotModal
+  const [liveRequests, setLiveRequests] = useState([]);         // pending + accepted
 
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
@@ -161,7 +381,8 @@ export default function AlumniDashboard() {
   useEffect(() => {
     const load = () => {
       const all = getRequests();
-      setLiveRequests(all.filter(r => r.alumniName === user.name && r.status === 'pending'));
+      // Show pending + accepted (waiting for slot booking)
+      setLiveRequests(all.filter(r => r.alumniName === user.name && (r.status === 'pending' || r.status === 'accepted')));
     };
     load();
     const interval = setInterval(load, 3000);
@@ -207,16 +428,22 @@ export default function AlumniDashboard() {
     setLiveRequests(prev => prev.filter(r => r.id !== id));
   };
 
-  const handleAccepted = (updated) => {
-    setLiveRequests(prev => prev.filter(r => r.id !== updated.id));
-    // Add to schedule
-    const formatted = formatScheduledTime(updated.scheduledTime);
+  const handleAccepted = (requestId) => {
+    // Move from pending → accepted in local state
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'accepted' } : r));
+  };
+
+  const handleSlotBooked = (requestId, scheduledTime) => {
+    setLiveRequests(prev => prev.filter(r => r.id !== requestId));
+    const formatted = formatScheduledTime(scheduledTime);
+    const req = liveRequests.find(r => r.id === requestId);
     setExtraSlots(s => [...s, {
       when: formatted,
-      title: `Mock Interview: ${updated.studentName}`,
-      sub: updated.topic,
+      title: `Mock Interview: ${req?.studentName || 'Student'}`,
+      sub: req?.topic || 'Mock Interview',
       active: true,
-      roomId: updated.roomId,
+      roomId: `room-${requestId.slice(-8)}-${Date.now()}`,
+      scheduledTime,
     }]);
   };
 
@@ -376,8 +603,16 @@ export default function AlumniDashboard() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Interview Requests</h2>
-          <span style={{ background: 'rgba(195,192,255,0.1)', color: '#c3c0ff', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{liveRequests.length} Pending</span>
+          <span style={{ background: 'rgba(195,192,255,0.1)', color: '#c3c0ff', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {liveRequests.filter(r => r.status === 'pending').length} Pending
+          </span>
+          {liveRequests.filter(r => r.status === 'accepted').length > 0 && (
+            <span style={{ background: 'rgba(255,185,95,0.1)', color: '#ffb95f', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              {liveRequests.filter(r => r.status === 'accepted').length} Awaiting Slot
+            </span>
+          )}
         </div>
+
         {liveRequests.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#c7c4d8' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }}>task_alt</span>
@@ -385,31 +620,60 @@ export default function AlumniDashboard() {
             <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 6 }}>New requests from students will appear here</p>
           </div>
         )}
+
         {liveRequests.map(r => (
-          <div key={r.id} style={{ background: '#171f33', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(70,69,85,0.2)' }}>
-            <div style={{ display: 'flex', gap: '1.5rem' }}>
-              <div style={{ width: 64, height: 64, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{r.studentName}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{r.topic}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setAcceptingRequest(r)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Accept & Schedule</button>
-                    <button onClick={() => handleDeclineRequest(r.id)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Decline</button>
-                  </div>
+          <div key={r.id} style={{ background: '#171f33', borderRadius: 16, padding: '1.25rem 1.5rem', border: `1px solid ${r.status === 'accepted' ? 'rgba(255,185,95,0.2)' : 'rgba(70,69,85,0.2)'}`, cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = r.status === 'accepted' ? 'rgba(255,185,95,0.4)' : 'rgba(195,192,255,0.2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = r.status === 'accepted' ? 'rgba(255,185,95,0.2)' : 'rgba(70,69,85,0.2)'; }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {/* Avatar */}
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.studentName}</span>
+                  {/* Status badge */}
+                  <span style={{ padding: '0.15rem 0.5rem', borderRadius: 999, fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                    background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : 'rgba(195,192,255,0.1)',
+                    color: r.status === 'accepted' ? '#ffb95f' : '#c3c0ff',
+                  }}>
+                    {r.status === 'accepted' ? '✓ Accepted' : '⏳ Pending'}
+                  </span>
                 </div>
-                {r.message && (
-                  <div style={{ background: 'rgba(45,52,73,0.5)', borderLeft: '2px solid #c3c0ff', borderRadius: 8, padding: '0.75rem 1rem' }}>
-                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Student's Message</div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(218,226,253,0.8)', fontStyle: 'italic', lineHeight: 1.6 }}>"{r.message}"</p>
-                  </div>
-                )}
-                <div style={{ marginTop: 8, fontSize: '0.65rem', color: 'rgba(199,196,216,0.5)' }}>
-                  Sent {new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
+                <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
+                {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `• ${r.studentProfile.department}` : ''}</div>}
               </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {r.status === 'pending' && (
+                  <>
+                    <button onClick={() => setViewingRequest(r)} style={{ padding: '0.45rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span> View & Accept
+                    </button>
+                    <button onClick={() => { handleDeclineRequest(r.id); }} style={{ padding: '0.45rem 0.75rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                      Decline
+                    </button>
+                  </>
+                )}
+                {r.status === 'accepted' && (
+                  <button onClick={() => setBookingRequest(r)} style={{ padding: '0.45rem 1rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_month</span> Book Slot
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Message preview */}
+            {r.message && (
+              <div style={{ marginTop: '0.875rem', padding: '0.6rem 0.875rem', background: 'rgba(45,52,73,0.4)', borderLeft: '2px solid rgba(195,192,255,0.3)', borderRadius: 8, fontSize: '0.75rem', color: 'rgba(218,226,253,0.7)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                "{r.message.length > 100 ? r.message.slice(0, 100) + '...' : r.message}"
+              </div>
+            )}
+
+            <div style={{ marginTop: 8, fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)' }}>
+              Sent {new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         ))}
@@ -476,7 +740,7 @@ export default function AlumniDashboard() {
                         <div style={{ fontSize: '0.65rem', color: '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{r.topic}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setAcceptingRequest(r)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Accept</button>
+                        <button onClick={() => setViewingRequest(r)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Accept</button>
                         <button onClick={() => handleDeclineRequest(r.id)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Decline</button>
                       </div>
                     </div>
@@ -533,7 +797,20 @@ export default function AlumniDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
       {showSlotModal && <AddSlotModal onClose={() => setShowSlotModal(false)} onAdd={handleAddSlot} />}
-      {acceptingRequest && <AcceptModal request={acceptingRequest} onClose={() => setAcceptingRequest(null)} onAccepted={handleAccepted} />}
+      {viewingRequest && (
+        <StudentDetailModal
+          request={viewingRequest}
+          onClose={() => setViewingRequest(null)}
+          onAccept={() => handleAccepted(viewingRequest.id)}
+        />
+      )}
+      {bookingRequest && (
+        <BookSlotModal
+          request={bookingRequest}
+          onClose={() => setBookingRequest(null)}
+          onBooked={(scheduledTime) => handleSlotBooked(bookingRequest.id, scheduledTime)}
+        />
+      )}
 
       {/* ── SIDEBAR ── */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>

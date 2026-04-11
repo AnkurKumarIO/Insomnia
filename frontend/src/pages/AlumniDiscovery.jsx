@@ -114,7 +114,28 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
   const [sent, setSent] = useState(false);
 
   const handleSend = () => {
-    sendRequest({ studentName, studentId: studentName, alumniName: alumni.name, alumniRole: `${alumni.title} • ${alumni.company}`, topic, message });
+    // Attach student profile from localStorage if available
+    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    sendRequest({
+      studentName,
+      studentId: studentName,
+      alumniName: alumni.name,
+      alumniRole: `${alumni.title} • ${alumni.company}`,
+      topic,
+      message,
+      studentProfile: {
+        name: profile.name || studentName,
+        college: profile.college || '',
+        department: profile.department || '',
+        year: profile.year || '',
+        cgpa: profile.cgpa || '',
+        linkedin: profile.linkedin || '',
+        github: profile.github || '',
+        resumeName: profile.resumeName || '',
+        skills: profile.skills || [],
+        bio: profile.bio || '',
+      },
+    });
     setSent(true);
     setTimeout(() => { onSent(); onClose(); }, 1800);
   };
