@@ -1,6 +1,7 @@
 import React, { useState, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import './index.css';
+import AlumNexLogo from './AlumNexLogo';
 import LandingPage from './pages/LandingPage';
 import StudentAuth from './pages/StudentAuth';
 import StudentRegistration from './pages/StudentRegistration';
@@ -72,8 +73,9 @@ function PublicNavbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/" className="navbar-brand">
-        🎓 <span>AlumniConnect</span> AI
+      <Link to="/" className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+        <AlumNexLogo size={28} />
+        <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></span>
       </Link>
       <div className="navbar-links">
         <Link to="/login">Sign In</Link>

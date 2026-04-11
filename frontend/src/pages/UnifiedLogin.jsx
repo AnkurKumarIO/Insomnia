@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import AlumNexLogo from '../AlumNexLogo';
 
 // ── Hardcoded credential store (simulates what would be emailed after TNP approval) ──
 // Format: { username, password, role, name, department, email }
@@ -105,10 +106,11 @@ export default function UnifiedLogin() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 30, fontVariationSettings: "'FILL' 1" }}>school</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: '0.75rem' }}>
+            <AlumNexLogo size={40} />
+            <span style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></span>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 6 }}>AlumniConnect AI</h1>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 6 }}>AlumNex</h1>
           <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Sign in with your credentials</p>
         </div>
 

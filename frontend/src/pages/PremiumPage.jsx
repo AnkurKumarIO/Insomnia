@@ -35,7 +35,7 @@ export default function PremiumPage() {
       <div style={{ textAlign: 'center', padding: '1rem 0' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.3rem 1rem', background: 'rgba(195,192,255,0.08)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 999, marginBottom: '1.5rem' }}>
           <span className="material-symbols-outlined" style={{ color: '#c3c0ff', fontSize: 14, fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
-          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.15em' }}>AlumniConnect Premium</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.15em' }}>AlumNex Premium</span>
         </div>
         <h1 style={{ fontSize: 'clamp(1.75rem,4vw,3rem)', fontWeight: 900, letterSpacing: '-0.04em', marginBottom: '1rem', lineHeight: 1.1 }}>
           Unlock Your Full{' '}

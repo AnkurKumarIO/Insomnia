@@ -1,22 +1,31 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+import AlumNexLogo from '../AlumNexLogo';
+
 export default function LandingPage() {
   return (
     <div style={{ background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif', minHeight: '100vh' }}>
       {/* Hero */}
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '8rem 2rem 6rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <section style={{ textAlign: 'center', marginBottom: '5rem', maxWidth: 900 }}>
-          <span style={{ display: 'inline-block', padding: '0.4rem 1rem', marginBottom: '1.5rem', borderRadius: 999, background: '#222a3d', border: '1px solid rgba(70,69,85,0.3)', color: '#c3c0ff', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>
-            Powered by Advanced Intelligence
-          </span>
+          {/* Logo + Name */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: '2rem' }}>
+            <AlumNexLogo size={52} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: '#fff' }}>
+                Alum<span style={{ color: '#60a5fa' }}>NEX</span>
+              </div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#c7c4d8', marginTop: 2 }}>Intelligence Platform</div>
+            </div>
+          </div>
           <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4.5rem)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 0.95, marginBottom: '2rem', textShadow: '0 0 20px rgba(195,192,255,0.3)' }}>
             The Intelligence Bridge Between{' '}
             <span style={{ color: '#c3c0ff' }}>Campus</span> and{' '}
             <span style={{ color: '#4edea3' }}>Career</span>
           </h1>
           <p style={{ fontSize: '1.1rem', color: '#c7c4d8', lineHeight: 1.7, maxWidth: 640, margin: '0 auto', opacity: 0.85 }}>
-            Unlock the collective power of your alumni ecosystem. A unified portal designed to synchronize students, alumni, and administrators through data-driven career pathways.
+            AlumNex connects students, alumni, and administrators through AI-powered career pathways, mock interviews, and mentorship.
           </p>
         </section>
 
@@ -124,7 +133,14 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer style={{ padding: '3rem 2rem', borderTop: '1px solid rgba(70,69,85,0.2)', background: '#0b1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumniConnect AI. The Digital Curator.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlumNexLogo size={22} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#dae2fd' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></span>
+          </div>
+          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNex. The Intelligence Platform.</p>
+          <p style={{ fontSize: '0.65rem', color: '#c7c4d8', opacity: 0.6 }}>Developed by <strong style={{ color: '#c3c0ff', opacity: 1 }}>The Tesseract</strong></p>
+        </div>
         <div style={{ display: 'flex', gap: '2rem' }}>
           {['Privacy','Terms','API','Contact'].map(l => (
             <a key={l} href="#" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', textDecoration: 'none' }}>{l}</a>

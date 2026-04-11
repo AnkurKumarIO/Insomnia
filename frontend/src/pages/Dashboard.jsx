@@ -5,6 +5,7 @@ import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
+import AlumNexLogo from '../AlumNexLogo';
 import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
 
 // ── Inline BookModal for Recommended Mentor ───────────────────────────────────
@@ -347,8 +348,13 @@ export default function Dashboard() {
       )}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1rem', zIndex: 50 }}>
         <div style={{ padding: '1.5rem 1rem 1rem' }}>
-          <div style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#c3c0ff' }}>AlumniConnect</div>
-          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#c7c4d8', marginTop: 2 }}>Intelligence Suite</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlumNexLogo size={28} />
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+              <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginTop: 1 }}>Intelligence Suite</div>
+            </div>
+          </div>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {NAV_ITEMS.map(({ icon, label: l, tab }) => {
@@ -367,7 +373,7 @@ export default function Dashboard() {
             <button onClick={() => setActiveTab('premium')} style={{ width: '100%', padding: '0.4rem', background: '#060e20', color: '#c3c0ff', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Upgrade to Pro</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(70,69,85,0.3)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <a href="mailto:support@alumniconnect.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
+            <a href="mailto:support@alumnex.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>help</span> Support
             </a>
             <button onClick={() => { logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -506,7 +512,7 @@ export default function Dashboard() {
         </section>
 
         <footer style={{ marginTop: 'auto', padding: '3rem 2rem', borderTop: '1px solid rgba(70,69,85,0.2)', background: '#0b1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumniConnect AI. The Digital Curator.</p>
+          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNex. The Intelligence Platform.</p>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             {['Privacy','Terms','API','Contact'].map(l => <a key={l} href="#" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', textDecoration: 'none' }}>{l}</a>)}
           </div>

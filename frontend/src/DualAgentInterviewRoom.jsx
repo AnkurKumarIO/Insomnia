@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './App';
+import AlumNexLogo from './AlumNexLogo';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
@@ -461,7 +462,7 @@ export default function DualAgentInterviewRoom() {
       {/* Top bar */}
       <nav style={{ height: 64, background: 'rgba(11,19,38,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem', flexShrink: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <span style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#c3c0ff' }}>AlumniConnect AI</span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#c3c0ff' }}>AlumNex</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#222a3d', padding: '0.3rem 0.75rem', borderRadius: 999, border: '1px solid rgba(70,69,85,0.3)' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: isConnected ? '#4edea3' : '#ffb4ab', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
             <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isConnected ? '#4edea3' : '#ffb4ab' }}>

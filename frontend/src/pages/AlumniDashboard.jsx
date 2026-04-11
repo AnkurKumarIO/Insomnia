@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import SettingsPage from './SettingsPage';
 
@@ -948,13 +949,11 @@ export default function AlumniDashboard() {
 
       {/* ── SIDEBAR ── */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 20, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+          <AlumNexLogo size={32} />
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#c3c0ff', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>Alumni Portal</div>
-            <div style={{ fontSize: '0.6rem', color: '#c7c4d8', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>The Digital Curator</div>
+            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff', letterSpacing: '-0.02em' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+            <div style={{ fontSize: '0.55rem', color: '#c7c4d8', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>Alumni Portal</div>
           </div>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
