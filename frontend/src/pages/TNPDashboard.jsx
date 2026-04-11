@@ -60,18 +60,18 @@ export default function TNPDashboard() {
           });
         }
       } catch {}
-      // Approved accounts that were recently created (alumni/student)
+      // Pending alumni applications (awaiting TNP approval)
       try {
-        const approved = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
-        approved.slice(-5).forEach(acc => {
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        pendingAlumni.forEach(acc => {
           notifs.push({
-            id: `approved-${acc.username}`,
-            type: acc.role === 'ALUMNI' ? 'alumni_register' : 'student_register',
-            title: acc.role === 'ALUMNI' ? 'Alumni Applied for Verification' : 'Student Account Created',
-            desc: `${acc.name} (${acc.role}) — ${acc.email}`,
-            time: new Date().toISOString(),
-            icon: acc.role === 'ALUMNI' ? 'psychology' : 'school',
-            color: acc.role === 'ALUMNI' ? '#4edea3' : '#c3c0ff',
+            id: `pending-alumni-${acc.id || acc.email}`,
+            type: 'alumni_register',
+            title: 'Alumni Approval Request',
+            desc: `${acc.name} (${acc.department || 'Alumni'}) applied for mentor verification`,
+            time: acc.createdAt || new Date().toISOString(),
+            icon: 'psychology',
+            color: '#4edea3',
           });
         });
       } catch {}

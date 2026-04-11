@@ -58,6 +58,23 @@ export default function AlumniLogin() {
         localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
       }
 
+      // Notify TNP: add to pending alumni list so bell shows notification
+      try {
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        const alreadyExists = pendingAlumni.find(a => a.email === email);
+        if (!alreadyExists) {
+          pendingAlumni.push({
+            id: dbUser.id,
+            name: dbUser.name,
+            email,
+            department: department || 'General',
+            role: 'ALUMNI',
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem('alumniconnect_pending_alumni', JSON.stringify(pendingAlumni));
+        }
+      } catch {}
+
       setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err) {
       console.error('Alumni login error:', err);
