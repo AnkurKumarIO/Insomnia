@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { getRequests, acceptRequest, declineRequest, formatScheduledTime } from '../interviewRequests';
@@ -137,6 +137,23 @@ export default function AlumniDashboard() {
   const [acceptingRequest, setAcceptingRequest] = useState(null);
   const [liveRequests, setLiveRequests] = useState([]);
 
+  // Profile dropdown
+  const [showProfile, setShowProfile] = useState(false);
+  const [editProfile, setEditProfile] = useState(false);
+  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+  const [profileForm, setProfileForm] = useState({
+    username: savedProfile.username || user?.name || '',
+    email:    savedProfile.email    || '',
+    domain:   savedProfile.domain   || savedProfile.department || '',
+    experience: savedProfile.experience || '',
+  });
+
+  // Notifications panel
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [seenNotifIds, setSeenNotifIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('alumni_seen_notifs') || '[]'); } catch { return []; }
+  });
+
   if (!user) return <Navigate to="/" replace />;
   const firstName = user.name ? user.name.split(' ')[0] : 'Alumni';
 
@@ -147,10 +164,38 @@ export default function AlumniDashboard() {
       setLiveRequests(all.filter(r => r.alumniName === user.name && r.status === 'pending'));
     };
     load();
-    // Poll every 3s so new requests appear without refresh
     const interval = setInterval(load, 3000);
     return () => clearInterval(interval);
   }, [user.name]);
+
+  // Build notifications list: new requests + meetings in 24h
+  const allScheduled = [...SCHEDULE, ...extraSlots];
+  const now = Date.now();
+  const upcomingMeetings = allScheduled.filter(s => {
+    if (!s.scheduledTime) return false;
+    const t = new Date(s.scheduledTime).getTime();
+    return t > now && t - now <= 24 * 60 * 60 * 1000;
+  });
+  const notifications = [
+    ...liveRequests.map(r => ({ id: r.id, type: 'request', title: 'New Interview Request', desc: `${r.studentName} wants to book a ${r.topic}`, time: r.createdAt })),
+    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} — ${s.when}`, time: s.scheduledTime })),
+  ];
+  const unreadCount = notifications.filter(n => !seenNotifIds.includes(n.id)).length;
+
+  const openNotifs = () => {
+    setShowNotifs(v => !v);
+    setShowProfile(false);
+    // Mark all as seen
+    const ids = notifications.map(n => n.id);
+    setSeenNotifIds(ids);
+    localStorage.setItem('alumni_seen_notifs', JSON.stringify(ids));
+  };
+
+  const saveProfileForm = () => {
+    const updated = { ...savedProfile, ...profileForm };
+    localStorage.setItem('alumniconnect_profile', JSON.stringify(updated));
+    setEditProfile(false);
+  };
 
   const handleAddSlot = ({ date, time, duration }) => {
     const label = `${date} • ${time}`;
@@ -489,6 +534,8 @@ export default function AlumniDashboard() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
       {showSlotModal && <AddSlotModal onClose={() => setShowSlotModal(false)} onAdd={handleAddSlot} />}
       {acceptingRequest && <AcceptModal request={acceptingRequest} onClose={() => setAcceptingRequest(null)} onAccepted={handleAccepted} />}
+
+      {/* ── SIDEBAR ── */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem' }}>
           <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -509,41 +556,174 @@ export default function AlumniDashboard() {
             );
           })}
         </nav>
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Link to="/interview/demo-room" style={{ display: 'block', width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: 'white', borderRadius: 12, textAlign: 'center', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none' }}>
-            New Mentorship
-          </Link>
+        {/* Only Sign Out at bottom — no "New Mentorship" button */}
+        <div style={{ marginTop: 'auto' }}>
           <button onClick={() => { logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
           </button>
         </div>
       </aside>
 
+      {/* ── MAIN ── */}
       <main style={{ marginLeft: 256, flex: 1 }}>
         <header style={{ position: 'fixed', top: 0, left: 256, right: 0, height: 64, zIndex: 40, background: 'rgba(11,19,38,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#131b2e', padding: '0.4rem 1rem', borderRadius: 999, width: 320 }}>
+          {/* Search bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#131b2e', padding: '0.4rem 1rem', borderRadius: 999, width: 300 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c7c4d8' }}>search</span>
             <input placeholder="Search candidates or sessions..." style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }} />
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>notifications</span>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>mail</span>
-            <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c3c0ff' }}>{user.name || 'Alumni'}</div>
-              <div style={{ fontSize: '0.6rem', color: '#c7c4d8' }}>SENIOR MENTOR</div>
+
+            {/* ── NOTIFICATIONS ── */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={openNotifs} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: showNotifs ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifs ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
+                {/* Red dot for unread */}
+                {unreadCount > 0 && (
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
+                )}
+              </button>
+
+              {showNotifs && (
+                <>
+                  <div onClick={() => setShowNotifs(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, width: 340, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Notifications</span>
+                      <span style={{ fontSize: '0.65rem', color: '#c7c4d8' }}>{notifications.length} total</span>
+                    </div>
+                    <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
+                          <p style={{ fontSize: '0.875rem' }}>All caught up!</p>
+                        </div>
+                      ) : notifications.map((n, i) => (
+                        <div key={n.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: i === 0 ? 'rgba(195,192,255,0.03)' : 'transparent' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'request' ? 'rgba(195,192,255,0.12)' : 'rgba(78,222,163,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'request' ? '#c3c0ff' : '#4edea3', fontVariationSettings: "'FILL' 1" }}>
+                              {n.type === 'request' ? 'person_add' : 'event'}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: 3 }}>{n.title}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.4 }}>{n.desc}</div>
+                            <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
+                              {new Date(n.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          {n.type === 'request' && (
+                            <button onClick={() => { setShowNotifs(false); setActiveTab('requests'); }} style={{ padding: '0.25rem 0.6rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', border: 'none', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>View</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1d00a5', fontSize: '0.85rem' }}>{firstName[0]}</div>
+
+            <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
+
+            {/* ── PROFILE BUTTON ── */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => { setShowProfile(p => !p); setShowNotifs(false); }} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c3c0ff' }}>{user.name || 'Alumni'}</div>
+                  <div style={{ fontSize: '0.6rem', color: '#c7c4d8' }}>SENIOR MENTOR</div>
+                </div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1d00a5', fontSize: '0.85rem', border: showProfile ? '2px solid #c3c0ff' : '2px solid transparent', transition: 'border 0.2s' }}>{firstName[0]}</div>
+              </button>
+
+              {/* Profile dropdown */}
+              {showProfile && (
+                <>
+                  <div onClick={() => setShowProfile(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 48, right: 0, width: 300, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+
+                    {!editProfile ? (
+                      <>
+                        {/* Profile view */}
+                        <div style={{ padding: '1.25rem', background: 'linear-gradient(135deg,rgba(79,70,229,0.2),rgba(11,19,38,0.8))', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.1rem', color: '#1d00a5', flexShrink: 0 }}>{firstName[0]}</div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#dae2fd' }}>{user.name || 'Alumni'}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#c7c4d8', marginTop: 2 }}>{savedProfile.domain || savedProfile.department || 'Senior Mentor'}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ padding: '0.75rem 1rem' }}>
+                          {[
+                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || '—' },
+                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || '—' },
+                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || '—' },
+                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || '—' },
+                          ].map(item => (
+                            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.45rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#c3c0ff' }}>{item.icon}</span>
+                              <span style={{ fontSize: '0.7rem', color: '#c7c4d8', flex: 1 }}>{item.label}</span>
+                              <span style={{ fontSize: '0.7rem', color: '#dae2fd', fontWeight: 600, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(70,69,85,0.15)', display: 'flex', gap: 8 }}>
+                          <button onClick={() => setEditProfile(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                            Edit Profile
+                          </button>
+                          <button onClick={() => { setShowProfile(false); logout(); navigate('/'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                            Sign Out
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Edit profile form */}
+                        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button onClick={() => setEditProfile(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 0, display: 'flex' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
+                          </button>
+                          <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Edit Profile</span>
+                        </div>
+                        <div style={{ padding: '1rem' }}>
+                          {[
+                            { key: 'username',   label: 'Username',   icon: 'alternate_email', placeholder: 'your.username' },
+                            { key: 'email',      label: 'Email',      icon: 'mail',            placeholder: 'you@company.com' },
+                            { key: 'domain',     label: 'Domain',     icon: 'work',            placeholder: 'e.g. Software Engineering' },
+                            { key: 'experience', label: 'Experience', icon: 'history_edu',     placeholder: 'e.g. 8 years at Google' },
+                          ].map(field => (
+                            <div key={field.key} style={{ marginBottom: '0.875rem' }}>
+                              <label style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#c3c0ff' }}>{field.icon}</span>
+                                {field.label}
+                              </label>
+                              <input
+                                value={profileForm[field.key]}
+                                onChange={e => setProfileForm(f => ({ ...f, [field.key]: e.target.value }))}
+                                placeholder={field.placeholder}
+                                style={{ width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 8, padding: '0.55rem 0.75rem', color: '#dae2fd', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                          ))}
+                          <button onClick={saveProfileForm} style={{ width: '100%', padding: '0.65rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                            Save Changes
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
+
         <section style={{ marginTop: 64, padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
           {renderContent()}
         </section>
       </main>
-
-      <Link to="/interview/demo-room" style={{ position: 'fixed', bottom: 40, right: 40, width: 56, height: 56, background: 'linear-gradient(135deg,#4f46e5,#6366f1)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(79,70,229,0.4)', zIndex: 50, textDecoration: 'none' }}>
-        <span className="material-symbols-outlined" style={{ color: 'white', fontSize: 24, fontVariationSettings: "'FILL' 1" }}>add</span>
-      </Link>
+      {/* FAB removed */}
     </div>
   );
 }
