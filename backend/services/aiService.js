@@ -1,172 +1,175 @@
-/**
- * Agent 1: The AI Resume Analyzer (Pre-Interview)
- * Mock logic representing Gemini processing a parsed PDF resume.
- * @param {string} resumeText 
- */
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const apiKey = process.env.GEMINI_API_KEY;
+const genAI  = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+
+// Shared helper — call Gemini and parse JSON from the response
+async function callGemini(prompt, fallback) {
+  if (!genAI) {
+    console.warn('[Gemini] API key not set — using fallback');
+    return fallback;
+  }
+  try {
+    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text   = result.response.text().trim();
+
+    // Strip markdown code fences if present
+    const clean = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+    return JSON.parse(clean);
+  } catch (err) {
+    console.error('[Gemini] Error:', err.message);
+    return fallback;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent 1: Resume Analyzer
+// ─────────────────────────────────────────────────────────────────────────────
 const analyzeResume = async (resumeText) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        score: Math.floor(Math.random() * 30 + 70), // Mock score 70-100
-        target_companies: ["Google", "Microsoft", "Stripe", "Attlasian"],
-        formatting_fixes: [
-          "Use bullet points for experience instead of paragraphs.",
-          "Highlight 'React' and 'Node.js' in a dedicated skills section."
-        ]
-      });
-    }, 1200);
-  });
+  const prompt = `
+You are an expert technical recruiter and career coach. Analyze the following resume text and return a JSON object with exactly these fields:
+
+{
+  "score": <integer 0-100 representing overall resume quality>,
+  "target_companies": [<array of 4-5 company names that match the candidate's profile>],
+  "formatting_fixes": [<array of 3-5 specific, actionable improvements>],
+  "strengths": [<array of 2-3 key strengths found in the resume>],
+  "summary": "<one sentence summary of the candidate's profile>"
+}
+
+Resume text:
+"""
+${resumeText}
+"""
+
+Return ONLY valid JSON, no markdown, no explanation.`;
+
+  const fallback = {
+    score: 72,
+    target_companies: ['Google', 'Microsoft', 'Stripe', 'Atlassian', 'Razorpay'],
+    formatting_fixes: [
+      'Use bullet points for experience instead of paragraphs.',
+      "Add a dedicated Skills section highlighting your top technologies.",
+      'Quantify your achievements with metrics (e.g. reduced load time by 40%).',
+    ],
+    strengths: ['Strong technical foundation', 'Relevant project experience'],
+    summary: 'A motivated developer with hands-on experience in modern web technologies.',
+  };
+
+  return callGemini(prompt, fallback);
 };
 
-/**
- * Agent 2: The Socratic Whisperer (Live Alumni AI)
- * Context-aware hint engine — analyses transcript and returns targeted coaching.
- * @param {string} transcriptChunk 
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent 2: Socratic Whisperer (live interview coaching hints)
+// ─────────────────────────────────────────────────────────────────────────────
 const generateSocraticHint = async (transcriptChunk) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const text = transcriptChunk.toLowerCase();
+  const prompt = `
+You are an expert technical interview coach assisting an alumni mentor in real-time during a mock interview.
 
-      // Topic → hint map (ordered by specificity)
-      const rules = [
-        // Frontend
-        { keys: ['react', 'jsx', 'component', 'hook', 'useeffect', 'usestate'],
-          hints: [
-            "Ask how they handle state management at scale — Redux vs Zustand vs Context?",
-            "Probe their understanding of React's reconciliation algorithm and virtual DOM diffing.",
-            "Ask about their experience with React Server Components or concurrent features.",
-          ]
-        },
-        { keys: ['css', 'tailwind', 'styled', 'animation', 'responsive'],
-          hints: [
-            "Ask how they approach design systems and component reusability across teams.",
-            "Probe their understanding of CSS specificity, cascade, and performance implications.",
-          ]
-        },
-        // Backend
-        { keys: ['node', 'express', 'api', 'rest', 'graphql', 'endpoint'],
-          hints: [
-            "Ask how they handle API versioning and backward compatibility in production.",
-            "Probe their approach to rate limiting, authentication middleware, and error handling.",
-            "Ask about their experience designing idempotent APIs.",
-          ]
-        },
-        { keys: ['database', 'sql', 'postgres', 'mysql', 'query', 'index', 'schema'],
-          hints: [
-            "Ask about their experience with query optimization — EXPLAIN plans, index strategies.",
-            "Probe their understanding of ACID properties and when to use NoSQL vs relational.",
-            "Ask how they handle database migrations in a zero-downtime deployment.",
-          ]
-        },
-        { keys: ['redis', 'cache', 'caching', 'memcache'],
-          hints: [
-            "Ask how they decide what to cache and how they handle cache invalidation.",
-            "Probe their understanding of cache stampede and how to prevent it.",
-          ]
-        },
-        // System design
-        { keys: ['scale', 'scalab', 'microservice', 'distributed', 'load balanc', 'kubernetes', 'docker'],
-          hints: [
-            "Ask how they'd design a system to handle 10x traffic overnight — what breaks first?",
-            "Probe their understanding of CAP theorem and how it influenced their design decisions.",
-            "Ask about their experience with service discovery and inter-service communication.",
-          ]
-        },
-        { keys: ['kafka', 'queue', 'message', 'event', 'pubsub', 'rabbitmq'],
-          hints: [
-            "Ask how they handle message ordering guarantees and exactly-once delivery.",
-            "Probe their experience with dead-letter queues and retry strategies.",
-          ]
-        },
-        // AI/ML
-        { keys: ['machine learning', 'ml', 'model', 'llm', 'gpt', 'ai', 'neural', 'training'],
-          hints: [
-            "Ask how they evaluate model performance beyond accuracy — precision, recall, F1?",
-            "Probe their understanding of model drift and how they monitor production ML systems.",
-            "Ask about their experience with prompt engineering and LLM token efficiency.",
-          ]
-        },
-        // Soft skills / leadership
-        { keys: ['team', 'lead', 'manage', 'conflict', 'disagree', 'mentor'],
-          hints: [
-            "Ask for a specific example where they had to influence without authority.",
-            "Probe how they give constructive feedback to peers — ask for a real scenario.",
-            "Ask how they prioritize when everything is urgent and stakeholders disagree.",
-          ]
-        },
-        { keys: ['fail', 'mistake', 'wrong', 'bug', 'error', 'incident', 'outage'],
-          hints: [
-            "Probe deeper — ask what they'd do differently and what systemic change they made.",
-            "Ask how they communicated the incident to stakeholders and what the post-mortem looked like.",
-          ]
-        },
-        { keys: ['project', 'built', 'shipped', 'launched', 'delivered'],
-          hints: [
-            "Ask about the biggest technical challenge they faced and how they unblocked it.",
-            "Probe the impact — ask for specific metrics: users, revenue, latency improvement.",
-            "Ask what they'd redesign if they started the project today.",
-          ]
-        },
-        // Security
-        { keys: ['security', 'auth', 'oauth', 'jwt', 'xss', 'csrf', 'injection'],
-          hints: [
-            "Ask how they stay current with security vulnerabilities in their stack.",
-            "Probe their understanding of the OWASP Top 10 and which they've encountered.",
-          ]
-        },
-      ];
+The student just said:
+"""
+${transcriptChunk}
+"""
 
-      // Find matching rule
-      for (const rule of rules) {
-        if (rule.keys.some(k => text.includes(k))) {
-          const hint = rule.hints[Math.floor(Math.random() * rule.hints.length)];
-          return resolve({ hint });
-        }
-      }
+Generate ONE sharp, Socratic follow-up question or coaching hint the alumni should ask next to probe deeper. 
+The hint should be specific to what the student said, not generic.
 
-      // Generic fallbacks
-      const fallbacks = [
-        "Ask them to walk you through the most complex system they've ever built end-to-end.",
-        "Probe their decision-making process — ask 'why this approach over alternatives?'",
-        "Ask about a time they had to learn something completely new under time pressure.",
-        "Ask what they're currently learning and why they chose that topic.",
-        "Probe their understanding of trade-offs — ask 'what would you sacrifice for speed?'",
-      ];
-      resolve({ hint: fallbacks[Math.floor(Math.random() * fallbacks.length)] });
-    }, 600);
-  });
+Return ONLY a JSON object:
+{ "hint": "<your coaching hint here>" }
+
+No markdown, no explanation, just JSON.`;
+
+  const fallback = {
+    hint: "Ask them to walk you through the most complex system they've ever built end-to-end.",
+  };
+
+  return callGemini(prompt, fallback);
 };
 
-/**
- * Agent 3: The Post-Interview Analytics Generator
- * Aggregates live coach metrics and full interview transcripts for insights.
- * @param {Array} metricsArray 
- * @param {string} fullTranscript 
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent 3: Post-Interview Analytics Generator
+// ─────────────────────────────────────────────────────────────────────────────
 const generatePostInterviewAnalytics = async (metricsArray, fullTranscript) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        overall_confidence: "82%",
-        communication_clarity: "High",
-        technical_depth: "Moderate",
-        actionable_insights: [
-          "Work on reducing filler words like 'um' and 'like'.",
-          "You explained React well, but stumbled on Node.js middleware concepts. Review Express.js routing.",
-          "Maintained good eye contact throughout the technical explanation."
-        ],
-        suggested_readings: [
-          "https://react.dev/learn",
-          "https://nodejs.org/en/docs/"
-        ]
-      });
-    }, 2000);
-  });
+  const metricsText = metricsArray.length > 0
+    ? `Live metrics recorded during the interview: ${JSON.stringify(metricsArray)}`
+    : 'No live metrics recorded.';
+
+  const transcriptText = fullTranscript
+    ? `Full interview transcript:\n"""\n${fullTranscript}\n"""`
+    : 'No transcript available.';
+
+  const prompt = `
+You are an expert interview performance analyst. Analyze the following mock interview data and return a detailed JSON report.
+
+${metricsText}
+
+${transcriptText}
+
+Return a JSON object with exactly these fields:
+{
+  "overall_confidence": "<percentage like '78%' or qualitative like 'High/Moderate/Low'>",
+  "communication_clarity": "<High / Moderate / Low>",
+  "technical_depth": "<High / Moderate / Low>",
+  "actionable_insights": [<array of 3-5 specific, personalized improvement tips based on the transcript>],
+  "suggested_readings": [<array of 2-3 relevant URLs or resource titles>],
+  "score": <integer 0-100 overall performance score>
+}
+
+Return ONLY valid JSON, no markdown, no explanation.`;
+
+  const fallback = {
+    overall_confidence: '75%',
+    communication_clarity: 'Moderate',
+    technical_depth: 'Moderate',
+    actionable_insights: [
+      "Structure answers using the STAR method for behavioral questions.",
+      "Reduce filler words — pause instead of saying 'um' or 'like'.",
+      "Quantify your impact when describing past projects.",
+    ],
+    suggested_readings: [
+      'https://www.techinterviewhandbook.org',
+      'https://leetcode.com/explore/',
+    ],
+    score: 75,
+  };
+
+  return callGemini(prompt, fallback);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent 4: AI Profile Strength Analyzer
+// ─────────────────────────────────────────────────────────────────────────────
+const analyzeProfileStrength = async (profileData) => {
+  const prompt = `
+You are a career coach reviewing a student's profile for job readiness.
+
+Profile:
+${JSON.stringify(profileData, null, 2)}
+
+Return a JSON object:
+{
+  "score": <integer 0-100>,
+  "label": "<Starter / Growing / Strong / Expert>",
+  "missing": [<array of 2-3 specific things they should add to improve their profile>],
+  "top_skills": [<array of their top 3 skills from the profile>]
+}
+
+Return ONLY valid JSON, no markdown.`;
+
+  const fallback = {
+    score: 60,
+    label: 'Growing',
+    missing: ['Add a GitHub link', 'Upload your resume', 'Add target companies'],
+    top_skills: [],
+  };
+
+  return callGemini(prompt, fallback);
 };
 
 module.exports = {
   analyzeResume,
   generateSocraticHint,
-  generatePostInterviewAnalytics
+  generatePostInterviewAnalytics,
+  analyzeProfileStrength,
 };

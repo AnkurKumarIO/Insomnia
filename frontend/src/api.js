@@ -162,6 +162,15 @@ export const api = {
     () => MOCK_API.interviewAnalytics(data)
   ),
 
+  profileStrength: (profileData) => callOrMock(
+    () => fetch(`${API_BASE}/ai/profile-strength`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileData }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(600); return { score: 60, label: 'Growing', missing: ['Add GitHub link', 'Upload resume'], top_skills: [] }; }
+  ),
+
   // ── Interview Requests ──────────────────────────────────────
 
   getRequests: (params = {}) => callOrMock(

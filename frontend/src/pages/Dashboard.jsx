@@ -128,6 +128,7 @@ export default function Dashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [recommendedMentor, setRecommendedMentor] = useState(null);
   const [profileData, setProfileData] = useState({});
+  const [aiProfileStrength, setAiProfileStrength] = useState(null);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -178,10 +179,11 @@ export default function Dashboard() {
 
     if (user?.id) {
       api.getUser(user.id).then(u => {
-        if (u?.profile_data) setProfileData(u.profile_data);
-        else {
-          const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
-          setProfileData(saved);
+        const pd = u?.profile_data || JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        setProfileData(pd);
+        // Ask Gemini to evaluate profile strength
+        if (Object.keys(pd).length > 0) {
+          api.profileStrength(pd).then(r => { if (r && !r.error) setAiProfileStrength(r); }).catch(() => {});
         }
       }).catch(() => {
         const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
@@ -195,26 +197,28 @@ export default function Dashboard() {
 
   const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
 
-  // Derive real profile data
-  const skills = (profileData.skills || []).slice(0, 3);
+  // Profile completion — use Gemini result if available, else calculate locally
+  const profileCompletion = aiProfileStrength?.score ?? (() => {
+    const checks = [
+      !!profileData.bio, !!profileData.linkedin, !!profileData.github,
+      !!profileData.department, (profileData.skills?.length > 0),
+      !!profileData.cgpa, !!profileData.resumeName,
+      (profileData.projects?.some(p => p.title)),
+      (profileData.targetRoles?.length > 0),
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  })();
+  const completionLabel = aiProfileStrength?.label ?? (profileCompletion >= 80 ? 'Expert' : profileCompletion >= 50 ? 'Growing' : 'Starter');
+  const skills = aiProfileStrength?.top_skills?.length > 0
+    ? aiProfileStrength.top_skills
+    : (profileData.skills || []).slice(0, 3);
+
   const SKILL_COLORS = ['#c3c0ff', '#4edea3', '#ffb95f'];
-  const myRequests = getRequestsByStudent(user?.name || '');
-  const pendingCount  = myRequests.filter(r => r.status === 'pending').length;
+  const myRequests     = getRequestsByStudent(user?.name || '');
+  const pendingCount   = myRequests.filter(r => r.status === 'pending').length;
   const interviewCount = myRequests.filter(r => r.status === 'slot_booked' || r.status === 'accepted').length;
-
-  // Profile completion %
-  const completionChecks = [
-    !!profileData.bio, !!profileData.linkedin, !!profileData.github,
-    !!profileData.department, (profileData.skills?.length > 0),
-    !!profileData.cgpa, !!profileData.resumeName,
-    (profileData.projects?.some(p => p.title)),
-    (profileData.targetRoles?.length > 0),
-  ];
-  const profileCompletion = Math.round((completionChecks.filter(Boolean).length / completionChecks.length) * 100);
-  const CIRC = 2 * Math.PI * 70;
+  const CIRC   = 2 * Math.PI * 70;
   const offset = CIRC * (1 - profileCompletion / 100);
-  const completionLabel = profileCompletion >= 80 ? 'Expert' : profileCompletion >= 50 ? 'Growing' : 'Starter';
-
   const savedProfile = profileData;
 
   const renderContent = () => {
