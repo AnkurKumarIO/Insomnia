@@ -34,6 +34,7 @@ export default function TNPDashboard() {
   const [credModal, setCredModal] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [queueSearch, setQueueSearch] = useState(''); // PDF-style search for verification queue
   // Settings state
   const [commSettings, setCommSettings] = useState({ emailNotifs: true, smsAlerts: false, weeklyReport: true, instantApproval: false, mentorMatchAlert: true });
   const [roles, setRoles] = useState([
@@ -80,41 +81,78 @@ export default function TNPDashboard() {
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
     { icon: 'rule',            label: 'Verification Queue', tab: 'queue' },
     { icon: 'analytics',       label: 'Analytics',          tab: 'analytics' },
-    { icon: 'policy',          label: 'Compliance & Logs',  tab: 'compliance' },
+    { icon: 'policy',          label: 'Compliance & Log',   tab: 'compliance' },
     { icon: 'settings_suggest',label: 'System Settings',    tab: 'settings' },
   ];
 
   const renderContent = () => {
-    if (activeTab === 'queue') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
-        {QUEUE.map((q, i) => {
-          const st = queueStatus[q.name];
-          return (
-            <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{q.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
-                </div>
+    if (activeTab === 'queue') {
+      const q = queueSearch.toLowerCase().trim();
+      const filteredQueue = q
+        ? QUEUE.filter(item =>
+            item.name.toLowerCase().includes(q) ||
+            item.sub.toLowerCase().includes(q) ||
+            item.status.toLowerCase().includes(q)
+          )
+        : QUEUE;
+
+      const highlight = (text) => {
+        if (!q) return text;
+        const str = String(text);
+        const idx = str.toLowerCase().indexOf(q);
+        if (idx === -1) return str;
+        return (
+          <>
+            {str.slice(0, idx)}
+            <mark style={{ background: 'rgba(195,192,255,0.35)', color: '#dae2fd', borderRadius: 3, padding: '0 2px' }}>{str.slice(idx, idx + q.length)}</mark>
+            {str.slice(idx + q.length)}
+          </>
+        );
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
+            {q && (
+              <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>
+                <span style={{ color: '#c3c0ff', fontWeight: 700 }}>{filteredQueue.length}</span> of {QUEUE.length} results for "<span style={{ color: '#c3c0ff' }}>{queueSearch}</span>"
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
-                </span>
-                {!st && <>
-                  <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                  <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
-                </>}
-              </div>
+            )}
+          </div>
+          {filteredQueue.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16, border: '1px solid rgba(70,69,85,0.15)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, opacity: 0.3, display: 'block', marginBottom: 10 }}>search_off</span>
+              <p style={{ fontWeight: 600 }}>No results for "{queueSearch}"</p>
             </div>
-          );
-        })}
-      </div>
-    );
+          ) : filteredQueue.map((item, i) => {
+            const st = queueStatus[item.name];
+            return (
+              <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : item.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ color: item.color, fontSize: 22 }}>{item.icon}</span>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{highlight(item.name)}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{highlight(item.sub)}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : highlight(item.status)}
+                  </span>
+                  {!st && <>
+                    <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                    <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                  </>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
     if (activeTab === 'analytics') return <AnalyticsTab />;
     if (activeTab === 'compliance') return <ComplianceTab logRole={logRole} setLogRole={setLogRole} logAction={logAction} setLogAction={setLogAction} logDate={logDate} setLogDate={setLogDate} />;
     if (activeTab === 'settings') return <SystemSettingsTab commSettings={commSettings} setCommSettings={setCommSettings} roles={roles} setRoles={setRoles} />;
@@ -193,17 +231,29 @@ export default function TNPDashboard() {
       <main style={{ marginLeft: 256, flex: 1 }}>
         <header style={{ position: 'fixed', top: 0, left: 256, right: 0, height: 64, zIndex: 40, background: 'rgba(11,19,38,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <div style={{ position: 'relative' }}>
-              <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
-              <input placeholder="Search students, alumni, or companies..." style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 320, outline: 'none' }} />
-            </div>
+            {/* Search — only shown on home/queue tabs, searches verification queue */}
+            {(activeTab === 'home' || activeTab === 'queue') && (
+              <div style={{ position: 'relative' }}>
+                <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
+                <input
+                  value={queueSearch}
+                  onChange={e => setQueueSearch(e.target.value)}
+                  placeholder="Search verification queue..."
+                  style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 280, outline: 'none' }}
+                />
+                {queueSearch && (
+                  <button onClick={() => setQueueSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 0, display: 'flex' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                  </button>
+                )}
+              </div>
+            )}
             <nav style={{ display: 'flex', gap: '1.5rem' }}>
               {[
-                { label: 'Overview',   tab: 'home' },
-                { label: 'Compliance', tab: 'compliance' },
-                { label: 'Logs',       tab: 'compliance' },
-              ].map((t, i) => (
-                <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: activeTab === t.tab ? 600 : 400, color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'none' }}>{t.label}</button>
+                { label: 'Overview',         tab: 'home' },
+                { label: 'Compliance & Log', tab: 'compliance' },
+              ].map((t) => (
+                <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: activeTab === t.tab ? 600 : 400, color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', background: 'none', border: 'none', cursor: 'pointer', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t.label}</button>
               ))}
             </nav>
           </div>
@@ -315,34 +365,45 @@ export default function TNPDashboard() {
                   <h3 style={{ fontWeight: 700, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ color: '#c3c0ff' }}>rule</span> Verification Queue
                   </h3>
-                  <a href="#" style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</a>
+                  <button onClick={() => setActiveTab('queue')} style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {QUEUE.map((q, i) => {
-                    const st = queueStatus[q.name];
-                    return (
-                    <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
+                  {(() => {
+                    const sq = queueSearch.toLowerCase().trim();
+                    const filtered = sq ? QUEUE.filter(item => item.name.toLowerCase().includes(sq) || item.sub.toLowerCase().includes(sq) || item.status.toLowerCase().includes(sq)) : QUEUE;
+                    const hl = (text) => {
+                      if (!sq) return text;
+                      const str = String(text);
+                      const idx = str.toLowerCase().indexOf(sq);
+                      if (idx === -1) return str;
+                      return <>{str.slice(0, idx)}<mark style={{ background: 'rgba(195,192,255,0.35)', color: '#dae2fd', borderRadius: 3, padding: '0 2px' }}>{str.slice(idx, idx + sq.length)}</mark>{str.slice(idx + sq.length)}</>;
+                    };
+                    return filtered.map((item, i) => {
+                      const st = queueStatus[item.name];
+                      return (
+                        <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : item.color}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span className="material-symbols-outlined" style={{ color: item.color, fontSize: 22 }}>{item.icon}</span>
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700 }}>{hl(item.name)}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{hl(item.sub)}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : hl(item.status)}
+                            </span>
+                            {!st && <>
+                              <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                              <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                            </>}
+                          </div>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{q.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
-                        </span>
-                        {!st && <>
-                          <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                          <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
-                        </>}
-                      </div>
-                    </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
