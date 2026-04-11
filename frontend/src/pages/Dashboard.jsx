@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
+import PremiumPage from './PremiumPage';
+import SettingsPage from './SettingsPage';
 
 const SKILLS = [
   { label: 'Data Architecture', pct: 92, color: '#c3c0ff' },
@@ -34,8 +36,9 @@ export default function Dashboard() {
   const offset = CIRC * (1 - 0.8);
 
   const renderContent = () => {
-    if (activeTab === 'directory') return <AlumniDiscovery />;
+    if (activeTab === 'directory') return <AlumniDiscovery searchQuery={search} />;
     if (activeTab === 'analytics') return <ProgressAnalytics />;
+    if (activeTab === 'premium') return <PremiumPage />;
     if (activeTab === 'messages') return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>chat_bubble</span>
@@ -43,13 +46,7 @@ export default function Dashboard() {
         <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Real-time chat with alumni mentors</p>
       </div>
     );
-    if (activeTab === 'settings') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>settings</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Settings</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Profile & preferences management</p>
-      </div>
-    );
+    if (activeTab === 'settings') return <SettingsPage />;
     // home
     return (
       <>
@@ -166,9 +163,9 @@ export default function Dashboard() {
                   <span key={t} style={{ padding: '0.2rem 0.6rem', background: 'rgba(78,222,163,0.1)', color: '#4edea3', fontSize: '0.65rem', borderRadius: 999, fontWeight: 500 }}>{t}</span>
                 ))}
               </div>
-              <Link to="/interview/demo-room" style={{ width: '100%', padding: '0.6rem', background: '#222a3d', color: '#dae2fd', fontSize: '0.75rem', fontWeight: 600, borderRadius: 10, textDecoration: 'none', textAlign: 'center', display: 'block' }}>
+              <button onClick={() => setActiveTab('directory')} style={{ width: '100%', padding: '0.6rem', background: '#222a3d', color: '#dae2fd', fontSize: '0.75rem', fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'center', display: 'block' }}>
                 Book Mock Interview
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -197,10 +194,10 @@ export default function Dashboard() {
           <div style={{ background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
             <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#1d00a5', fontWeight: 700, marginBottom: 4 }}>Elite Access</div>
             <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1d00a5', marginBottom: 12, lineHeight: 1.4 }}>Unlock AI Mentorship</div>
-            <button style={{ width: '100%', padding: '0.4rem', background: '#060e20', color: '#c3c0ff', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Upgrade to Pro</button>
+            <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.4rem', background: '#060e20', color: '#c3c0ff', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Upgrade to Pro</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(70,69,85,0.3)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
+            <a href="mailto:support@alumniconnect.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>help</span> Support
             </a>
             <button onClick={() => { logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -213,8 +210,13 @@ export default function Dashboard() {
       <main style={{ marginLeft: 256, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <header style={{ position: 'fixed', top: 0, left: 256, right: 0, height: 64, zIndex: 40, background: 'rgba(11,19,38,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem' }}>
           <nav style={{ display: 'flex', gap: '1.5rem' }}>
-            {['Network','Insights','Mentorship','Events'].map((t, i) => (
-              <a key={t} href="#" style={{ fontSize: '0.875rem', fontWeight: 500, textDecoration: 'none', color: i === 0 ? '#c3c0ff' : '#c7c4d8', borderBottom: i === 0 ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t}</a>
+            {[
+              { label: 'Network',     tab: 'directory' },
+              { label: 'Insights',    tab: 'analytics' },
+              { label: 'Mentorship',  tab: 'premium'   },
+              { label: 'Events',      tab: 'messages'  },
+            ].map((t) => (
+              <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t.label}</button>
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

@@ -26,11 +26,15 @@ module.exports = (io) => {
 
     // Transcript → AI hint → broadcast to ALL in room so both tabs see it
     socket.on('transcript_chunk', async (roomId, textChunk) => {
-      console.log(`[Room ${roomId}] Transcript: ${textChunk}`);
-      const { generateSocraticHint } = require('../services/aiService');
-      const hintData = await generateSocraticHint(textChunk);
-      if (hintData && hintData.hint) {
-        interviewNamespace.to(roomId).emit('whisperer_feed', hintData.hint);
+      try {
+        console.log(`[Room ${roomId}] Transcript: ${textChunk}`);
+        const { generateSocraticHint } = require('../services/aiService');
+        const hintData = await generateSocraticHint(textChunk);
+        if (hintData && hintData.hint) {
+          interviewNamespace.to(roomId).emit('whisperer_feed', hintData.hint);
+        }
+      } catch (err) {
+        console.error('[Whisperer] Error generating hint:', err.message);
       }
     });
   });

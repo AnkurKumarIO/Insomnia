@@ -66,6 +66,7 @@ export default function StudentAuth() {
 
         <div className="auth-footer">
           <p>Upload any file — OCR is mocked. Logs in as <strong>Alice Johnson</strong>.</p>
+          <p style={{ marginTop: 8 }}>New student? <a href="/auth/student/register" style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>Create account</a></p>
         </div>
       </div>
     </div>

@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } f
 import './index.css';
 import LandingPage from './pages/LandingPage';
 import StudentAuth from './pages/StudentAuth';
+import StudentRegistration from './pages/StudentRegistration';
+import StudentLogin from './pages/StudentLogin';
+import ProfileSetup from './pages/ProfileSetup';
 import TNPLogin from './pages/TNPLogin';
 import AlumniLogin from './pages/AlumniLogin';
 import Dashboard from './pages/Dashboard';
@@ -51,6 +54,13 @@ function DashboardRouter() {
   return <Dashboard />;
 }
 
+// Landing page guard — redirect to dashboard if already logged in
+function LandingGuard() {
+  const { user } = useContext(AuthContext);
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <LandingPage />;
+}
+
 // Minimal navbar only shown on public pages (not on full-screen interview room)
 function PublicNavbar() {
   const { user } = useContext(AuthContext);
@@ -79,14 +89,17 @@ function App() {
       <Router>
         <PublicNavbar />
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<LandingGuard />} />
           <Route path="/auth/student" element={<StudentAuth />} />
+          <Route path="/auth/student/register" element={<StudentRegistration />} />
+          <Route path="/auth/student/login" element={<StudentLogin />} />
+          <Route path="/profile-setup" element={<ProfileSetup />} />
           <Route path="/auth/tnp" element={<TNPLogin />} />
           <Route path="/auth/alumni" element={<AlumniLogin />} />
           <Route path="/dashboard" element={<DashboardRouter />} />
           <Route path="/interview/:roomId" element={<InterviewRoom />} />
           <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
