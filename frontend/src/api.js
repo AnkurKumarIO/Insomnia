@@ -231,6 +231,11 @@ export const api = {
     async () => { await mockDelay(300); return null; }
   ),
 
+  getUserByEmail: (email) => callOrMock(
+    () => fetch(`${API_BASE}/users/by-email/${encodeURIComponent(email)}`).then(r => r.json()),
+    async () => { await mockDelay(300); return null; }
+  ),
+
   // ── Student Register ────────────────────────────────────────
 
   studentRegister: (payload) => callOrMock(

@@ -478,12 +478,26 @@ export default function AlumniDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Try fetching from backend using alumni's DB id
-        const alumniId = user.id;
-        if (alumniId) {
+        // Resolve real alumni UUID — user.id might be a mock value like 'alm-001'
+        let alumniId = user.id;
+        const isMockId = !alumniId || alumniId.startsWith('alm-') || alumniId.startsWith('stu-');
+
+        if (isMockId) {
+          // Look up by email from localStorage or by name via alumni list
+          const storedUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+          if (storedUser.id && !storedUser.id.startsWith('alm-')) {
+            alumniId = storedUser.id;
+          } else {
+            // Fetch alumni list and find by name
+            const alumniList = await api.getAlumni().catch(() => []);
+            const match = alumniList.find(a => a.name === user.name);
+            if (match) alumniId = match.id;
+          }
+        }
+
+        if (alumniId && !alumniId.startsWith('alm-')) {
           const data = await api.getRequests({ alumniId });
-          if (Array.isArray(data) && data.length >= 0) {
-            // Map DB shape → local shape and merge into localStorage
+          if (Array.isArray(data)) {
             const mapped = data.map(r => ({
               id:            r.request_id,
               studentName:   r.student_name || r.student?.name || '',
@@ -492,13 +506,13 @@ export default function AlumniDashboard() {
               alumniRole:    '',
               topic:         r.topic,
               message:       r.message || '',
-              status:        (r.status || 'PENDING').toLowerCase().replace('slot_booked','slot_booked'),
+              status:        (r.status || 'PENDING').toLowerCase(),
               scheduledTime: r.scheduled_time || null,
               roomId:        r.room_id || null,
               createdAt:     r.created_at,
               studentProfile: r.student_profile_snapshot || null,
             }));
-            // Merge into localStorage so other functions can read it
+            // Merge into localStorage
             const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
             mapped.forEach(dbReq => {
               const idx = local.findIndex(l => l.id === dbReq.id);
@@ -506,14 +520,16 @@ export default function AlumniDashboard() {
               else local[idx] = { ...local[idx], ...dbReq };
             });
             localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
-            setLiveRequests(mapped.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'slot_booked'));
+            setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
             return;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('AlumniDashboard: failed to load requests from DB', err.message);
+      }
       // Fallback to localStorage
       const all = getRequests();
-      setLiveRequests(all.filter(r => r.alumniName === user.name && (r.status === 'pending' || r.status === 'accepted' || r.status === 'slot_booked')));
+      setLiveRequests(all.filter(r => r.alumniName === user.name && ['pending','accepted','slot_booked'].includes(r.status)));
     };
     load();
     const interval = setInterval(load, 5000);

@@ -59,4 +59,20 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET /users/by-email/:email
+router.get('/by-email/:email', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', decodeURIComponent(req.params.email))
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(404).json({ error: 'User not found' });
+  }
+});
+
 module.exports = router;

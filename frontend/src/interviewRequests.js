@@ -41,30 +41,39 @@ export function markStudentNotifsRead(studentName) {
 // ── Send a request (student → alumni) ────────────────────────────────────────
 
 export async function sendRequest({ studentName, studentId, alumniName, alumniRole, topic, message, studentProfile, alumniId }) {
-  // Try backend first
+  // Get the real student UUID from auth context
+  let realStudentId = studentId;
   try {
-    const user = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
-    const sid  = user.id || studentId;
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    if (authUser.id && !authUser.id.startsWith('stu-') && !authUser.id.startsWith('alm-')) {
+      realStudentId = authUser.id; // real Supabase UUID
+    }
+  } catch {}
 
-    if (sid && alumniId) {
+  // Try backend first — only if we have real UUIDs
+  const hasRealIds = realStudentId && alumniId &&
+    !realStudentId.startsWith('stu-') && !alumniId.startsWith('alm-');
+
+  if (hasRealIds) {
+    try {
       const result = await api.createRequest({
-        studentId: sid,
+        studentId: realStudentId,
         alumniId,
         topic:    topic   || 'Mock Interview',
         message:  message || '',
         studentProfileSnapshot: studentProfile || null,
       });
       if (result && result.request_id) {
-        // Also mirror to localStorage so BookButton can read it instantly
+        // Mirror to localStorage so BookButton reads it instantly
         const local = loadLocal();
         local.push({
           id:            result.request_id,
           studentName,
-          studentId:     sid,
+          studentId:     realStudentId,
           alumniName,
           alumniRole,
           topic:         result.topic,
-          message:       result.message,
+          message:       result.message || '',
           status:        'pending',
           scheduledTime: null,
           roomId:        null,
@@ -74,9 +83,11 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
         saveLocal(local);
         return result;
       }
+    } catch (e) {
+      console.warn('sendRequest: backend failed, falling back to localStorage', e.message);
     }
-  } catch (e) {
-    console.warn('sendRequest: backend unavailable, falling back to localStorage', e.message);
+  } else {
+    console.warn('sendRequest: missing real UUIDs — studentId:', realStudentId, 'alumniId:', alumniId, '— using localStorage only');
   }
 
   // Fallback — localStorage only
@@ -84,7 +95,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
   const req = {
     id:            `req-${Date.now()}`,
     studentName,
-    studentId,
+    studentId:     realStudentId || studentId,
     alumniName,
     alumniRole,
     topic:         topic   || 'Mock Interview',
@@ -98,6 +109,12 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
   local.push(req);
   saveLocal(local);
   return req;
+}
+
+// Normalize DB status (PENDING/ACCEPTED/SLOT_BOOKED/DECLINED) → local (pending/accepted/slot_booked/declined)
+function normalizeStatus(status) {
+  if (!status) return 'pending';
+  return status.toLowerCase().replace('slot_booked', 'slot_booked');
 }
 
 // ── Get all requests (for alumni dashboard) ───────────────────────────────────
