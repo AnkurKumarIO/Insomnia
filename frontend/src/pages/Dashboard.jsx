@@ -175,13 +175,78 @@ export default function Dashboard() {
     if (activeTab === 'directory') return <AlumniDiscovery searchQuery={search} />;
     if (activeTab === 'analytics') return <ProgressAnalytics />;
     if (activeTab === 'premium') return <PremiumPage />;
-    if (activeTab === 'messages') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>chat_bubble</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Messages coming soon</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Real-time chat with alumni mentors</p>
-      </div>
-    );
+    if (activeTab === 'messages') {
+      const allNotifs = studentNotifs;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 4 }}>Messages & Notifications</h2>
+              <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Updates from your interview requests and scheduled sessions</p>
+            </div>
+            {allNotifs.some(n => !n.read) && (
+              <button onClick={() => markStudentNotifsRead(user.name)} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          {allNotifs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16, border: '1px solid rgba(70,69,85,0.15)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 56, opacity: 0.25, display: 'block', marginBottom: 16 }}>notifications_none</span>
+              <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 6 }}>No messages yet</p>
+              <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>Notifications from alumni will appear here once you send interview requests</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {allNotifs.map(n => {
+                const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                const canJoin = n.type === 'slot_booked' && req?.roomId && req?.scheduledTime &&
+                  Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
+                const iconMap = { slot_booked: 'event_available', accepted: 'check_circle', declined: 'cancel', default: 'notifications' };
+                const colorMap = { slot_booked: '#4edea3', accepted: '#c3c0ff', declined: '#ffb4ab', default: '#c7c4d8' };
+                const bgMap = { slot_booked: 'rgba(78,222,163,0.1)', accepted: 'rgba(195,192,255,0.1)', declined: 'rgba(255,180,171,0.1)', default: 'rgba(70,69,85,0.1)' };
+                const type = n.type || 'default';
+                return (
+                  <div key={n.id} style={{ background: !n.read ? '#171f33' : '#131b2e', borderRadius: 14, padding: '1.25rem', border: `1px solid ${!n.read ? 'rgba(195,192,255,0.12)' : 'rgba(70,69,85,0.12)'}`, display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: bgMap[type] || bgMap.default, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: colorMap[type] || colorMap.default, fontVariationSettings: "'FILL' 1" }}>
+                        {iconMap[type] || iconMap.default}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: !n.read ? '#dae2fd' : '#c7c4d8' }}>{n.title}</span>
+                        {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0 }} />}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6, marginBottom: 6 }}>{n.message}</p>
+                      <div style={{ fontSize: '0.65rem', color: 'rgba(199,196,216,0.4)', fontWeight: 600 }}>
+                        {new Date(n.createdAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {/* Join Now button */}
+                      {n.type === 'slot_booked' && req && (
+                        <div style={{ marginTop: 10 }}>
+                          {canJoin ? (
+                            <a href={`/interview/${req.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                            </a>
+                          ) : req.scheduledTime ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
+                              {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
     if (activeTab === 'settings') return <SettingsPage />;
     // home
     return (
@@ -359,9 +424,16 @@ export default function Dashboard() {
               { label: 'Network',     tab: 'directory' },
               { label: 'Insights',    tab: 'analytics' },
               { label: 'Mentorship',  tab: 'premium'   },
-              { label: 'Events',      tab: 'messages'  },
+              { label: 'Messages',    tab: 'messages'  },
             ].map((t) => (
-              <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t.label}</button>
+              <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4, position: 'relative', display: 'flex', alignItems: 'center', gap: 5 }}>
+                {t.label}
+                {t.tab === 'messages' && studentNotifs.filter(n => !n.read).length > 0 && (
+                  <span style={{ background: '#ff4444', color: 'white', borderRadius: 999, fontSize: '0.55rem', fontWeight: 700, padding: '0.1rem 0.35rem', minWidth: 16, textAlign: 'center' }}>
+                    {studentNotifs.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

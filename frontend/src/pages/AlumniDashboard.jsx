@@ -447,6 +447,7 @@ export default function AlumniDashboard() {
   const [bookingRequest, setBookingRequest] = useState(null);
   const [reschedulingRequest, setReschedulingRequest] = useState(null);
   const [liveRequests, setLiveRequests] = useState([]);
+  const [declinedToast, setDeclinedToast] = useState(null); // { name } for brief toast
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Profile dropdown
@@ -516,8 +517,13 @@ export default function AlumniDashboard() {
   };
 
   const handleDeclineRequest = (id) => {
+    const req = liveRequests.find(r => r.id === id);
     declineRequest(id);
     setLiveRequests(prev => prev.filter(r => r.id !== id));
+    if (req) {
+      setDeclinedToast({ name: req.studentName });
+      setTimeout(() => setDeclinedToast(null), 3000);
+    }
   };
 
   const handleAccepted = (requestId) => {
@@ -702,9 +708,25 @@ export default function AlumniDashboard() {
       const HOURS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
       const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-      // Collect all booked slots (from SCHEDULE + extraSlots)
+      // Collect all booked slots (from SCHEDULE + extraSlots + slot_booked requests)
+      const bookedRequests = liveRequests.filter(r => r.status === 'slot_booked' && r.scheduledTime);
       const allSlots = [...SCHEDULE, ...extraSlots];
+
+      // Check if a day/hour cell has a booking — using ISO scheduledTime for accuracy
       const isBooked = (dayIdx, hour) => {
+        // Check bookedRequests by ISO date
+        const cellDate = weekDays[dayIdx];
+        const cellHour = parseInt(hour.split(':')[0]);
+        const hasBookedReq = bookedRequests.some(r => {
+          const d = new Date(r.scheduledTime);
+          return d.getDate() === cellDate.getDate() &&
+                 d.getMonth() === cellDate.getMonth() &&
+                 d.getFullYear() === cellDate.getFullYear() &&
+                 d.getHours() === cellHour;
+        });
+        if (hasBookedReq) return true;
+
+        // Fallback: check string-based slots
         return allSlots.some(s => {
           if (!s.when) return false;
           const parts = s.when.split('•');
@@ -714,7 +736,6 @@ export default function AlumniDashboard() {
           const isPM = s.when.includes('PM') && slotHour !== 12;
           const slotH24 = isPM ? slotHour + 12 : slotHour;
           const slotHourStr = `${String(slotH24).padStart(2,'0')}:00`;
-          // Match by day label
           const dayLabel = DAY_LABELS[dayIdx];
           const isToday = parts[0].trim() === 'Today' && dayIdx === (today.getDay() + 6) % 7;
           const isTomorrow = parts[0].trim() === 'Tomorrow' && dayIdx === (today.getDay() + 7) % 7;
@@ -724,6 +745,18 @@ export default function AlumniDashboard() {
       };
 
       const getSlotInfo = (dayIdx, hour) => {
+        // Check bookedRequests first
+        const cellDate = weekDays[dayIdx];
+        const cellHour = parseInt(hour.split(':')[0]);
+        const bookedReq = bookedRequests.find(r => {
+          const d = new Date(r.scheduledTime);
+          return d.getDate() === cellDate.getDate() &&
+                 d.getMonth() === cellDate.getMonth() &&
+                 d.getFullYear() === cellDate.getFullYear() &&
+                 d.getHours() === cellHour;
+        });
+        if (bookedReq) return { title: `Mock Interview: ${bookedReq.studentName}`, sub: bookedReq.topic, active: true, roomId: bookedReq.roomId };
+
         return allSlots.find(s => {
           if (!s.when) return false;
           const parts = s.when.split('•');
@@ -817,7 +850,14 @@ export default function AlumniDashboard() {
               <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>Upcoming Sessions</span>
             </div>
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[...SCHEDULE, ...extraSlots].map((s, i) => (
+              {[...SCHEDULE, ...extraSlots, ...bookedRequests.map(r => ({
+                when: formatScheduledTime(r.scheduledTime),
+                title: `Mock Interview: ${r.studentName}`,
+                sub: r.topic,
+                active: true,
+                roomId: r.roomId,
+                scheduledTime: r.scheduledTime,
+              }))].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1rem', background: '#131b2e', borderRadius: 12, borderLeft: `3px solid ${s.active ? '#c3c0ff' : 'rgba(70,69,85,0.3)'}` }}>
                   <div>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, color: s.active ? '#c3c0ff' : '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>{s.when}</div>
@@ -1076,6 +1116,14 @@ export default function AlumniDashboard() {
           onClose={() => setReschedulingRequest(null)}
           onRescheduled={(newTime) => handleRescheduled(reschedulingRequest.id, newTime)}
         />
+      )}
+
+      {/* Declined toast */}
+      {declinedToast && (
+        <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', background: '#222a3d', border: '1px solid rgba(255,180,171,0.3)', borderRadius: 12, padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: 10, zIndex: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', animation: 'slideUp 0.3s ease' }}>
+          <span className="material-symbols-outlined" style={{ color: '#ffb4ab', fontSize: 20 }}>cancel</span>
+          <span style={{ fontSize: '0.875rem', color: '#dae2fd' }}>Request from <strong>{declinedToast.name}</strong> declined</span>
+        </div>
       )}
 
       {/* ── SIDEBAR ── */}
