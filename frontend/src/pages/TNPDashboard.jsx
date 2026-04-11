@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 const QUEUE = [
   { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
@@ -27,7 +28,8 @@ export default function TNPDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [queueStatus, setQueueStatus] = useState({});
-  const [credModal, setCredModal] = useState(null); // { name, username, password, email }
+  const [credModal, setCredModal] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   if (!user) return <Navigate to="/login" replace />;
 
@@ -116,7 +118,6 @@ export default function TNPDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
 
-      {/* Credentials Modal */}
       {credModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(78,222,163,0.25)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
@@ -146,6 +147,13 @@ export default function TNPDashboard() {
           </div>
         </div>
       )}
+
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={() => { logout(); navigate('/login'); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
       {/* Sidebar */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
@@ -169,7 +177,7 @@ export default function TNPDashboard() {
           <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
             Generate Report
           </button>
-          <a href="#" onClick={e => { e.preventDefault(); logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
+          <a href="#" onClick={e => { e.preventDefault(); setShowLogoutConfirm(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
           </a>
         </div>

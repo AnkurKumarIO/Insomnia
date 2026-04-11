@@ -7,6 +7,7 @@ import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
 import AlumNexLogo from '../AlumNexLogo';
 import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 // ── Inline BookModal for Recommended Mentor ───────────────────────────────────
 const RECOMMENDED_MENTOR = {
@@ -132,6 +133,7 @@ export default function Dashboard() {
   const [studentNotifs, setStudentNotifs] = useState([]);
   const [showMentorBook, setShowMentorBook] = useState(false);
   const [mentorBookSent, setMentorBookSent] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -380,6 +382,12 @@ export default function Dashboard() {
           onSent={() => setMentorBookSent(true)}
         />
       )}
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={() => { logout(); navigate('/login'); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1rem', zIndex: 50 }}>
         <div style={{ padding: '1.5rem 1rem 1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -410,7 +418,7 @@ export default function Dashboard() {
             <a href="mailto:support@alumnex.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>help</span> Support
             </a>
-            <button onClick={() => { logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+            <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
             </button>
           </div>
@@ -552,7 +560,7 @@ export default function Dashboard() {
                     <button onClick={() => { setShowProfile(false); setActiveTab('settings'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Edit Profile
                     </button>
-                    <button onClick={() => { setShowProfile(false); logout(); navigate('/login'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                    <button onClick={() => setShowLogoutConfirm(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Sign Out
                     </button>
                   </div>

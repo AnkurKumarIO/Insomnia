@@ -4,6 +4,7 @@ import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import SettingsPage from './SettingsPage';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 // ── Student Detail + Accept Modal ────────────────────────────────────────────
 function StudentDetailModal({ request, onClose, onAccept }) {
@@ -447,7 +448,9 @@ export default function AlumniDashboard() {
   const [bookingRequest, setBookingRequest] = useState(null);
   const [reschedulingRequest, setReschedulingRequest] = useState(null);
   const [liveRequests, setLiveRequests] = useState([]);
-  const [declinedToast, setDeclinedToast] = useState(null); // { name } for brief toast
+  const [declinedToast, setDeclinedToast] = useState(null);
+  const [acceptedToast, setAcceptedToast] = useState(null); // { name }
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Profile dropdown
@@ -527,8 +530,13 @@ export default function AlumniDashboard() {
   };
 
   const handleAccepted = (requestId) => {
-    // Move from pending → accepted in local state
+    const req = liveRequests.find(r => r.id === requestId);
     setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'accepted' } : r));
+    // Show accepted toast
+    if (req) {
+      setAcceptedToast({ name: req.studentName });
+      setTimeout(() => setAcceptedToast(null), 3500);
+    }
   };
 
   const handleSlotBooked = (requestId, scheduledTime) => {
@@ -1126,6 +1134,25 @@ export default function AlumniDashboard() {
         </div>
       )}
 
+      {/* Accepted toast */}
+      {acceptedToast && (
+        <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', background: '#131b2e', border: '1px solid rgba(78,222,163,0.35)', borderRadius: 12, padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: 10, zIndex: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', animation: 'slideUp 0.3s ease' }}>
+          <span className="material-symbols-outlined" style={{ color: '#4edea3', fontSize: 20, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+          <div>
+            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#4edea3' }}>Request Accepted!</div>
+            <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{acceptedToast.name} has been notified. Click "Book Slot" to schedule.</div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={() => { logout(); navigate('/login'); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
+
       {/* ── SIDEBAR ── */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
@@ -1147,7 +1174,7 @@ export default function AlumniDashboard() {
         </nav>
         {/* Only Sign Out at bottom — no "New Mentorship" button */}
         <div style={{ marginTop: 'auto' }}>
-          <button onClick={() => { logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+          <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
           </button>
         </div>
@@ -1271,7 +1298,7 @@ export default function AlumniDashboard() {
                           <button onClick={() => setEditProfile(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                             Edit Profile
                           </button>
-                          <button onClick={() => { setShowProfile(false); logout(); navigate('/login'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <button onClick={() => setShowLogoutConfirm(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                             Sign Out
                           </button>
                         </div>
