@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AlumNexLogo from '../AlumNexLogo';
-import { api } from '../api';
+import { supabase } from '../lib/supabaseClient';
+import { getUserByEmail, createUser } from '../lib/db';
 
 function genPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -46,33 +47,47 @@ export default function StudentRegistration() {
     const username = genUsername(form.name);
     const password = genPassword();
 
-    // Register directly via the student endpoint — creates Supabase auth + users row
-    const result = await api.studentRegister({
-      name:       form.name,
-      email:      form.email,
-      department: form.department,
-      college:    form.college,
-      year:       form.year,
-      username,
-      password,
-    }).catch(err => ({ error: err.message }));
+    try {
+      // 1. Check if user already exists
+      const existing = await getUserByEmail(form.email);
+      if (existing) {
+        setRegError('An account with this email already exists. Please log in.');
+        setLoading(false);
+        return;
+      }
 
-    if (result?.error) {
-      setRegError(result.error);
-      setLoading(false);
-      return;
+      // 2. Create Supabase Auth user directly from frontend
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email:    form.email,
+        password: password,
+        options:  { data: { name: form.name, role: 'STUDENT' } },
+      });
+
+      if (authErr) throw authErr;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('Failed to create auth user');
+
+      // 3. Insert profile row into users table
+      await createUser({
+        id:         userId,
+        role:       'STUDENT',
+        name:       form.name,
+        email:      form.email,
+        department: form.department,
+        college:    form.college,
+        year:       form.year,
+        username,
+      });
+
+      // 4. Store pending profile locally
+      const pending = { ...form, username, password, role: 'STUDENT', id: userId };
+      localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(pending));
+      setCreds({ username, password });
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      setRegError(err.message || 'Registration failed. Please try again.');
     }
-
-    // Store pending profile with the real Supabase user id
-    const pending = {
-      ...form,
-      username,
-      password,
-      role: 'STUDENT',
-      id: result?.user?.id || null,
-    };
-    localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(pending));
-    setCreds({ username, password });
     setLoading(false);
   };
 

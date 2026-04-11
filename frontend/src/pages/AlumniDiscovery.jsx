@@ -192,12 +192,14 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
   const [bookingAlumni, setBookingAlumni] = useState(null);
   const [refreshKey, setRefreshKey]     = useState(0);
 
-  // Fetch alumni from backend / Supabase
+  // Fetch alumni from Supabase directly
   useEffect(() => {
-    api.getAlumni().then(data => {
-      if (Array.isArray(data)) setAllAlumni(data.map(toDisplayAlumni));
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    import('../lib/db').then(({ getAllAlumni }) => {
+      getAllAlumni().then(data => {
+        if (Array.isArray(data)) setAllAlumni(data.map(toDisplayAlumni));
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    });
   }, []);
 
   const companies = [...new Set(allAlumni.map(a => a.company))].sort();

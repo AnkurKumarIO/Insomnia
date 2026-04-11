@@ -474,58 +474,54 @@ export default function AlumniDashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = user.name ? user.name.split(' ')[0] : 'Alumni';
 
-  // Load requests for this alumni from Supabase (falls back to localStorage)
+  // Load requests for this alumni from Supabase directly
   useEffect(() => {
     const load = async () => {
       try {
-        // Resolve real alumni UUID — user.id might be a mock value like 'alm-001'
+        // Resolve real alumni UUID
         let alumniId = user.id;
-        const isMockId = !alumniId || alumniId.startsWith('alm-') || alumniId.startsWith('stu-');
+        const isMockId = !alumniId || String(alumniId).startsWith('alm-') || String(alumniId).startsWith('stu-');
 
         if (isMockId) {
-          // Look up by email from localStorage or by name via alumni list
-          const storedUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
-          if (storedUser.id && !storedUser.id.startsWith('alm-')) {
-            alumniId = storedUser.id;
-          } else {
-            // Fetch alumni list and find by name
-            const alumniList = await api.getAlumni().catch(() => []);
-            const match = alumniList.find(a => a.name === user.name);
-            if (match) alumniId = match.id;
-          }
+          // Look up by name from alumni list
+          const { getAllAlumni } = await import('../lib/db');
+          const alumniList = await getAllAlumni();
+          const match = alumniList.find(a => a.name === user.name);
+          if (match) alumniId = match.id;
         }
 
-        if (alumniId && !alumniId.startsWith('alm-')) {
-          const data = await api.getRequests({ alumniId });
-          if (Array.isArray(data)) {
-            const mapped = data.map(r => ({
-              id:            r.request_id,
-              studentName:   r.student_name || r.student?.name || '',
-              studentId:     r.student_id,
-              alumniName:    r.alumni_name  || user.name,
-              alumniRole:    '',
-              topic:         r.topic,
-              message:       r.message || '',
-              status:        (r.status || 'PENDING').toLowerCase(),
-              scheduledTime: r.scheduled_time || null,
-              roomId:        r.room_id || null,
-              createdAt:     r.created_at,
-              studentProfile: r.student_profile_snapshot || null,
-            }));
-            // Merge into localStorage
-            const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
-            mapped.forEach(dbReq => {
-              const idx = local.findIndex(l => l.id === dbReq.id);
-              if (idx === -1) local.push(dbReq);
-              else local[idx] = { ...local[idx], ...dbReq };
-            });
-            localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
-            setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
-            return;
-          }
+        if (alumniId && !String(alumniId).startsWith('alm-')) {
+          const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
+          const data = await dbGetRequests(alumniId);
+
+          const mapped = data.map(r => ({
+            id:            r.request_id,
+            studentName:   r.student_name || r.student?.name || '',
+            studentId:     r.student_id,
+            alumniName:    user.name,
+            alumniRole:    '',
+            topic:         r.topic,
+            message:       r.message || '',
+            status:        (r.status || 'PENDING').toLowerCase(),
+            scheduledTime: r.scheduled_time || null,
+            roomId:        r.room_id || null,
+            createdAt:     r.created_at,
+            studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
+          }));
+
+          // Merge into localStorage
+          const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+          mapped.forEach(dbReq => {
+            const idx = local.findIndex(l => l.id === dbReq.id);
+            if (idx === -1) local.push(dbReq);
+            else local[idx] = { ...local[idx], ...dbReq };
+          });
+          localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
+          setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
+          return;
         }
       } catch (err) {
-        console.warn('AlumniDashboard: failed to load requests from DB', err.message);
+        console.warn('AlumniDashboard: failed to load requests', err.message);
       }
       // Fallback to localStorage
       const all = getRequests();

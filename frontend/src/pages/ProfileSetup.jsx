@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import { api } from '../api';
+import { updateUserProfile } from '../lib/db';
 
 const STEPS = ['Personal Info', 'Skills & Academics', 'Resume & Projects', 'Career Goals', 'Review'];
 const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
@@ -220,9 +220,9 @@ export default function ProfileSetup() {
       profileCompletedAt: new Date().toISOString(),
     };
 
-    // Save to Supabase
+    // Save to Supabase directly
     if (userId) {
-      await api.saveProfile(userId, profilePayload).catch(err =>
+      await updateUserProfile(userId, profilePayload).catch(err =>
         console.warn('Profile save failed:', err)
       );
     }

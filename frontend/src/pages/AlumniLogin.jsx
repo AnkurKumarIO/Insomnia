@@ -1,7 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import { api } from '../api';
+import { supabase } from '../lib/supabaseClient';
+import { getUserByEmail, createUser } from '../lib/db';
 
 export default function AlumniLogin() {
   const [name, setName] = useState('');
@@ -17,43 +18,50 @@ export default function AlumniLogin() {
     setLoading(true);
     setStatus(null);
     try {
-      const result = await api.alumniLogin(name, email, department);
-      if (result.token) {
-        setStatus({ type: 'success', message: `Welcome, ${result.user.name}!` });
+      // 1. Check if alumni already exists in users table
+      let dbUser = await getUserByEmail(email);
 
-        let userData = {
-          id:         result.user.id,
-          name:       result.user.name,
-          role:       result.user.role || 'ALUMNI',
-          department: result.user.department || department,
+      if (!dbUser) {
+        // 2. Create Supabase Auth + users row
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
           email,
-        };
+          password: `alumni_${Date.now()}`,
+          options: { data: { name, role: 'ALUMNI' } },
+        });
+        if (authErr) throw authErr;
 
-        // If id looks like a mock, fetch the real one by email
-        if (!userData.id || userData.id.startsWith('alm-')) {
-          const dbUser = await api.getUserByEmail(email).catch(() => null);
-          if (dbUser?.id) {
-            userData = { ...userData, id: dbUser.id, name: dbUser.name, department: dbUser.department };
-          }
-        }
-
-        login(userData, result.token);
-
-        // Sync profile_data from Supabase to localStorage
-        if (userData.id && !userData.id.startsWith('alm-')) {
-          api.getUser(userData.id).then(dbUser => {
-            if (dbUser?.profile_data) {
-              localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
-            }
-          }).catch(() => {});
-        }
-
-        setTimeout(() => navigate('/dashboard'), 1000);
-      } else {
-        setStatus({ type: 'error', message: result.error || 'Login failed.' });
+        dbUser = await createUser({
+          id:         authData.user.id,
+          role:       'ALUMNI',
+          name,
+          email,
+          department: department || 'General',
+        });
       }
+
+      if (!dbUser) throw new Error('Failed to create or find user');
+
+      setStatus({ type: 'success', message: `Welcome, ${dbUser.name}!` });
+
+      const userData = {
+        id:         dbUser.id,
+        name:       dbUser.name,
+        role:       dbUser.role || 'ALUMNI',
+        department: dbUser.department || department,
+        email,
+      };
+
+      login(userData, `token-${Date.now()}`);
+
+      // Sync profile_data to localStorage
+      if (dbUser.profile_data) {
+        localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
+      }
+
+      setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err) {
-      setStatus({ type: 'error', message: 'Server connection failed.' });
+      console.error('Alumni login error:', err);
+      setStatus({ type: 'error', message: err.message || 'Login failed.' });
     }
     setLoading(false);
   };
