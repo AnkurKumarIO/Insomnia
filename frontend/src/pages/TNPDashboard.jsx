@@ -1,64 +1,37 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
-
-const QUEUE = [
-  { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
-  { name: 'Sarah Jenkins', sub: 'Alumni • Senior Dev at Google • Batch 2018', status: 'ID Verification', color: '#ffb95f', icon: 'history_edu' },
-  { name: 'Dr. Elena Rodriguez', sub: 'Alumni Mentor • PhD in AI Ethics • Batch 2015', status: 'Academic Check', color: '#c3c0ff', icon: 'psychology' },
-];
-
-const FEED = [
-  { icon: 'person_add', color: '#4edea3', title: 'New Alumni Verified', desc: 'David K. (Senior UI Designer at Airbnb) has joined the mentor pool.', time: '2 minutes ago' },
-  { icon: 'campaign', color: '#c3c0ff', title: 'Placement Drive Scheduled', desc: 'Microsoft Recruitment Drive for Batch 2024 set for Oct 15th.', time: '1 hour ago' },
-  { icon: 'event_available', color: '#ffb95f', title: '12 Interviews Completed', desc: 'Mock interview session for "Fintech Role" concluded successfully.', time: '4 hours ago' },
-];
-
-const HEATMAP = [
-  { dept: 'CS Dept',  vals: [92,84,95,62,48] },
-  { dept: 'IT Dept',  vals: [78,88,42,81,24] },
-  { dept: 'ECE Dept', vals: [45,31,58,18,39] },
-];
-const HMAP_COLS = ['Frontend','Backend','Data Sci','DevOps','UI/UX'];
+import { api } from '../api';
 
 export default function TNPDashboard() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('home');
-  const [queueStatus, setQueueStatus] = useState({});
-  const [credModal, setCredModal] = useState(null);
+  const [activeTab, setActiveTab]       = useState('home');
+  const [queueStatus, setQueueStatus]   = useState({});
+  const [credModal, setCredModal]       = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [stats, setStats]               = useState({ verified_students: 0, active_mentors: 0, mock_interviews: 0, scheduled_today: 0 });
+  const [recentAlumni, setRecentAlumni] = useState([]);
 
   if (!user) return <Navigate to="/login" replace />;
 
-  function genPassword() {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
-    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  }
-  function genUsername(name) {
-    const parts = name.trim().toLowerCase().split(/\s+/);
-    const base = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
-    return base.replace(/[^a-z.]/g, '') + Math.floor(Math.random() * 90 + 10);
-  }
+  useEffect(() => {
+    api.getPlatformStats().then(s => { if (s && !s.error) setStats(s); }).catch(() => {});
+    api.getPendingUsers().then(u => { if (Array.isArray(u)) setPendingUsers(u); }).catch(() => {});
+    api.getAlumni().then(a => { if (Array.isArray(a)) setRecentAlumni(a.slice(0, 3)); }).catch(() => {});
+  }, []);
 
-  const handleApprove = (q) => {
-    const username = genUsername(q.name);
-    const password = genPassword();
-    const email = `${username}@alumniconnect.edu`;
-    const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
-
-    // Save to approved accounts store
-    const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
-    existing.push({ username, password, role, name: q.name, email, department: q.sub });
-    localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
-
-    setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
-    setCredModal({ name: q.name, username, password, email, role });
+  const handleApprove = async (u) => {
+    await api.verifyUser(u.id, 'VERIFIED').catch(() => {});
+    setPendingUsers(prev => prev.filter(p => p.id !== u.id));
+    setQueueStatus(s => ({ ...s, [u.id]: 'approved' }));
+    setCredModal({ name: u.name, email: u.email, role: u.role });
   };
 
-  const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
+  const handleReview = (id) => setQueueStatus(s => ({ ...s, [id]: 'review' }));
 
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
@@ -71,26 +44,34 @@ export default function TNPDashboard() {
     if (activeTab === 'queue') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
-        {QUEUE.map((q, i) => {
-          const st = queueStatus[q.name];
+        {pendingUsers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }}>check_circle</span>
+            <p style={{ fontWeight: 600 }}>No pending verifications</p>
+            <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 4 }}>All users are verified</p>
+          </div>
+        ) : pendingUsers.map((u) => {
+          const st = queueStatus[u.id];
+          const color = u.role === 'ALUMNI' ? '#ffb95f' : '#c3c0ff';
+          const icon  = u.role === 'ALUMNI' ? 'history_edu' : 'school';
           return (
-            <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
+            <div key={u.id} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : color}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
+                  <span className="material-symbols-outlined" style={{ color, fontSize: 22 }}>{icon}</span>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700 }}>{q.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
+                  <div style={{ fontWeight: 700 }}>{u.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{u.role} • {u.department || u.email}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
+                  {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : 'Pending'}
                 </span>
                 {!st && <>
-                  <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                  <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                  <button onClick={() => handleApprove(u)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                  <button onClick={() => handleReview(u.id)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                 </>}
               </div>
             </div>
@@ -129,7 +110,7 @@ export default function TNPDashboard() {
                 <span style={{ color: '#ffb95f' }}>In production, these would be emailed to {credModal.email}</span>
               </p>
             </div>
-            {[['Username', credModal.username], ['Password', credModal.password], ['Email', credModal.email], ['Role', credModal.role]].map(([label, val]) => (
+            {[['Name', credModal.name], ['Email', credModal.email], ['Role', credModal.role]].map(([label, val]) => (
               <div key={label} style={{ background: '#131b2e', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(70,69,85,0.2)' }}>
                 <div>
                   <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>{label}</div>
@@ -225,9 +206,9 @@ export default function TNPDashboard() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1.5rem' }}>
             {[
-              { label: 'Total Verified', val: '14,208', change: '+12% this month', icon: 'verified_user' },
-              { label: 'Active Mentors', val: '842', change: '42 new in 7 days', icon: 'record_voice_over' },
-              { label: 'Mock Interviews', val: '2,115', change: '118 scheduled today', icon: 'videocam' },
+              { label: 'Verified Students', val: stats.verified_students.toLocaleString(), change: 'Total verified', icon: 'verified_user' },
+              { label: 'Active Mentors',    val: stats.active_mentors.toLocaleString(),    change: 'Alumni mentors', icon: 'record_voice_over' },
+              { label: 'Mock Interviews',   val: stats.mock_interviews.toLocaleString(),   change: `${stats.scheduled_today} scheduled`, icon: 'videocam' },
             ].map(s => (
               <div key={s.label} style={{ background: '#171f33', borderRadius: 16, padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, right: 0, padding: '1rem', opacity: 0.1 }}>
@@ -259,31 +240,39 @@ export default function TNPDashboard() {
                   <a href="#" style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</a>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {QUEUE.map((q, i) => {
-                    const st = queueStatus[q.name];
+                  {(pendingUsers.length > 0 ? pendingUsers.slice(0, 3) : []).map((u) => {
+                    const st = queueStatus[u.id];
+                    const color = u.role === 'ALUMNI' ? '#ffb95f' : '#c3c0ff';
+                    const icon  = u.role === 'ALUMNI' ? 'history_edu' : 'school';
                     return (
-                    <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
+                    <div key={u.id} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : color}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
+                          <span className="material-symbols-outlined" style={{ color, fontSize: 22 }}>{icon}</span>
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700 }}>{q.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
+                          <div style={{ fontWeight: 700 }}>{u.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{u.role} • {u.department || u.email}</div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
+                          {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : 'Pending'}
                         </span>
                         {!st && <>
-                          <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                          <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                          <button onClick={() => handleApprove(u)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                          <button onClick={() => handleReview(u.id)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                         </>}
                       </div>
                     </div>
                     );
                   })}
+                  {pendingUsers.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', color: '#c7c4d8', opacity: 0.5, background: '#131b2e', borderRadius: 12 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>check_circle</span>
+                      <p style={{ fontSize: '0.8rem' }}>No pending verifications</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -323,16 +312,18 @@ export default function TNPDashboard() {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }}>
                   <div style={{ position: 'absolute', left: 11, top: 8, bottom: 8, width: 1, background: 'rgba(70,69,85,0.3)' }} />
-                  {FEED.map((f, i) => (
-                    <div key={i} style={{ position: 'relative', paddingLeft: 36 }}>
-                      <div style={{ position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: '50%', background: `${f.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 12, color: f.color, fontVariationSettings: "'FILL' 1" }}>{f.icon}</span>
+                  {recentAlumni.length > 0 ? recentAlumni.map((a, i) => (
+                    <div key={a.id} style={{ position: 'relative', paddingLeft: 36 }}>
+                      <div style={{ position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: '50%', background: 'rgba(78,222,163,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#4edea3', fontVariationSettings: "'FILL' 1" }}>person_add</span>
                       </div>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: 4 }}>{f.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#c7c4d8', lineHeight: 1.5 }}>{f.desc}</div>
-                      <div style={{ fontSize: '0.6rem', color: 'rgba(199,196,216,0.5)', marginTop: 4, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.1em' }}>{f.time}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: 4 }}>Alumni Verified</div>
+                      <div style={{ fontSize: '0.75rem', color: '#c7c4d8', lineHeight: 1.5 }}>{a.name} ({a.company}) has joined the mentor pool.</div>
+                      <div style={{ fontSize: '0.6rem', color: 'rgba(199,196,216,0.5)', marginTop: 4, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.1em' }}>Batch {a.batch_year || '—'}</div>
                     </div>
-                  ))}
+                  )) : (
+                    <div style={{ paddingLeft: 36, color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.5 }}>No recent activity</div>
+                  )}
                 </div>
                 <button onClick={() => setActiveTab('queue')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                   View Full History

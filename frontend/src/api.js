@@ -249,6 +249,32 @@ export const api = {
       ];
     }
   ),
+
+  // ── Stats ────────────────────────────────────────────────────
+
+  getPlatformStats: () => callOrMock(
+    () => fetch(`${API_BASE}/stats/platform`).then(r => r.json()),
+    async () => { await mockDelay(400); return { verified_students: 5, active_mentors: 6, mock_interviews: 0, scheduled_today: 0 }; }
+  ),
+
+  getInterviewRecords: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/stats/interviews?userId=${userId}`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
+  ),
+
+  getPendingUsers: () => callOrMock(
+    () => fetch(`${API_BASE}/stats/pending-users`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
+  ),
+
+  verifyUser: (id, status) => callOrMock(
+    () => fetch(`${API_BASE}/stats/verify/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(300); return { id, verification_status: status }; }
+  ),
 };
 
 export const SOCKET_URL = API_BASE;

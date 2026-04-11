@@ -8,30 +8,30 @@ import SettingsPage from './SettingsPage';
 import AlumNexLogo from '../AlumNexLogo';
 import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import { api } from '../api';
 
 // ── Inline BookModal for Recommended Mentor ───────────────────────────────────
-const RECOMMENDED_MENTOR = {
-  name: 'Priya Sharma', title: 'Senior Software Engineer', company: 'Google',
-  tags: ['React', 'System Design', 'Big Tech'],
-};
 const TOPICS = [
   'Mock Interview – General', 'Mock Interview – System Design',
   'Mock Interview – Frontend', 'Mock Interview – Backend',
   'Career Guidance', 'Resume Review',
 ];
 
-function MentorBookModal({ studentName, onClose, onSent }) {
+function MentorBookModal({ mentor, studentName, onClose, onSent }) {
   const [topic, setTopic] = useState(TOPICS[0]);
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
+
+  if (!mentor) return null;
 
   const handleSend = () => {
     const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
     sendRequest({
       studentName,
       studentId: studentName,
-      alumniName: RECOMMENDED_MENTOR.name,
-      alumniRole: `${RECOMMENDED_MENTOR.title} • ${RECOMMENDED_MENTOR.company}`,
+      alumniName: mentor.name,
+      alumniId:   mentor.id,
+      alumniRole: `${mentor.title} • ${mentor.company}`,
       topic,
       message,
       studentProfile: {
@@ -61,7 +61,7 @@ function MentorBookModal({ studentName, onClose, onSent }) {
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Sent!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
-              Your request has been sent to <strong style={{ color: '#dae2fd' }}>{RECOMMENDED_MENTOR.name}</strong>.<br />
+              Your request has been sent to <strong style={{ color: '#dae2fd' }}>{mentor.name}</strong>.<br />
               You'll see the scheduled time once they accept.
             </p>
           </div>
@@ -70,16 +70,18 @@ function MentorBookModal({ studentName, onClose, onSent }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Book Mock Interview</div>
-                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{RECOMMENDED_MENTOR.name}</h3>
-                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{RECOMMENDED_MENTOR.title} • {RECOMMENDED_MENTOR.company}</p>
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{mentor.name}</h3>
+                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} • {mentor.company}</p>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.25rem' }}>
-              {RECOMMENDED_MENTOR.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
-            </div>
+            {mentor.tags?.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.25rem' }}>
+                {mentor.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Session Type</label>
@@ -89,7 +91,7 @@ function MentorBookModal({ studentName, onClose, onSent }) {
               </div>
               <div>
                 <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Message <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
-                <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={`Hi Priya, I'd love to practice ${topic.toLowerCase()} with you...`} rows={3} style={{ ...inp, resize: 'none' }} />
+                <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={`Hi ${mentor.name?.split(' ')[0]}, I'd love to practice ${topic.toLowerCase()} with you...`} rows={3} style={{ ...inp, resize: 'none' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem' }}>
@@ -105,16 +107,6 @@ function MentorBookModal({ studentName, onClose, onSent }) {
   );
 }
 
-const SKILLS = [
-  { label: 'Data Architecture', pct: 92, color: '#c3c0ff' },
-  { label: 'Product Strategy',  pct: 78, color: '#4edea3' },
-  { label: 'Interface Design',  pct: 64, color: '#ffb95f' },
-];
-const PIPELINE = [
-  { icon: 'rocket_launch', label: 'Applied',    count: 12, color: '#c3c0ff' },
-  { icon: 'forum',         label: 'Interviews', count: 4,  color: '#4edea3' },
-  { icon: 'verified',      label: 'Offers',     count: 1,  color: '#ffb95f' },
-];
 const NAV_ITEMS = [
   { icon: 'dashboard',   label: 'Dashboard',          tab: 'home' },
   { icon: 'group',       label: 'Directory',           tab: 'directory' },
@@ -134,6 +126,8 @@ export default function Dashboard() {
   const [showMentorBook, setShowMentorBook] = useState(false);
   const [mentorBookSent, setMentorBookSent] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [recommendedMentor, setRecommendedMentor] = useState(null);
+  const [profileData, setProfileData] = useState({});
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -166,12 +160,62 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user.name]);
 
-  const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
-  const CIRC = 2 * Math.PI * 70;
-  const offset = CIRC * (1 - 0.8);
+  // Fetch recommended mentor + profile data
+  useEffect(() => {
+    api.getAlumni().then(alumni => {
+      if (Array.isArray(alumni) && alumni.length > 0) {
+        const a = alumni[0];
+        const p = a.profile_data || {};
+        setRecommendedMentor({
+          id:      a.id,
+          name:    a.name,
+          company: a.company || '',
+          title:   p.title || (a.company ? `Alumni at ${a.company}` : 'Alumni'),
+          tags:    (p.skills || []).slice(0, 3),
+        });
+      }
+    }).catch(() => {});
 
-  // Load saved profile for the dropdown
-  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    if (user?.id) {
+      api.getUser(user.id).then(u => {
+        if (u?.profile_data) setProfileData(u.profile_data);
+        else {
+          const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+          setProfileData(saved);
+        }
+      }).catch(() => {
+        const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        setProfileData(saved);
+      });
+    } else {
+      const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+      setProfileData(saved);
+    }
+  }, [user?.id]);
+
+  const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
+
+  // Derive real profile data
+  const skills = (profileData.skills || []).slice(0, 3);
+  const SKILL_COLORS = ['#c3c0ff', '#4edea3', '#ffb95f'];
+  const myRequests = getRequestsByStudent(user?.name || '');
+  const pendingCount  = myRequests.filter(r => r.status === 'pending').length;
+  const interviewCount = myRequests.filter(r => r.status === 'slot_booked' || r.status === 'accepted').length;
+
+  // Profile completion %
+  const completionChecks = [
+    !!profileData.bio, !!profileData.linkedin, !!profileData.github,
+    !!profileData.department, (profileData.skills?.length > 0),
+    !!profileData.cgpa, !!profileData.resumeName,
+    (profileData.projects?.some(p => p.title)),
+    (profileData.targetRoles?.length > 0),
+  ];
+  const profileCompletion = Math.round((completionChecks.filter(Boolean).length / completionChecks.length) * 100);
+  const CIRC = 2 * Math.PI * 70;
+  const offset = CIRC * (1 - profileCompletion / 100);
+  const completionLabel = profileCompletion >= 80 ? 'Expert' : profileCompletion >= 50 ? 'Growing' : 'Starter';
+
+  const savedProfile = profileData;
 
   const renderContent = () => {
     if (activeTab === 'directory') return <AlumniDiscovery searchQuery={search} />;
@@ -275,8 +319,8 @@ export default function Dashboard() {
                   <circle cx="80" cy="80" r="70" fill="transparent" stroke="#c3c0ff" strokeWidth="10" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={offset} />
                 </svg>
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '1.75rem', fontWeight: 900 }}>80%</span>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3' }}>Expert</span>
+                  <span style={{ fontSize: '1.75rem', fontWeight: 900 }}>{profileCompletion}%</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3' }}>{completionLabel}</span>
                 </div>
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.75rem', textAlign: 'center', color: '#c7c4d8', lineHeight: 1.6, maxWidth: 180 }}>
@@ -291,22 +335,29 @@ export default function Dashboard() {
               <div style={label}>Top Proficiencies</div>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#c7c4d8' }}>more_horiz</span>
             </div>
-            {SKILLS.map(({ label: l, pct, color }) => (
-              <div key={l} style={{ marginBottom: '1.5rem' }}>
+            {skills.length > 0 ? skills.map((skill, idx) => (
+              <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
-                  <span style={{ fontWeight: 500 }}>{l}</span><span style={{ color: '#c7c4d8' }}>{pct}%</span>
+                  <span style={{ fontWeight: 500 }}>{skill}</span>
+                  <span style={{ color: '#c7c4d8' }}>—</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999 }} />
+                  <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
                 </div>
               </div>
-            ))}
+            )) : (
+              <p style={{ fontSize: '0.8rem', color: '#c7c4d8', opacity: 0.6 }}>Add skills in your profile to see them here.</p>
+            )}
           </div>
 
           {/* Pipeline */}
           <div style={glass}>
             <div style={{ ...label, marginBottom: '1.5rem' }}>Pipeline</div>
-            {PIPELINE.map(({ icon, label: l, count, color }) => (
+            {[
+              { icon: 'send',       label: 'Requests Sent', count: myRequests.length,  color: '#c3c0ff' },
+              { icon: 'forum',      label: 'Interviews',    count: interviewCount,      color: '#4edea3' },
+              { icon: 'hourglass_empty', label: 'Pending', count: pendingCount,         color: '#ffb95f' },
+            ].map(({ icon, label: l, count, color }) => (
               <div key={l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: '#222a3d', borderRadius: 10, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -377,6 +428,7 @@ export default function Dashboard() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
       {showMentorBook && (
         <MentorBookModal
+          mentor={recommendedMentor}
           studentName={user?.name || 'Student'}
           onClose={() => setShowMentorBook(false)}
           onSent={() => setMentorBookSent(true)}
