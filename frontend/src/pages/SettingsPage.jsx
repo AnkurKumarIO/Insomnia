@@ -83,10 +83,9 @@ export default function SettingsPage() {
   const lbl = { fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 };
 
   const SECTIONS = [
-    { id: 'profile',       icon: 'person',        label: 'Edit Profile'    },
-    { id: 'notifications', icon: 'notifications', label: 'Notifications'   },
-    { id: 'account',       icon: 'manage_accounts',label: 'Account'        },
-    { id: 'privacy',       icon: 'lock',          label: 'Privacy'         },
+    { id: 'profile',       icon: 'person',         label: 'Edit Profile'  },
+    { id: 'notifications', icon: 'notifications',  label: 'Notifications' },
+    { id: 'account',       icon: 'manage_accounts', label: 'Account'      },
   ];
 
   return (
@@ -253,36 +252,6 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* ── PRIVACY ── */}
-        {activeSection === 'privacy' && (
-          <div style={{ background: '#131b2e', borderRadius: 16, padding: '2rem', border: '1px solid rgba(70,69,85,0.15)' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Privacy Settings</h3>
-            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', marginBottom: '1.75rem' }}>Control who can see your profile and activity.</p>
-            {[
-              { label: 'Show profile in Alumni Directory', desc: 'Allow students to find and book sessions with you' },
-              { label: 'Show online status', desc: 'Let others see when you\'re active on the platform' },
-              { label: 'Allow direct messages', desc: 'Students can message you directly' },
-              { label: 'Share session analytics', desc: 'Allow platform to use anonymized data for improvements' },
-            ].map((item, i) => {
-              const [on, setOn] = useState(i < 3);
-              return (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', background: '#171f33', borderRadius: 12, border: '1px solid rgba(70,69,85,0.15)', marginBottom: '0.75rem' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: 3 }}>{item.label}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{item.desc}</div>
-                  </div>
-                  <div onClick={() => setOn(v => !v)} style={{ width: 44, height: 24, borderRadius: 999, background: on ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#2d3449', cursor: 'pointer', position: 'relative', transition: 'background 0.3s', flexShrink: 0 }}>
-                    <div style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-                  </div>
-                </div>
-              );
-            })}
-            <button onClick={flashSaved} style={{ marginTop: '0.5rem', padding: '0.75rem 2rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>
-              Save Privacy Settings
-            </button>
           </div>
         )}
 
