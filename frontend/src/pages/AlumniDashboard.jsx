@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
+import { api } from '../api';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -473,17 +474,51 @@ export default function AlumniDashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = user.name ? user.name.split(' ')[0] : 'Alumni';
 
-  // Load requests for this alumni from the shared store
+  // Load requests for this alumni from Supabase (falls back to localStorage)
   useEffect(() => {
-    const load = () => {
+    const load = async () => {
+      try {
+        // Try fetching from backend using alumni's DB id
+        const alumniId = user.id;
+        if (alumniId) {
+          const data = await api.getRequests({ alumniId });
+          if (Array.isArray(data) && data.length >= 0) {
+            // Map DB shape → local shape and merge into localStorage
+            const mapped = data.map(r => ({
+              id:            r.request_id,
+              studentName:   r.student_name || r.student?.name || '',
+              studentId:     r.student_id,
+              alumniName:    r.alumni_name  || user.name,
+              alumniRole:    '',
+              topic:         r.topic,
+              message:       r.message || '',
+              status:        (r.status || 'PENDING').toLowerCase().replace('slot_booked','slot_booked'),
+              scheduledTime: r.scheduled_time || null,
+              roomId:        r.room_id || null,
+              createdAt:     r.created_at,
+              studentProfile: r.student_profile_snapshot || null,
+            }));
+            // Merge into localStorage so other functions can read it
+            const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+            mapped.forEach(dbReq => {
+              const idx = local.findIndex(l => l.id === dbReq.id);
+              if (idx === -1) local.push(dbReq);
+              else local[idx] = { ...local[idx], ...dbReq };
+            });
+            localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
+            setLiveRequests(mapped.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'slot_booked'));
+            return;
+          }
+        }
+      } catch {}
+      // Fallback to localStorage
       const all = getRequests();
-      // Show pending + accepted + slot_booked
       setLiveRequests(all.filter(r => r.alumniName === user.name && (r.status === 'pending' || r.status === 'accepted' || r.status === 'slot_booked')));
     };
     load();
-    const interval = setInterval(load, 3000);
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [user.name]);
+  }, [user.name, user.id]);
 
   // Build notifications list: new requests + meetings in 24h
   const allScheduled = [...SCHEDULE, ...extraSlots];

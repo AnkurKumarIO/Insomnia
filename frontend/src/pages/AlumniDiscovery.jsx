@@ -56,6 +56,7 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
       studentName,
       studentId: studentName,
       alumniName: alumni.name,
+      alumniId:   alumni.id,
       alumniRole: `${alumni.title} • ${alumni.company}`,
       topic,
       message,

@@ -6,14 +6,29 @@ const supabase = require('../supabase');
 router.get('/', async (req, res) => {
   try {
     const { alumniId, studentId } = req.query;
-    let query = supabase.from('interview_requests').select('*').order('created_at', { ascending: false });
+    let query = supabase
+      .from('interview_requests')
+      .select(`
+        *,
+        student:users!interview_requests_student_id_fkey(id, name, email, profile_data),
+        alumni:users!interview_requests_alumni_id_fkey(id, name, email)
+      `)
+      .order('created_at', { ascending: false });
 
-    if (alumniId) query = query.eq('alumni_id', alumniId);
+    if (alumniId)  query = query.eq('alumni_id', alumniId);
     if (studentId) query = query.eq('student_id', studentId);
 
     const { data, error } = await query;
     if (error) throw error;
-    res.json(data);
+
+    // Flatten names into top-level fields for easy frontend use
+    const result = (data || []).map(r => ({
+      ...r,
+      student_name: r.student?.name || '',
+      alumni_name:  r.alumni?.name  || '',
+    }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
