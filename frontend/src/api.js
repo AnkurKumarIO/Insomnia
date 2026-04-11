@@ -162,6 +162,15 @@ export const api = {
     () => MOCK_API.interviewAnalytics(data)
   ),
 
+  profileStrength: (profileData) => callOrMock(
+    () => fetch(`${API_BASE}/ai/profile-strength`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileData }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(600); return { score: 60, label: 'Growing', missing: ['Add GitHub link', 'Upload resume'], top_skills: [] }; }
+  ),
+
   // ── Interview Requests ──────────────────────────────────────
 
   getRequests: (params = {}) => callOrMock(
@@ -247,6 +256,63 @@ export const api = {
         { id: 'alm-5', name: 'Sneha Patel',   company: 'Atlassian', department: 'Computer Science',       batch_year: 2021, profile_data: { bio: 'Product Engineer at Atlassian. Frontend & product thinking.', skills: ['React','JavaScript','Figma','Jest'], openTo: ['Mock Interviews','Internship Guidance'] } },
         { id: 'alm-6', name: 'Arjun Nair',    company: 'Uber',      department: 'Electronics & Communication', batch_year: 2016, profile_data: { bio: 'Staff Engineer at Uber Maps. DSA & competitive programming mentor.', skills: ['C++','Python','Kafka','DSA'], openTo: ['Mock Interviews','DSA Coaching'] } },
       ];
+    }
+  ),
+
+  // ── Stats ────────────────────────────────────────────────────
+
+  getPlatformStats: () => callOrMock(
+    () => fetch(`${API_BASE}/stats/platform`).then(r => r.json()),
+    async () => { await mockDelay(400); return { verified_students: 5, active_mentors: 6, mock_interviews: 0, scheduled_today: 0 }; }
+  ),
+
+  getInterviewRecords: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/stats/interviews?userId=${userId}`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
+  ),
+
+  getPendingUsers: () => callOrMock(
+    () => fetch(`${API_BASE}/stats/pending-users`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
+  ),
+
+  verifyUser: (id, status) => callOrMock(
+    () => fetch(`${API_BASE}/stats/verify/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(300); return { id, verification_status: status }; }
+  ),
+
+  // ── AI Chat ─────────────────────────────────────────────────
+
+  chatInterview: (messages, role = 'coach') => callOrMock(
+    () => fetch(`${API_BASE}/chat/interview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, role }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(800); return { reply: "That's a great point! Can you elaborate on the technical implementation?" }; }
+  ),
+
+  getInterviewQuestions: (topic) => callOrMock(
+    () => fetch(`${API_BASE}/chat/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(600);
+      return { questions: [
+        { q: "Tell me about yourself and your background.", cat: "Intro" },
+        { q: "Describe a challenging technical problem you solved recently.", cat: "Behavioral" },
+        { q: "How would you design a scalable notification system?", cat: "System Design" },
+        { q: "What's the difference between SQL and NoSQL databases?", cat: "Technical" },
+        { q: "How do you handle conflicts within your team?", cat: "Behavioral" },
+        { q: "Explain the concept of microservices and their trade-offs.", cat: "System Design" },
+        { q: "Where do you see yourself in 5 years?", cat: "Career" },
+      ]};
     }
   ),
 };
