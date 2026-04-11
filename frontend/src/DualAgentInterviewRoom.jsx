@@ -51,11 +51,13 @@ export default function DualAgentInterviewRoom() {
   const [whisperLoading, setWhisperLoading] = useState(false);
   const [sidebarTab, setSidebarTab] = useState('chat'); // 'chat' | 'whisperer' | 'interviewer'
   const [chatMessages, setChatMessages] = useState([
-    { role: 'ai', text: "Hi! I'm your AI Interview Coach. Ask me anything about interview techniques, how to answer a question, or request a practice question.", time: new Date().toLocaleTimeString() }
+    { role: 'ai', text: "Hi! I'm your AI Interview Coach powered by Llama 3.3. Ask me anything about interview techniques, how to answer a question, or request a practice question.", time: new Date().toLocaleTimeString() }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef(null);
+  const [interviewQuestions, setInterviewQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
 
   // Live metrics — vary over time
   const [confTarget, setConfTarget] = useState(72);
@@ -83,6 +85,15 @@ export default function DualAgentInterviewRoom() {
   const [camPermission, setCamPermission] = useState('pending'); // pending | granted | denied | unavailable
 
   const myId = user?.name || user?.role || 'User';
+
+  // Load AI interview questions on mount
+  useEffect(() => {
+    setQuestionsLoading(true);
+    api.getInterviewQuestions().then(data => {
+      if (data?.questions?.length > 0) setInterviewQuestions(data.questions);
+      setQuestionsLoading(false);
+    }).catch(() => setQuestionsLoading(false));
+  }, []);
 
   useEffect(() => {
     const socket = io(`${SOCKET_URL}/interview`);
@@ -326,59 +337,30 @@ export default function DualAgentInterviewRoom() {
     }
   };
 
-  const AI_RESPONSES = {
-    greet: ["Hello! Ready to ace your interview? Let's start with a warm-up question.", "Great to meet you! I'll be coaching you through this session."],
-    question: [
-      "Tell me about a time you faced a major technical challenge. How did you approach it?",
-      "How would you design a URL shortener like bit.ly? Walk me through your thought process.",
-      "Explain the difference between REST and GraphQL. When would you choose one over the other?",
-      "Describe a situation where you had to learn a new technology quickly. What was your strategy?",
-      "How do you handle disagreements with your team lead on technical decisions?",
-      "What's the most complex system you've built? What were the key design decisions?",
-      "How would you optimize a slow database query? Walk me through your debugging process.",
-    ],
-    feedback: [
-      "Good answer! Try to add specific metrics or numbers to make it more impactful.",
-      "Nice structure! Consider using the STAR method: Situation, Task, Action, Result.",
-      "Strong technical depth. Make sure to also highlight the business impact of your work.",
-      "Good start! Try to be more concise — aim for 2-3 minutes per answer.",
-    ],
-    tip: [
-      "💡 Tip: Always clarify requirements before diving into a solution.",
-      "💡 Tip: Think out loud — interviewers want to see your reasoning process.",
-      "💡 Tip: It's okay to ask for a moment to think before answering.",
-      "💡 Tip: Use concrete examples from your past experience whenever possible.",
-    ],
-    default: [
-      "That's a great point! Let me ask you a follow-up: how would you scale that solution?",
-      "Interesting approach. What trade-offs did you consider?",
-      "Good thinking. Can you elaborate on the technical implementation?",
-      "I see. How would you handle edge cases in that scenario?",
-    ],
-  };
-
-  const getAIResponse = (msg) => {
-    const m = msg.toLowerCase();
-    if (m.includes('hello') || m.includes('hi') || m.includes('hey')) return AI_RESPONSES.greet[Math.floor(Math.random() * AI_RESPONSES.greet.length)];
-    if (m.includes('question') || m.includes('ask me') || m.includes('practice')) return AI_RESPONSES.question[Math.floor(Math.random() * AI_RESPONSES.question.length)];
-    if (m.includes('feedback') || m.includes('how did i') || m.includes('was that good')) return AI_RESPONSES.feedback[Math.floor(Math.random() * AI_RESPONSES.feedback.length)];
-    if (m.includes('tip') || m.includes('advice') || m.includes('help')) return AI_RESPONSES.tip[Math.floor(Math.random() * AI_RESPONSES.tip.length)];
-    return AI_RESPONSES.default[Math.floor(Math.random() * AI_RESPONSES.default.length)];
-  };
-
-  const sendChatMessage = () => {
-    const msg = chatInput.trim();
+  const sendChatMessage = async (overrideMsg) => {
+    const msg = (overrideMsg || chatInput).trim();
     if (!msg) return;
     const userMsg = { role: 'user', text: msg, time: new Date().toLocaleTimeString() };
-    setChatMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...chatMessages, userMsg];
+    setChatMessages(updatedMessages);
     setChatInput('');
     setChatLoading(true);
-    setTimeout(() => {
-      const aiReply = { role: 'ai', text: getAIResponse(msg), time: new Date().toLocaleTimeString() };
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
+    try {
+      // Build message history for Groq context
+      const history = updatedMessages.map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.text,
+      }));
+      const data = await api.chatInterview(history, 'coach');
+      const aiReply = { role: 'ai', text: data.reply || "I'm thinking...", time: new Date().toLocaleTimeString() };
       setChatMessages(prev => [...prev, aiReply]);
-      setChatLoading(false);
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-    }, 900 + Math.random() * 600);
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'ai', text: "Connection issue — please try again.", time: new Date().toLocaleTimeString() }]);
+    }
+    setChatLoading(false);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
   const triggerHint = (text) => {
@@ -656,13 +638,13 @@ export default function DualAgentInterviewRoom() {
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } }}
                   placeholder="Ask AI Coach anything..."
                   style={{ flex: 1, background: '#222a3d', border: '1px solid rgba(70,69,85,0.3)', borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.78rem', outline: 'none' }} />
-                <button onClick={sendChatMessage} disabled={!chatInput.trim()} style={{ width: 38, height: 38, borderRadius: 10, background: chatInput.trim() ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d', border: 'none', cursor: chatInput.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <button onClick={() => sendChatMessage()} disabled={!chatInput.trim()} style={{ width: 38, height: 38, borderRadius: 10, background: chatInput.trim() ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d', border: 'none', cursor: chatInput.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span className="material-symbols-outlined" style={{ color: chatInput.trim() ? '#1d00a5' : '#464555', fontSize: 16 }}>send</span>
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {['Ask me a question', 'Give feedback', 'Interview tip'].map(q => (
-                  <button key={q} onClick={() => { setChatInput(q); }} style={{ padding: '0.25rem 0.6rem', background: 'rgba(195,192,255,0.08)', border: '1px solid rgba(195,192,255,0.15)', borderRadius: 999, fontSize: '0.6rem', color: '#c3c0ff', cursor: 'pointer', fontWeight: 600 }}>{q}</button>
+                  <button key={q} onClick={() => sendChatMessage(q)} style={{ padding: '0.25rem 0.6rem', background: 'rgba(195,192,255,0.08)', border: '1px solid rgba(195,192,255,0.15)', borderRadius: 999, fontSize: '0.6rem', color: '#c3c0ff', cursor: 'pointer', fontWeight: 600 }}>{q}</button>
                 ))}
               </div>
             </div>
@@ -739,40 +721,50 @@ export default function DualAgentInterviewRoom() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(199,196,216,0.4)', marginBottom: 4 }}>Interview Questions</div>
 
-              {[
-                { q: "Tell me about yourself and your background.", cat: 'Intro', color: '#c3c0ff' },
-                { q: "Describe a challenging technical problem you solved recently.", cat: 'Behavioral', color: '#ffb95f' },
-                { q: "How would you design a scalable notification system?", cat: 'System Design', color: '#4edea3' },
-                { q: "What's the difference between SQL and NoSQL databases?", cat: 'Technical', color: '#c3c0ff' },
-                { q: "How do you handle conflicts within your team?", cat: 'Behavioral', color: '#ffb95f' },
-                { q: "Explain the concept of microservices and their trade-offs.", cat: 'System Design', color: '#4edea3' },
-                { q: "Where do you see yourself in 5 years?", cat: 'Career', color: '#ffb4ab' },
-              ].map((item, i) => (
-                <div key={i} style={{ background: '#171f33', borderRadius: 10, padding: '0.875rem', border: '1px solid rgba(70,69,85,0.2)', cursor: 'pointer', transition: 'all 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${item.color}40`; e.currentTarget.style.background = '#1e2740'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(70,69,85,0.2)'; e.currentTarget.style.background = '#171f33'; }}
-                  onClick={() => {
-                    const aiMsg = { role: 'ai', text: item.q, time: new Date().toLocaleTimeString() };
-                    setChatMessages(prev => [...prev, aiMsg]);
-                    setSidebarTab('chat');
-                    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-                  }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <p style={{ fontSize: '0.78rem', color: '#dae2fd', lineHeight: 1.5, flex: 1 }}>{item.q}</p>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#c7c4d8', flexShrink: 0, marginTop: 2 }}>arrow_forward</span>
-                  </div>
-                  <div style={{ marginTop: 6 }}>
-                    <span style={{ padding: '0.15rem 0.5rem', background: `${item.color}15`, border: `1px solid ${item.color}30`, borderRadius: 999, fontSize: '0.58rem', fontWeight: 700, color: item.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{item.cat}</span>
-                  </div>
+              {questionsLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem', color: '#c7c4d8' }}>
+                  <div style={{ display: 'flex', gap: 3 }}>{[0,1,2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: '#c3c0ff', animation: `bounce 1.2s ease-in-out ${i*0.2}s infinite` }} />)}</div>
+                  <span style={{ fontSize: '0.75rem' }}>Generating questions with AI...</span>
                 </div>
-              ))}
+              ) : interviewQuestions.map((item, i) => {
+                const colorMap = { Intro: '#c3c0ff', Behavioral: '#ffb95f', Technical: '#c3c0ff', 'System Design': '#4edea3', Career: '#ffb4ab' };
+                const color = colorMap[item.cat] || '#c3c0ff';
+                return (
+                  <div key={i} style={{ background: '#171f33', borderRadius: 10, padding: '0.875rem', border: '1px solid rgba(70,69,85,0.2)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = `${color}40`; e.currentTarget.style.background = '#1e2740'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(70,69,85,0.2)'; e.currentTarget.style.background = '#171f33'; }}
+                    onClick={() => {
+                      const aiMsg = { role: 'ai', text: item.q, time: new Date().toLocaleTimeString() };
+                      setChatMessages(prev => [...prev, aiMsg]);
+                      setSidebarTab('chat');
+                      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <p style={{ fontSize: '0.78rem', color: '#dae2fd', lineHeight: 1.5, flex: 1 }}>{item.q}</p>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#c7c4d8', flexShrink: 0, marginTop: 2 }}>arrow_forward</span>
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ padding: '0.15rem 0.5rem', background: `${color}15`, border: `1px solid ${color}30`, borderRadius: 999, fontSize: '0.58rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{item.cat}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div style={{ padding: '0.875rem', borderTop: '1px solid rgba(70,69,85,0.2)', flexShrink: 0 }}>
-              <button onClick={() => {
-                const questions = ["Tell me about a time you led a project under tight deadlines.", "How do you approach learning a new technology?", "Describe your ideal engineering culture.", "What's your biggest professional achievement?"];
-                const q = questions[Math.floor(Math.random() * questions.length)];
-                const aiMsg = { role: 'ai', text: q, time: new Date().toLocaleTimeString() };
+            <div style={{ padding: '0.875rem', borderTop: '1px solid rgba(70,69,85,0.2)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={async () => {
+                setQuestionsLoading(true);
+                const data = await api.getInterviewQuestions().catch(() => null);
+                if (data?.questions?.length > 0) setInterviewQuestions(data.questions);
+                setQuestionsLoading(false);
+              }} style={{ width: '100%', padding: '0.6rem', background: '#222a3d', color: '#c7c4d8', border: '1px solid rgba(70,69,85,0.3)', borderRadius: 10, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span>
+                Regenerate Questions
+              </button>
+              <button onClick={async () => {
+                if (interviewQuestions.length === 0) return;
+                const item = interviewQuestions[Math.floor(Math.random() * interviewQuestions.length)];
+                const aiMsg = { role: 'ai', text: item.q, time: new Date().toLocaleTimeString() };
                 setChatMessages(prev => [...prev, aiMsg]);
                 setSidebarTab('chat');
                 setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);

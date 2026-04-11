@@ -284,6 +284,37 @@ export const api = {
     }).then(r => r.json()),
     async () => { await mockDelay(300); return { id, verification_status: status }; }
   ),
+
+  // ── AI Chat ─────────────────────────────────────────────────
+
+  chatInterview: (messages, role = 'coach') => callOrMock(
+    () => fetch(`${API_BASE}/chat/interview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, role }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(800); return { reply: "That's a great point! Can you elaborate on the technical implementation?" }; }
+  ),
+
+  getInterviewQuestions: (topic) => callOrMock(
+    () => fetch(`${API_BASE}/chat/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(600);
+      return { questions: [
+        { q: "Tell me about yourself and your background.", cat: "Intro" },
+        { q: "Describe a challenging technical problem you solved recently.", cat: "Behavioral" },
+        { q: "How would you design a scalable notification system?", cat: "System Design" },
+        { q: "What's the difference between SQL and NoSQL databases?", cat: "Technical" },
+        { q: "How do you handle conflicts within your team?", cat: "Behavioral" },
+        { q: "Explain the concept of microservices and their trade-offs.", cat: "System Design" },
+        { q: "Where do you see yourself in 5 years?", cat: "Career" },
+      ]};
+    }
+  ),
 };
 
 export const SOCKET_URL = API_BASE;

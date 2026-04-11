@@ -19,6 +19,7 @@ app.use('/users',         require('./routes/users'));
 app.use('/alumni',        require('./routes/alumni'));
 app.use('/register',      require('./routes/register'));
 app.use('/stats',         require('./routes/stats'));
+app.use('/chat',          require('./routes/chat'));
 
 // HTTP Server + Socket.io
 const server = http.createServer(app);
