@@ -1,7 +1,7 @@
 // Interview requests — backed by Supabase directly from frontend
 // Falls back to localStorage when Supabase is unreachable
 
-import { createRequest as dbCreateRequest, getRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
+import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
 
 const STORAGE_KEY = 'alumniconnect_interview_requests';
 const NOTIF_KEY   = 'alumniconnect_student_notifications';
