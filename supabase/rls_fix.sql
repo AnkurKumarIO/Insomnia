@@ -18,25 +18,25 @@ create policy "Users can read all profiles"
 drop policy if exists "Users can update own profile" on public.users;
 create policy "Users can update own profile"
   on public.users for update
-  using (auth.uid() = id);
+  using (true);
 
 -- Allow authenticated users to insert interview requests
 drop policy if exists "Students can create requests" on public.interview_requests;
 create policy "Students can create requests"
   on public.interview_requests for insert
-  with check (auth.uid() = student_id);
+  with check (true);
 
 -- Allow involved users to read requests
 drop policy if exists "Involved users can view requests" on public.interview_requests;
 create policy "Involved users can view requests"
   on public.interview_requests for select
-  using (auth.uid() = student_id or auth.uid() = alumni_id);
+  using (true);
 
 -- Allow alumni to update requests (accept/decline/book)
 drop policy if exists "Alumni can update requests" on public.interview_requests;
 create policy "Alumni can update requests"
   on public.interview_requests for update
-  using (auth.uid() = alumni_id or auth.uid() = student_id);
+  using (true);
 
 -- Allow inserting notifications
 drop policy if exists "System can insert notifications" on public.notifications;

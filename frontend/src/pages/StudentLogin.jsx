@@ -2,6 +2,8 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { api } from '../api';
+import { supabase } from '../lib/supabaseClient';
+import { getUserById } from '../lib/db';
 
 export default function StudentLogin() {
   const navigate = useNavigate();
@@ -25,7 +27,15 @@ export default function StudentLogin() {
     const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
 
     if (pending.username === username.trim() && pending.password === password.trim()) {
-      // Credentials match — fetch real user from Supabase if we have an id
+      // Sign into Supabase Auth to get a real session (needed for RLS on requests)
+      if (pending.email && pending.password) {
+        await supabase.auth.signInWithPassword({
+          email:    pending.email,
+          password: pending.password,
+        }).catch(() => {});
+      }
+
+      // Fetch real user data from Supabase
       let userData = {
         id:         pending.id   || null,
         name:       pending.name || 'Student',
@@ -34,25 +44,15 @@ export default function StudentLogin() {
         email:      pending.email || '',
       };
 
-      // Try to get the latest user data from Supabase
       if (pending.id) {
-        const dbUser = await api.getUser(pending.id).catch(() => null);
-        if (dbUser && !dbUser.error) {
-          userData = {
-            id:         dbUser.id,
-            name:       dbUser.name,
-            role:       dbUser.role,
-            department: dbUser.department,
-            email:      dbUser.email,
-          };
-          // Sync profile_data to localStorage
+        const dbUser = await getUserById(pending.id).catch(() => null);
+        if (dbUser) {
+          userData = { id: dbUser.id, name: dbUser.name, role: dbUser.role, department: dbUser.department, email: dbUser.email };
           if (dbUser.profile_data) {
-            const existing = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
-            localStorage.setItem('alumniconnect_profile', JSON.stringify({ ...existing, ...dbUser.profile_data }));
+            localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
           }
         }
       }
-
       login(userData, `token-${Date.now()}`);
 
       // If profile not yet completed, go to profile setup

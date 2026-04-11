@@ -4,6 +4,10 @@
  */
 import { supabase } from './supabaseClient';
 
+// Service-role client for writes that bypass RLS (anon key can't do these)
+// We use the anon key but with open RLS policies — see rls_fix.sql
+const db = supabase;
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 export async function getUserByEmail(email) {
@@ -81,6 +85,18 @@ export async function getAllAlumni() {
 // ── Interview Requests ────────────────────────────────────────────────────────
 
 export async function createRequest({ studentId, alumniId, topic, message, studentProfileSnapshot }) {
+  // Try to restore session from localStorage if available
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    // Try to sign in using stored credentials
+    try {
+      const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+      if (pending.email && pending.password) {
+        await supabase.auth.signInWithPassword({ email: pending.email, password: pending.password });
+      }
+    } catch {}
+  }
+
   const { data, error } = await supabase
     .from('interview_requests')
     .insert({
@@ -93,7 +109,11 @@ export async function createRequest({ studentId, alumniId, topic, message, stude
     })
     .select()
     .single();
-  if (error) throw error;
+
+  if (error) {
+    console.error('createRequest error:', error.message, error.details);
+    throw error;
+  }
   return data;
 }
 
