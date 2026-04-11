@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EduVerify | Verification Status</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-variant": "#2d3449",
+                    "surface-bright": "#31394d",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "surface-container-high": "#222a3d",
+                    "surface-tint": "#c3c0ff",
+                    "tertiary-container": "#885500",
+                    "outline": "#918fa1",
+                    "on-background": "#dae2fd",
+                    "on-error-container": "#ffdad6",
+                    "error": "#ffb4ab",
+                    "surface-container-low": "#131b2e",
+                    "inverse-surface": "#dae2fd",
+                    "on-surface": "#dae2fd",
+                    "primary": "#c3c0ff",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "secondary-container": "#00a572",
+                    "on-surface-variant": "#c7c4d8",
+                    "tertiary": "#ffb95f",
+                    "surface-dim": "#0b1326",
+                    "on-tertiary-container": "#ffd4a4",
+                    "on-error": "#690005",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "surface": "#0b1326",
+                    "secondary-fixed-dim": "#4edea3",
+                    "error-container": "#93000a",
+                    "primary-fixed": "#e2dfff",
+                    "secondary": "#4edea3",
+                    "secondary-fixed": "#6ffbbe",
+                    "background": "#0b1326",
+                    "surface-container": "#171f33",
+                    "on-secondary": "#003824",
+                    "inverse-primary": "#4d44e3",
+                    "primary-container": "#4f46e5",
+                    "on-primary-fixed": "#0f0069",
+                    "surface-container-highest": "#2d3449",
+                    "outline-variant": "#464555",
+                    "on-tertiary-fixed": "#2a1700",
+                    "on-primary": "#1d00a5",
+                    "surface-container-lowest": "#060e20",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "tertiary-fixed": "#ffddb8",
+                    "on-tertiary": "#472a00",
+                    "inverse-on-surface": "#283044",
+                    "on-secondary-fixed": "#002113",
+                    "on-secondary-container": "#00311f",
+                    "on-primary-container": "#dad7ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      body { font-family: 'Inter', sans-serif; background-color: #0b1326; color: #dae2fd; }
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+      .glass-morphism {
+        background: rgba(45, 52, 73, 0.4);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      .uppercase-labels { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; font-size: 0.75rem; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="bg-[#0b1326]/80 backdrop-blur-xl sticky top-0 z-50 shadow-[0_20px_40px_rgba(0,0,0,0.4)] no-border">
+<div class="flex justify-between items-center px-8 py-4 w-full max-w-7xl mx-auto">
+<div class="text-xl font-bold tracking-tighter text-[#c3c0ff]">EduVerify</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 font-['Inter'] tracking-tight text-sm uppercase-labels" href="#">Dashboard</a>
+<a class="text-[#c3c0ff] border-b-2 border-[#4f46e5] pb-1 font-['Inter'] tracking-tight text-sm uppercase-labels" href="#">Verification</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 font-['Inter'] tracking-tight text-sm uppercase-labels" href="#">Documents</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 font-['Inter'] tracking-tight text-sm uppercase-labels" href="#">Support</a>
+</nav>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#c3c0ff] cursor-pointer transition-all active:scale-95">notifications</span>
+<span class="material-symbols-outlined text-[#c3c0ff] cursor-pointer transition-all active:scale-95">help_outline</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden">
+<img alt="Student Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a young college student with a neutral expression and professional attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXYopUOgvk96at0Am3hpXO6z0Ammefz6KPHmP-qFpcii7mTESfUesI7UtneGgSsPFA_rLxrpSOEHdaxn3RT4OS8pJc_H-e2o6a8HIfNedKGhyufVjInafP1OgrhF4i6HY_nvqmI8unnpiNjaS8JGEn4tUvyN8-MXBaY-FwLmAkWRIIceh6wt5nnaAhbZaLxHdKYQh0tNSj9ewExrsHgJB1mVmoYxYPJVY-IT4W0WqUEIhVTVDTuuQcfqtFlQsk8GitZJKOK7-iNYtl"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 max-w-7xl mx-auto w-full">
+<!-- Sidebar Navigation -->
+<aside class="hidden lg:flex flex-col p-6 gap-2 bg-[#131b2e] h-[calc(100vh-72px)] w-64 tonal-layering-no-lines">
+<div class="mb-8 px-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+<div>
+<p class="text-lg font-bold text-[#c3c0ff] leading-none">Student Portal</p>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mt-1">Verification Phase</p>
+</div>
+</div>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] hover:text-white rounded-xl transition-all duration-200 font-['Inter'] text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+                    Overview
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] hover:text-white rounded-xl transition-all duration-200 font-['Inter'] text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+                    Application
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] hover:text-white rounded-xl transition-all duration-200 font-['Inter'] text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined">fingerprint</span>
+                    Identity
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-[#222a3d] text-[#c3c0ff] rounded-xl font-semibold transition-all duration-200 font-['Inter'] text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+                    Status
+                </a>
+</nav>
+<div class="mt-auto p-4 bg-surface-container-lowest rounded-2xl">
+<p class="text-xs text-on-surface-variant mb-3">Need assistance with your documents?</p>
+<button class="w-full py-2 px-4 bg-surface-container-high hover:bg-surface-container-highest text-[#c3c0ff] rounded-lg text-xs font-semibold transition-colors">
+                    Contact Support
+                </button>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 p-6 md:p-12 overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<!-- Page Header -->
+<div class="mb-12">
+<p class="uppercase-labels text-primary mb-2">Process Tracking</p>
+<h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-on-surface">Verification Status</h1>
+<div class="mt-6 flex items-center gap-4 p-4 bg-surface-container-low rounded-xl border-l-4 border-primary">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">info</span>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                            Your details are under verification by the <span class="text-on-surface font-semibold">Training &amp; Placement Office</span>. Credentials will be emailed upon approval.
+                        </p>
+</div>
+</div>
+<!-- Status Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<!-- Progress Bento Card -->
+<div class="md:col-span-2 bg-surface-container-low rounded-3xl p-8 flex flex-col justify-between min-h-[320px] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-primary/10 transition-colors duration-700"></div>
+<div>
+<div class="flex justify-between items-start mb-10">
+<div>
+<h2 class="text-2xl font-bold mb-1">Queue Progress</h2>
+<p class="text-sm text-on-surface-variant">Step 3 of 4 in progress</p>
+</div>
+<div class="px-3 py-1 bg-primary-container/20 text-primary rounded-full text-xs font-bold uppercase tracking-widest">
+                                    75% Complete
+                                </div>
+</div>
+<!-- Stepper Checklist -->
+<div class="space-y-8">
+<div class="flex items-center gap-6">
+<div class="relative">
+<div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-on-secondary z-10 relative">
+<span class="material-symbols-outlined text-xl">check</span>
+</div>
+<div class="absolute top-10 left-1/2 w-0.5 h-8 bg-secondary -translate-x-1/2"></div>
+</div>
+<div>
+<h3 class="font-bold text-on-surface">Account Created</h3>
+<p class="text-xs text-on-surface-variant">Confirmed on Oct 24, 2023</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative">
+<div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-on-secondary z-10 relative">
+<span class="material-symbols-outlined text-xl">check</span>
+</div>
+<div class="absolute top-10 left-1/2 w-0.5 h-8 bg-surface-container-highest -translate-x-1/2"></div>
+</div>
+<div>
+<h3 class="font-bold text-on-surface">Sent to T&amp;P</h3>
+<p class="text-xs text-on-surface-variant">Forwarded on Oct 25, 2023</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="w-10 h-10 rounded-full border-2 border-primary border-dashed flex items-center justify-center text-primary animate-pulse">
+<span class="material-symbols-outlined text-xl">hourglass_empty</span>
+</div>
+<div>
+<h3 class="font-bold text-primary">Verification in Progress</h3>
+<p class="text-xs text-on-surface-variant">Estimated completion: 24-48 hours</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Stats / Info -->
+<div class="flex flex-col gap-6">
+<div class="bg-surface-container rounded-3xl p-6 flex-1 flex flex-col justify-center">
+<p class="uppercase-labels text-tertiary mb-2">Priority Status</p>
+<h3 class="text-xl font-bold mb-4">Standard Review</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">schedule</span>
+<span class="text-sm text-on-surface-variant">Queue #42</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">verified_user</span>
+<span class="text-sm text-on-surface-variant">Tier 1 Identity</span>
+</div>
+</div>
+</div>
+<div class="bg-gradient-to-br from-primary-container to-primary rounded-3xl p-6 flex flex-col justify-between text-on-primary min-h-[160px] shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-3xl opacity-50">mail</span>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest mb-1">Final Step</p>
+<p class="text-sm font-medium">Digital credentials will be dispatched to your inbox.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Detail Section - Alumni Intelligence Cards Style -->
+<div class="bg-surface-variant/40 rounded-3xl p-8 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary blur-[2px]"></div>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-8">
+<div class="flex-1">
+<h3 class="text-xl font-bold mb-2">Institutional Insight</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">
+                                Our Training &amp; Placement Office (T&amp;P) is currently processing a high volume of graduating students. Your position in the queue is prioritized based on the completion of your identity documentation.
+                            </p>
+</div>
+<div class="flex gap-4">
+<button class="bg-surface-container-high px-6 py-3 rounded-xl text-sm font-semibold hover:bg-surface-container-highest transition-colors">
+                                View History
+                            </button>
+<button class="bg-primary text-on-primary px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-wide hover:opacity-90 transition-opacity">
+                                Update Docs
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Bottom Navigation Bar (Mobile only) -->
+<footer class="md:hidden bg-[#0b1326]/80 backdrop-blur-xl fixed bottom-0 left-0 right-0 z-50">
+<div class="flex justify-around items-center py-4">
+<div class="flex flex-col items-center gap-1 text-[#c7c4d8] transition-colors">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="text-[10px] uppercase font-bold tracking-tighter">Overview</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-[#c7c4d8] transition-colors">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="text-[10px] uppercase font-bold tracking-tighter">Apply</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-[#c3c0ff]">
+<div class="w-10 h-10 bg-primary-container text-on-primary-container flex items-center justify-center rounded-xl mb-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+</div>
+<span class="text-[10px] uppercase font-bold tracking-tighter">Status</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-[#c7c4d8] transition-colors">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] uppercase font-bold tracking-tighter">Account</span>
+</div>
+</div>
+</footer>
+</body></html>

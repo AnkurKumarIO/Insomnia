@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Resource Vault | AlumniConnect AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#131b2e",
+                        "surface-container": "#171f33",
+                        "surface-bright": "#31394d",
+                        "surface": "#0b1326",
+                        "primary": "#c3c0ff",
+                        "on-primary": "#1d00a5",
+                        "surface-dim": "#0b1326",
+                        "on-tertiary": "#472a00",
+                        "on-secondary": "#003824",
+                        "on-primary-fixed": "#0f0069",
+                        "on-surface-variant": "#c7c4d8",
+                        "on-secondary-container": "#00311f",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "on-background": "#dae2fd",
+                        "on-secondary-fixed": "#002113",
+                        "inverse-primary": "#4d44e3",
+                        "secondary": "#4edea3",
+                        "on-primary-container": "#dad7ff",
+                        "tertiary-container": "#885500",
+                        "on-tertiary-container": "#ffd4a4",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-container-highest": "#2d3449",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed": "#e2dfff",
+                        "on-error": "#690005",
+                        "primary-container": "#4f46e5",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-surface": "#dae2fd",
+                        "inverse-surface": "#dae2fd",
+                        "secondary-container": "#00a572",
+                        "background": "#0b1326",
+                        "outline-variant": "#464555",
+                        "outline": "#918fa1",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#060e20",
+                        "tertiary-fixed": "#ffddb8",
+                        "on-tertiary-fixed": "#2a1700",
+                        "inverse-on-surface": "#283044",
+                        "secondary-fixed": "#6ffbbe",
+                        "error": "#ffb4ab",
+                        "surface-container-high": "#222a3d",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-tint": "#c3c0ff",
+                        "surface-variant": "#2d3449",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "tertiary": "#ffb95f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b1326; color: #dae2fd; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { backdrop-filter: blur(20px); background: rgba(23, 31, 51, 0.7); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container/30">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-[#0b1326]/80 backdrop-blur-xl flex justify-between items-center px-8 h-16 w-full shadow-[0_20px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(195,192,255,0.05)]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#c3c0ff] tracking-tighter">AlumniConnect AI</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors Inter font-sans tracking-tight" href="#">Directory</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors Inter font-sans tracking-tight" href="#">Events</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors Inter font-sans tracking-tight" href="#">Mentorship</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden sm:flex items-center bg-surface-container-lowest px-4 py-1.5 rounded-full border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm text-outline mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder-outline" placeholder="Global search..." type="text"/>
+</div>
+<button class="p-2 text-[#c3c0ff] hover:bg-[#222a3d] transition-all duration-300 rounded-full scale-95 active:opacity-80 transition-transform">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
+<img alt="User profile avatar" data-alt="professional male avatar portrait with soft blue studio lighting and neutral expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4R4RYo1kHMAlx23uMxtS7Z9BbDq7Gz8YIl_vpX1lks6AIw1rvDuRJ63CNUpx82Iiht1o2VlwveANYOVdY1-pv9Vc7OxF89cVQJwGCSpliTyXkPBWdrN4XdnSbs4shIPd3xF6Tkm235jfUwYvvyYVHzi66RXFca316BKabQS1AF2TlCqOMeoDAU8QOKgcrb1-OIR1gu4SAnmL5JTDkDzCl4OvYUPBYaBQ_z27u4McK0sjL6Hk4klwnlojqXNlEfIPBQL7-K69WW5OP"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-[#131b2e] border-r border-[#464555]/20 flex flex-col p-4 gap-2 z-40 hidden md:flex pt-20">
+<div class="mb-8 px-2">
+<h2 class="text-[#c3c0ff] font-black text-lg tracking-tight">AlumniConnect</h2>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant/60 font-bold">AI Intelligence</p>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] rounded-xl ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] rounded-xl ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">explore</span> Discovery
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-[#222a3d] text-[#c3c0ff] rounded-xl font-semibold ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">folder_shared</span> Resource Vault
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] rounded-xl ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">settings</span> Settings
+            </a>
+</nav>
+<div class="pt-4 border-t border-outline-variant/10 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] rounded-xl ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">contact_support</span> Support
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] hover:bg-[#171f33] rounded-xl ease-in-out duration-200 Inter labels-uppercase tracking-widest text-[10px]" href="#">
+<span class="material-symbols-outlined">logout</span> Logout
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-16 min-h-screen">
+<div class="max-w-7xl mx-auto px-6 py-12">
+<!-- Header Section -->
+<section class="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<span class="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-2 block">Knowledge Repository</span>
+<h1 class="text-5xl font-black tracking-tighter text-on-surface mb-3">Resource Vault</h1>
+<p class="text-on-surface-variant max-w-xl text-lg leading-relaxed">
+                        Curated industry insights, templates, and study materials shared by <span class="text-primary font-medium">Dr. Helena Vane</span>.
+                    </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/20 px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-xl">search</span> Search
+                    </button>
+<button class="bg-gradient-to-br from-primary-container to-primary text-on-primary px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-lg">upload</span> Upload Resource
+                    </button>
+</div>
+</section>
+<!-- Categories Chips -->
+<section class="mb-10 no-scrollbar overflow-x-auto flex items-center gap-3 pb-4">
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-primary text-on-primary font-bold text-sm">All Resources</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm">Interview Prep</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm">System Design</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm">Career Guides</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm">Coding Templates</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors font-medium text-sm">Case Studies</button>
+</section>
+<!-- Featured Section -->
+<section class="mb-16">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">push_pin</span>
+<h2 class="text-xl font-bold tracking-tight">Pinned Essentials</h2>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Featured Card 1 -->
+<div class="glass-panel rounded-2xl p-8 border border-primary/10 flex flex-col md:flex-row gap-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-4xl text-primary">auto_awesome</span>
+</div>
+<div class="w-full md:w-48 h-48 rounded-xl overflow-hidden shrink-0 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="close-up of clean code on a monitor screen in a dimly lit modern tech office environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKPHfJTEOhL-UwXtKOv1smiV8hE6gf2n76Wusauer-KSBzQPzrBrnzkpt7agVQjcGCkGzYi6BmD2YTB2_a3ski0w7C0LsX3igsxD5WD7oT2r7B64HURpQw6fysk8-8Y8hSKRNLwU7BN8Zb1KG6_uiBcgTKNxl5jE8s5_bzq_H2TghP_iX4-xcmn_gUHWO0bAwDAVlQ8lHWMY_ytg_suQASVtPpf1KXHadx-qY5zlR0qEJwOfV3aEn81GmQ1ebBRsdcA3841FWCdLau"/>
+</div>
+<div class="flex flex-col justify-between flex-1">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<span class="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">FAANG Prep</span>
+<span class="text-on-surface-variant/60 text-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">timer</span> 15 min read
+                                    </span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-3 leading-tight">Mastering Distributed Systems Interviews</h3>
+<p class="text-on-surface-variant text-sm line-clamp-2 leading-relaxed">
+                                    A comprehensive guide to answering scale-related questions at Tier 1 tech companies, including load balancing and replication.
+                                </p>
+</div>
+<div class="mt-6 flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-container-highest flex items-center justify-center">
+<span class="text-[10px] font-bold text-primary">+12</span>
+</div>
+</div>
+<button class="flex items-center gap-2 text-primary font-bold text-sm group">
+                                    View Guide
+                                    <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Featured Card 2 -->
+<div class="glass-panel rounded-2xl p-8 border border-primary/10 flex flex-col md:flex-row gap-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-4xl text-primary">star</span>
+</div>
+<div class="w-full md:w-48 h-48 rounded-xl overflow-hidden shrink-0 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="neatly organized desk with a notebook and pen with focused soft warm sunset lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAet5YoY5Py08YUb4OpJKQstMcbismw6ptI5V0Ir661LYYy4YZ4sgtMMchRhtA-oB5OS6VTUyyBxDPyMBUMJcjC50KWPdn8XDWfw4is9kpVSuRCXDooslIhgRRqhU3Q_JE_zZOZVKZmyNQGDvelMHfyZfFaAcVlAxSJpvCAEDFL5OCk-QDIf_XbJvzhZq22_b2IggIwaJoOMCLaMRo4yt9SUZxOeJD51obAXvarVJhjMDMRat03dD6oPPu9dnVvgvhM_aU469DrcBg_"/>
+</div>
+<div class="flex flex-col justify-between flex-1">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">PDF Toolkit</span>
+<span class="text-on-surface-variant/60 text-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">download</span> 2.4 MB
+                                    </span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-3 leading-tight">Venture Capital Negotiation Cheat Sheet</h3>
+<p class="text-on-surface-variant text-sm line-clamp-2 leading-relaxed">
+                                    Critical term sheet clauses explained for founders looking to raise Seed and Series A rounds from institutional investors.
+                                </p>
+</div>
+<div class="mt-6 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">visibility</span>
+<span class="text-xs text-on-surface-variant/60 font-medium">842 Views</span>
+</div>
+<button class="bg-surface-container-high hover:bg-surface-bright text-primary-fixed px-6 py-2 rounded-xl text-xs font-bold transition-all border border-outline-variant/10">
+                                    Download
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Resource Grid -->
+<section>
+<div class="flex items-center justify-between mb-8">
+<h2 class="text-2xl font-bold tracking-tight">Recent Additions</h2>
+<div class="flex items-center gap-4 text-sm text-on-surface-variant">
+<span>Sort by: <button class="text-on-surface font-semibold">Latest</button></span>
+<div class="w-px h-4 bg-outline-variant/20"></div>
+<button class="material-symbols-outlined text-lg">view_grid</button>
+<button class="material-symbols-outlined text-lg text-outline/50">format_list_bulleted</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Resource Card 1 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">picture_as_pdf</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">Machine Learning Roadmap 2024</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            A step-by-step path from statistics basics to LLM fine-tuning strategies.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Beginner</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">AI/ML</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Updated 2 days ago</span>
+<button class="text-primary font-bold text-sm hover:underline underline-offset-4">Open PDF</button>
+</div>
+</div>
+<!-- Resource Card 2 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-secondary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">link</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">The Ultimate React Performance Checklist</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            Curated Notion board with profiling techniques and optimization patterns.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Advanced</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Frontend</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Updated 1 week ago</span>
+<button class="text-secondary font-bold text-sm hover:underline underline-offset-4">Visit Link</button>
+</div>
+</div>
+<!-- Resource Card 3 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-tertiary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">movie</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">Soft Skills for Product Managers</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            A recorded masterclass on stakeholder management and conflict resolution.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Leadership</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Product</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Uploaded Oct 12</span>
+<button class="text-tertiary font-bold text-sm hover:underline underline-offset-4">Watch Video</button>
+</div>
+</div>
+<!-- AI Insight Card (Custom Component) -->
+<div class="col-span-1 md:col-span-2 lg:col-span-3 surface-variant bg-[#2d3449] p-8 rounded-2xl border-l-[3px] border-primary/40 flex flex-col md:flex-row items-center gap-8 shadow-xl">
+<div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center shrink-0 border border-primary/30">
+<span class="material-symbols-outlined text-4xl text-primary" style="font-variation-settings: 'FILL' 1;">psychology</span>
+</div>
+<div class="flex-1">
+<h5 class="text-primary font-bold text-sm uppercase tracking-widest mb-1">AI Recommendation</h5>
+<h4 class="text-xl font-bold mb-3">Based on your recent profile update</h4>
+<p class="text-on-surface-variant leading-relaxed">
+                                Our intelligence engine suggests focusing on <strong class="text-on-surface">GraphQL Schemas</strong> and <strong class="text-on-surface">Redis Caching</strong> for your upcoming interview at Stripe. Dr. Helena Vane has shared exclusive notes specifically for their engineering loop.
+                            </p>
+</div>
+<button class="bg-primary text-on-primary px-8 py-3 rounded-full font-black text-xs uppercase tracking-tighter hover:scale-105 transition-transform shrink-0">
+                            View Smart Bundle
+                        </button>
+</div>
+<!-- Resource Card 4 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">terminal</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">Kubernetes Helm Chart Samples</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            Production-ready configurations for deploying microservices with ease.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">DevOps</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Infrastructure</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Updated Oct 20</span>
+<button class="text-primary font-bold text-sm hover:underline underline-offset-4">Get Code</button>
+</div>
+</div>
+<!-- Resource Card 5 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-secondary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">description</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">SQL Optimization Workshop Handout</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            Exercises from the September alumni meet-up on query plan analysis.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Database</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Intermediate</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Updated Sep 30</span>
+<button class="text-secondary font-bold text-sm hover:underline underline-offset-4">Download</button>
+</div>
+</div>
+<!-- Resource Card 6 -->
+<div class="bg-surface-container rounded-2xl p-6 hover:translate-y-[-4px] transition-all duration-300 border border-transparent hover:border-outline-variant/20 group">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">folder_zip</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="text-lg font-bold text-on-surface mb-2">Startup Equity Modeling Sheets</h4>
+<p class="text-sm text-on-surface-variant line-clamp-2 mb-6 leading-relaxed">
+                            Excel templates for calculating dilution and employee stock option pools.
+                        </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Finance</span>
+<span class="px-2.5 py-0.5 rounded-md bg-surface-container-highest text-[10px] font-bold text-outline uppercase tracking-wider">Entrepreneurship</span>
+</div>
+<div class="pt-4 border-t border-outline-variant/10 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant/40">Updated Aug 15</span>
+<button class="text-on-surface font-bold text-sm hover:underline underline-offset-4">Download Zip</button>
+</div>
+</div>
+</div>
+<!-- Load More / Pagination -->
+<div class="mt-16 flex justify-center">
+<button class="px-12 py-4 bg-surface-container-low border border-outline-variant/20 rounded-2xl text-on-surface-variant font-bold hover:bg-surface-container hover:text-primary transition-all flex items-center gap-2">
+                        View More Resources
+                        <span class="material-symbols-outlined">expand_more</span>
+</button>
+</div>
+</section>
+</div>
+</main>
+<!-- Mobile Navigation Bar -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-[#0b1326]/90 backdrop-blur-lg border-t border-outline-variant/10 flex justify-around items-center h-16 z-50">
+<button class="flex flex-col items-center gap-1 text-on-surface-variant/60">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant/60">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Expl</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder_shared</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Vault</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant/60">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Set</span>
+</button>
+</nav>
+</body></html>

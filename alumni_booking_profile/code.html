@@ -1,0 +1,370 @@
+<html class="dark"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-fixed-dim": "#4edea3",
+            "primary-fixed-dim": "#c3c0ff",
+            "on-secondary-fixed": "#002113",
+            "secondary-fixed": "#6ffbbe",
+            "on-primary-fixed-variant": "#3323cc",
+            "on-secondary-container": "#00311f",
+            "surface-bright": "#31394d",
+            "on-error-container": "#ffdad6",
+            "on-surface": "#dae2fd",
+            "tertiary-fixed-dim": "#ffb95f",
+            "surface-dim": "#0b1326",
+            "primary-fixed": "#e2dfff",
+            "on-tertiary": "#472a00",
+            "on-background": "#dae2fd",
+            "secondary-container": "#00a572",
+            "surface-container-low": "#131b2e",
+            "on-secondary-fixed-variant": "#005236",
+            "error-container": "#93000a",
+            "error": "#ffb4ab",
+            "surface-tint": "#c3c0ff",
+            "outline": "#918fa1",
+            "on-primary-fixed": "#0f0069",
+            "outline-variant": "#464555",
+            "on-tertiary-fixed": "#2a1700",
+            "on-secondary": "#003824",
+            "on-primary-container": "#dad7ff",
+            "primary": "#c3c0ff",
+            "surface-container": "#171f33",
+            "surface-variant": "#2d3449",
+            "surface-container-high": "#222a3d",
+            "primary-container": "#4f46e5",
+            "on-tertiary-container": "#ffd4a4",
+            "on-error": "#690005",
+            "inverse-on-surface": "#283044",
+            "inverse-surface": "#dae2fd",
+            "surface-container-highest": "#2d3449",
+            "tertiary-container": "#885500",
+            "tertiary-fixed": "#ffddb8",
+            "inverse-primary": "#4d44e3",
+            "on-tertiary-fixed-variant": "#653e00",
+            "secondary": "#4edea3",
+            "on-surface-variant": "#c7c4d8",
+            "surface-container-lowest": "#060e20",
+            "surface": "#0b1326",
+            "background": "#0b1326",
+            "tertiary": "#ffb95f",
+            "on-primary": "#1d00a5"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-effect {
+      backdrop-filter: blur(20px);
+      background: rgba(45, 52, 73, 0.4);
+    }
+    .asymmetric-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 1024px) {
+      .asymmetric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 bg-[#0b1326]/80 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(195,192,255,0.05)]">
+<div class="flex items-center justify-between px-8 h-16 w-full max-w-[1920px] mx-auto">
+<div class="text-xl font-bold tracking-[-0.04em] bg-gradient-to-r from-[#4f46e5] to-[#c3c0ff] bg-clip-text text-transparent">
+        AlumniConnect AI
+      </div>
+<div class="hidden md:flex gap-8 items-center">
+<a class="text-[#c3c0ff] font-semibold text-sm" href="#">Discovery</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 text-sm" href="#">Mentorship</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 text-sm" href="#">Bookings</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-300 text-sm" href="#">Community</a>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#c3c0ff] cursor-pointer scale-95 active:scale-90 transition-transform">notifications</span>
+<span class="material-symbols-outlined text-[#c3c0ff] cursor-pointer scale-95 active:scale-90 transition-transform">settings</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
+<img alt="User avatar" data-alt="Close up portrait of a young professional male with a soft neutral background and modern studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBaPufMBDrFN7d5hiCb1l3T3g2CZZy5G209hQsbX9VetQF1i5nNxUKs3xGCQuYj5osnbLIaMMIOxxleFhRw7_3SQ0lRwebvcYXVO400fuR1-n2yikCR3_k9SYLv6QDqQmUjY6IRVCzisKXKiMY-bHuWXZWlZ4Qhh7V9RTSPSMS8ZRN87Xq18M8yeRQzUOIuXjYms-2Bxhym1cDIKbmhmW17M5wiPFZqb-oPZVPEgGRJWNg7e3u1fqYq03xvIbNik1gVoy0K2dobwWL8"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Side Navigation Shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-[#131b2e] hidden md:flex flex-col p-6 gap-y-4 pt-24 z-40">
+<div class="flex flex-col gap-1 mb-8">
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[10px] font-medium text-[#c7c4d8] opacity-70">Main Menu</span>
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3 px-4 py-3 bg-[#222a3d] text-[#c3c0ff] rounded-xl cursor-pointer">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-xs uppercase tracking-wider">Discovery</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] opacity-70 hover:bg-[#171f33] hover:opacity-100 transition-all rounded-xl cursor-pointer">
+<span class="material-symbols-outlined">school</span>
+<span class="text-xs uppercase tracking-wider">Mentorship</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] opacity-70 hover:bg-[#171f33] hover:opacity-100 transition-all rounded-xl cursor-pointer">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="text-xs uppercase tracking-wider">Bookings</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] opacity-70 hover:bg-[#171f33] hover:opacity-100 transition-all rounded-xl cursor-pointer">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-xs uppercase tracking-wider">Community</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-[#c7c4d8] opacity-70 hover:bg-[#171f33] hover:opacity-100 transition-all rounded-xl cursor-pointer">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-xs uppercase tracking-wider">Insights</span>
+</div>
+</div>
+</div>
+<button class="mt-auto bg-gradient-to-br from-primary-container to-primary text-on-primary py-3 rounded-xl text-[10px] uppercase tracking-widest font-bold shadow-lg shadow-primary-container/20">
+      New Connection
+    </button>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-0 md:ml-64 pt-24 pb-12 px-8 min-h-screen">
+<div class="max-w-6xl mx-auto space-y-12">
+<!-- Profile Header Hero -->
+<section class="relative rounded-2xl overflow-hidden h-64 border border-outline-variant/10">
+<div class="absolute inset-0 bg-gradient-to-r from-surface-dim via-surface-container-low to-transparent z-10"></div>
+<img alt="Profile banner" class="absolute inset-0 w-full h-full object-cover" data-alt="Abstract deep blue and indigo data visualization nodes interconnected with faint glowing lines on a dark space background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcCEAF1qEULtNhkQlR371obCArBZ8ZWWFPA244gqfcN7xmphq01jcj3rMN_1_9kl3xgtrj_bPf0n82dIdiEJ-MNEwkQFIND8ytBjhOtzP1hxA-Xf1G9DgpulZpiZ1LzhzbpH6PoQH9YsaeT9VB0Jf2Q85BB5mst7Y3gnKnicI7zGCaFPRcyqy95h8YlXZ9LIfVES39f4wqff3Dre7XAqTbKCuCXouXhST12R8HbUzIP3Y80H3NseBTcMc6mczMoPTkV0sOolQhMVsL"/>
+<div class="absolute bottom-8 left-8 z-20 flex items-end gap-6">
+<div class="w-32 h-32 rounded-2xl border-4 border-surface shadow-2xl overflow-hidden">
+<img alt="Alumni profile" class="w-full h-full object-cover" data-alt="Portrait of a senior software engineer in a modern workspace, warm overhead lighting, professional and approachable expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRukw5RuAOi0sQRSU4lsI5ehl9nnzIbsyLDQ00bZR6Xiqe5K4zaZUWb2ggUGyuQNFuAoBCUE2x5fkLkAbaMCmW-gssyU4vGknVh4fRA-Gkt8H92EOdruIqxxLptDkOThkqmika6DJue4pRNWY2PxAbhdy_BvIBBWQR3E584XS7iByIkLw2TH3DsT-9GACfNLpMpaafRf08JivBmeg-Drt7kYcYknC-gb_BYX8HJiOLnePbIfNc_mfUzPLGRM1EyTrzM-sf-einhYCS"/>
+</div>
+<div class="mb-2">
+<h1 class="text-4xl font-extrabold tracking-tight text-on-surface">Dr. Elena Sterling</h1>
+<p class="text-primary font-medium tracking-wide flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
+              Principal AI Architect at Quantum-X
+            </p>
+</div>
+</div>
+</section>
+<!-- Editorial Layout: Bio & Dashboard -->
+<div class="asymmetric-grid">
+<div class="space-y-6">
+<!-- Bio Section -->
+<div class="bg-surface-container-low rounded-xl p-8 shadow-sm border border-outline-variant/5">
+<h3 class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant mb-4">The Narrative</h3>
+<p class="text-on-surface/80 leading-relaxed text-lg font-light">
+              Pioneering the intersection of distributed systems and cognitive computing. With over 15 years of experience in Silicon Valley, I focus on mentoring the next generation of engineers who want to build ethical, scalable AI infrastructures. 
+            </p>
+<div class="mt-8 flex gap-4">
+<div class="p-3 bg-surface-container-high rounded-lg text-primary hover:text-secondary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">alternate_email</span>
+</div>
+<div class="p-3 bg-surface-container-high rounded-lg text-primary hover:text-secondary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">link</span>
+</div>
+<div class="p-3 bg-surface-container-high rounded-lg text-primary hover:text-secondary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">share</span>
+</div>
+</div>
+</div>
+<!-- Impact Dashboard -->
+<div class="bg-surface-container rounded-xl p-8 shadow-sm border-l-2 border-primary">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant">Impact Dashboard</h3>
+<span class="text-xs text-secondary bg-secondary/10 px-2 py-1 rounded">+12% this month</span>
+</div>
+<div class="flex items-end gap-2 h-48">
+<div class="flex-1 bg-surface-container-high rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md transition-all duration-500" style="height: 60%;"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-md relative">
+<div class="absolute bottom-0 w-full bg-primary/80 rounded-t-md" style="height: 45%;"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-md relative">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md" style="height: 85%;"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-md relative">
+<div class="absolute bottom-0 w-full bg-primary/70 rounded-t-md" style="height: 30%;"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-md relative">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md" style="height: 70%;"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-md relative">
+<div class="absolute bottom-0 w-full bg-primary/90 rounded-t-md" style="height: 55%;"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 text-[10px] text-on-surface-variant uppercase tracking-tighter">
+<span>Mentored</span>
+<span>Sessions</span>
+<span>Workshops</span>
+<span>Projects</span>
+<span>Ratings</span>
+<span>Network</span>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<!-- Resource Vault -->
+<div class="bg-surface-container-low rounded-xl p-8 border border-outline-variant/5">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">folder_open</span>
+<h3 class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant">Resource Vault</h3>
+</div>
+<div class="space-y-4">
+<div class="p-4 bg-surface-container-highest rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary">description</span>
+<div>
+<div class="text-sm font-medium text-on-surface">AI Scalability Blueprint</div>
+<div class="text-[10px] text-on-surface-variant">PDF • 4.2 MB</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">download</span>
+</div>
+<div class="p-4 bg-surface-container-highest rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">video_library</span>
+<div>
+<div class="text-sm font-medium text-on-surface">Distributed Systems 101</div>
+<div class="text-[10px] text-on-surface-variant">Video • 120 Mins</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">play_circle</span>
+</div>
+<div class="p-4 bg-surface-container-highest rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">terminal</span>
+<div>
+<div class="text-sm font-medium text-on-surface">PyTorch Optimization Snippets</div>
+<div class="text-[10px] text-on-surface-variant">Code • Git Gist</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+</div>
+</div>
+</div>
+<!-- Expertise Chips -->
+<div class="bg-surface-container-high rounded-xl p-8">
+<h3 class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant mb-4">Core Competencies</h3>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1.5 bg-secondary-container/20 text-secondary-fixed text-[10px] font-bold uppercase rounded-full">Neural Arch</span>
+<span class="px-3 py-1.5 bg-primary-container/20 text-primary-fixed-dim text-[10px] font-bold uppercase rounded-full">Cloud Infra</span>
+<span class="px-3 py-1.5 bg-tertiary-container/20 text-tertiary-fixed-dim text-[10px] font-bold uppercase rounded-full">Mentorship</span>
+<span class="px-3 py-1.5 bg-secondary-container/20 text-secondary-fixed text-[10px] font-bold uppercase rounded-full">System Design</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Booking Modal Overlay -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+<!-- Backdrop Blur -->
+<div class="absolute inset-0 bg-[#0b1326]/60 backdrop-blur-md"></div>
+<!-- Modal Container -->
+<div class="relative w-full max-w-4xl bg-surface-container-low rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(195,192,255,0.05)] overflow-hidden flex flex-col md:flex-row h-[600px]">
+<!-- Modal Side Sidebar (Left) -->
+<div class="w-full md:w-80 bg-surface-container-high p-8 flex flex-col justify-between">
+<div>
+<button class="mb-8 text-on-surface-variant flex items-center gap-2 hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+<span class="text-xs font-bold uppercase tracking-wider">Cancel</span>
+</button>
+<div class="flex items-center gap-4 mb-6">
+<img alt="Avatar small" class="w-12 h-12 rounded-lg object-cover" data-alt="Small thumbnail profile photo of male professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0gRiDt2kyP4XBw--ixOoInUHKpSn9bW0infkrSigCKyYBwroSzdfXB1KiHmw85UZxa3aASzG196ftpgzwO8yNtbD2K--BE8ureTSD90m_KkIXDjMcopX_m1grIwC6IQ5tIVVf-OaEmxz7RDZRvApA_EiJ6qgepcjeZnpNOfKgbv6pZJbPH6gDzlrn4Cl-f6qxBiuWlBxixvWV3Ejoo4NoF2JP2Alft3oFWMpyujY14s7PUtIGQltG_CW-BLk4UplqfUAp_LW-RI6T"/>
+<div>
+<h4 class="text-sm font-bold text-on-surface">Dr. Elena Sterling</h4>
+<p class="text-[10px] text-primary uppercase font-medium">Mentorship Session</p>
+</div>
+</div>
+<div class="space-y-6">
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-2">Duration</p>
+<div class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-sm">schedule</span>
+<span class="text-sm">45 Minutes</span>
+</div>
+</div>
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-2">Location</p>
+<div class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-sm">video_chat</span>
+<span class="text-sm">Connect Meet Portal</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-highest rounded-xl">
+<p class="text-[10px] text-secondary font-bold uppercase mb-1">Status</p>
+<p class="text-xs text-on-surface-variant">Elena is currently accepting new mentees for Q3.</p>
+</div>
+</div>
+<!-- Calendar/Slot Selection (Right) -->
+<div class="flex-1 p-8 overflow-y-auto custom-scrollbar">
+<div class="flex justify-between items-center mb-8">
+<h2 class="text-xl font-bold tracking-tight text-on-surface">Select a Date &amp; Time</h2>
+<div class="flex gap-2">
+<button class="p-2 bg-surface-container-high rounded-lg hover:text-primary"><span class="material-symbols-outlined">chevron_left</span></button>
+<button class="p-2 bg-surface-container-high rounded-lg hover:text-primary"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-1 mb-8 text-center text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+<span class="p-3 opacity-20">28</span><span class="p-3 opacity-20">29</span><span class="p-3 opacity-20">30</span><span class="p-3 bg-primary-container text-on-primary rounded-lg font-bold shadow-lg shadow-primary-container/30">1</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">2</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">3</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">4</span>
+<span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">5</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">6</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">7</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">8</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">9</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">10</span><span class="p-3 hover:bg-surface-container-high rounded-lg cursor-pointer">11</span>
+</div>
+<div class="space-y-4">
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Available Slots (Oct 1)</p>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+<button class="py-3 px-4 rounded-xl border border-outline-variant/20 text-on-surface hover:border-primary hover:text-primary transition-all text-sm font-medium">09:00 AM</button>
+<button class="py-3 px-4 rounded-xl border border-outline-variant/20 text-on-surface hover:border-primary hover:text-primary transition-all text-sm font-medium">10:30 AM</button>
+<button class="py-3 px-4 rounded-xl border border-primary bg-primary/10 text-primary transition-all text-sm font-bold">11:15 AM</button>
+<button class="py-3 px-4 rounded-xl bg-surface-container-highest/50 text-on-surface-variant/40 cursor-not-allowed line-through text-sm font-medium">02:00 PM</button>
+<button class="py-3 px-4 rounded-xl bg-surface-container-highest/50 text-on-surface-variant/40 cursor-not-allowed line-through text-sm font-medium">03:30 PM</button>
+<button class="py-3 px-4 rounded-xl border border-outline-variant/20 text-on-surface hover:border-primary hover:text-primary transition-all text-sm font-medium">04:45 PM</button>
+</div>
+</div>
+<div class="mt-8 flex flex-col gap-4">
+<div class="p-4 bg-surface-container-lowest border-l-2 border-tertiary rounded-lg">
+<div class="flex justify-between items-center">
+<span class="text-xs text-on-surface-variant font-medium">No preferred time available?</span>
+<button class="text-xs font-bold text-tertiary hover:underline uppercase tracking-wider">Request Custom Slot</button>
+</div>
+</div>
+<button class="w-full bg-gradient-to-br from-primary-container to-primary text-on-primary py-4 rounded-xl text-xs uppercase tracking-widest font-bold shadow-xl shadow-primary-container/20 scale-100 active:scale-95 transition-transform">
+            Confirm Booking
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Nav Shell (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-[#0b1326]/80 backdrop-blur-2xl px-6 h-16 flex items-center justify-around z-50">
+<span class="material-symbols-outlined text-[#c3c0ff]" style="font-variation-settings: 'FILL' 1;">explore</span>
+<span class="material-symbols-outlined text-[#c7c4d8]">school</span>
+<span class="material-symbols-outlined text-[#c7c4d8]">calendar_today</span>
+<span class="material-symbols-outlined text-[#c7c4d8]">groups</span>
+<span class="material-symbols-outlined text-[#c7c4d8]">person</span>
+</nav>
+</body></html>

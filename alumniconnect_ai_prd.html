@@ -1,0 +1,101 @@
+# 🌐 Master Frontend Flow: AlumniConnect AI
+**Global UI/UX Design System**
+* **Aesthetic:** Modern Tech-Savvy SaaS (similar to Linear, Notion, or Vercel).
+* **Theme:** Dark Mode primary, minimalist layouts, soft shadows, optional glassmorphism.
+* **Color Palette:** Deep Blue/Indigo (Primary), Green (Success), Yellow (Warning), Red (Rejection/Error).
+* **Typography:** Clean sans-serif (Inter or Roboto).
+* **Corner Styling:** Rounded edges (12–16px radius).
+---
+## Phase 1: The Gateway (Landing & Authentication)
+### 1. Unified Landing Page
+* **Layout:** Clean, centered, split-screen or three-card entry design.
+* **Headline/Copy:** *"Are you a Student, Alumni, or TNP Coordinator?"*
+* **Action:** Three distinct portal buttons routing to specific verification flows.
+### 2. Role-Based Verification & Registration
+**A. Student Registration Flow**
+* **Form:** Full Name, College Email, Institution Name, College ID Number.
+* **Document Upload:** Drag-and-drop zone for PDF/Image of College ID/Allotment Document.
+* **Loading State:** *"Scanning document for authenticity..."* (Backend triggers OCR & Integrity Check).
+* **Status Tracker Screen:**
+    * Account Created ✔️
+    * Sent to T&P ✔️
+    * Verification in Progress ⏳
+    * *Message:* "Your details are under verification by the Training & Placement Office. Credentials will be emailed upon approval."
+**B. Alumni Registration Flow**
+* **Two-Path Entry Form:** Choose between "Membership Number" or "Official Alumni Email".
+* **Document Upload:** Upload Degree Certificate or official ID Proof.
+* **Status Tracker:** Similar to the student flow, pending AI Forensic Logic to verify document authenticity.
+**C. TNP Coordinator Flow**
+* **Direct Access:** No registration. A secure login form requiring TNP ID, College Name, and College-assigned Password. Routes directly to the Admin Dashboard.
+### 3. Login Page
+* **Layout:** Minimalist centered card.
+* **Fields:** Email / ID, Password.
+* **Extras:** "Forgot Password" link, "Remember Me" checkbox.
+* **Action:** Primary "Login" button.
+---
+## Phase 2: Student Onboarding (First Login)
+Upon first successful login with generated credentials, students are locked into a multi-step profile wizard. A progress bar tracks completion at the top.
+* **Step 1: Personal Info:** Profile photo upload (circular), Name, Bio text area.
+* **Step 2: Academic Info:** Institution (auto-filled), Department dropdown, Year selector.
+* **Step 3: Skills:** Interactive tag/chip input system (like GitHub topics).
+* **Step 4: Resume Upload:** Drag & drop PDF uploader with a document preview.
+* **Step 5: Projects:** Repeating card inputs (Project Title, Description, Tech Stack tags, GitHub link).
+* **Step 6: External Links:** Input fields for GitHub, LinkedIn, Portfolio, etc.
+* **Step 7: Career Preferences:** Role selection cards (SDE, Data Analyst, etc.) and Target Company multi-select chips.
+* **CTA:** *"Complete Profile"* (Unlocks the Main Dashboard).
+---
+## Phase 3: The Student Experience (Dashboards)
+### 1. Main Dashboard (SaaS Style)
+* **Layout:** Left sidebar navigation (Dashboard, Profile, Alumni Network, Analytics, Resume Builder, Settings) + Main content grid.
+* **Top Cards:**
+    * *Profile Strength:* Circular progress indicator.
+    * *Career Progress:* Skill proficiency bars.
+    * *Application Tracker:* Pipeline status (Applied → Interview → Offer).
+### 2. AI Resume Analyzer Feature
+* **Headline:** *"Unlock Your Resume’s True Potential"*
+* **Sub-headline:** *"Let our AI scan your experience and perfectly align it with industry standards so you stand out to top recruiters."*
+* **Feature Cards (Bullet Points):**
+    * *Instant Scoring:* Get a clear strength rating out of 100.
+    * *Target Company Match:* Discover which companies are looking for your exact skill set.
+    * *Actionable Fixes:* Step-by-step suggestions on formatting and keyword optimization.
+    * *ATS Optimization:* Ensure your resume passes automated recruiter filters.
+### 3. Progress Analytics Dashboard
+* **Headline:** *"Your Growth Journey"*
+* **Sub-headline:** *"Track your mock interview performance, identify weak spots, and watch your confidence soar."*
+* **Graph Section:** A continuous line graph plotting 'Interview Score' over 'Interview Number'.
+    * *Tooltip:* "Hover over a point on the graph to see a quick snapshot of that specific interview."
+* **Actionable Insights Checklist:** A chronological list of past interviews below the graph. Clicking an interview expands an interactive checklist of AI/Mentor feedback.
+    * *Instructions:* "Check off these AI-generated action items as you practice them in real life to improve your next score!"
+* **Empty State:** *"No interviews yet! Book your first session with an alumnus to jumpstart your analytics graph."*
+### 4. Alumni Discovery & Booking (Impact Dashboard)
+* **Top Filter Bar (Sticky):** Dropdowns and chips for Company, Domain, Experience Slider, Skills, and Branch.
+* **Alumni Grid:** Responsive tiles (Avatar, Name, Role/Company, short summary, and a visual "Impact Score" out of 100).
+* **Expanded Profile View:** Full-page layout showing Bio, Socials, 'Resource Vault' (downloadable links), and an 'Impact Dashboard' (bar chart of 'Students Benefited').
+* **Booking Modal (Slot Selection):** Calendar view. If slots are empty/booked, displays a *"Request Custom Slot"* button to ping the Admin/Alumni.
+---
+## Phase 4: The Alumni Experience (Mentorship Hub)
+### 1. Alumni Dashboard 
+* **My Schedule (Calendar):** * *Description:* "Manage your availability. Greyed-out slots are already booked."
+* **Interview Requests:** * *Description:* "Students waiting for your guidance." 
+    * *Empty State:* "You're all caught up! No pending requests right now."
+    * *Card UI:* Displays Student Name, ID, Links, Full Resume, and an **AI-Generated Summary Resume**.
+* **Request Actions:** * *CTA Buttons:* "Accept & Schedule" or "Decline".
+* **Scheduled Interview Actions:** * *CTA Buttons:* "Reschedule Session" (Secondary), "Start Interview" (Primary - only active at exact scheduled time).
+* **Post-Interview Evaluation (Appears immediately after call ends):** * *UI:* Star rating for Overall Score, text area for 'Positive Feedback', and text area for 'Areas for Improvement'. 
+    * *CTA Button:* "Submit Evaluation".
+---
+## Phase 5: The Dual-Agent Interview Room (The Core Feature)
+This is the live video environment where the hackathon "magic" happens.
+* **Central Layout:** A clean 1-on-1 video call grid. Minimalist control bar at the bottom (Mute, Video Off, Share Screen, End Call).
+* **Student View (The Coach):**
+    * *Overlay:* A floating, semi-transparent widget.
+    * *Metrics:** Live 'Confidence Meter' (progress bar based on eye contact/movement) and a 'Clarity Gauge' (based on rate of speech/filler words).
+* **Alumni View (The Whisperer):**
+    * *Sidebar:* A private, read-only chat feed titled *"AI Whisperer"*.
+    * *Content:* Live-updating cards showing 'Suggested Follow-up Questions' and 'Technical Fact-Checks' based on the student's real-time audio transcript.
+---
+## Phase 6: The TNP Coordinator Experience (Admin Control)
+* **TNP Dashboard:** A master control center.
+* **Verification Queue:** A list of pending Student and Alumni registrations flagged by the AI for final human approval.
+* **Placement Readiness Heatmap:** Aggregate data showing overall student performance scores.
+* **System Oversight:** Ability to view platform statistics, assign custom slots, and manage database integrations.

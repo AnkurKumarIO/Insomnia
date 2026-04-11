@@ -1,0 +1,341 @@
+<html class="dark"><head>
+<meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed": "#002113",
+            "on-secondary-container": "#00311f",
+            "on-secondary": "#003824",
+            "primary-fixed-dim": "#c3c0ff",
+            "on-tertiary-fixed-variant": "#653e00",
+            "tertiary-container": "#885500",
+            "primary": "#c3c0ff",
+            "on-error": "#690005",
+            "outline": "#918fa1",
+            "on-primary": "#1d00a5",
+            "error-container": "#93000a",
+            "tertiary-fixed-dim": "#ffb95f",
+            "surface-dim": "#0b1326",
+            "surface-tint": "#c3c0ff",
+            "surface-container-highest": "#2d3449",
+            "on-surface": "#dae2fd",
+            "on-primary-container": "#dad7ff",
+            "on-primary-fixed": "#0f0069",
+            "tertiary": "#ffb95f",
+            "surface-variant": "#2d3449",
+            "on-surface-variant": "#c7c4d8",
+            "secondary": "#4edea3",
+            "on-primary-fixed-variant": "#3323cc",
+            "surface-container-lowest": "#060e20",
+            "on-secondary-fixed-variant": "#005236",
+            "primary-container": "#4f46e5",
+            "on-error-container": "#ffdad6",
+            "primary-fixed": "#e2dfff",
+            "tertiary-fixed": "#ffddb8",
+            "surface-bright": "#31394d",
+            "inverse-primary": "#4d44e3",
+            "error": "#ffb4ab",
+            "secondary-container": "#00a572",
+            "inverse-on-surface": "#283044",
+            "on-background": "#dae2fd",
+            "surface-container": "#171f33",
+            "surface": "#0b1326",
+            "surface-container-low": "#131b2e",
+            "on-tertiary-container": "#ffd4a4",
+            "surface-container-high": "#222a3d",
+            "on-tertiary-fixed": "#2a1700",
+            "inverse-surface": "#dae2fd",
+            "background": "#0b1326",
+            "secondary-fixed-dim": "#4edea3",
+            "secondary-fixed": "#6ffbbe",
+            "outline-variant": "#464555",
+            "on-tertiary": "#472a00"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "14px",
+            "xl": "18px",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body { font-family: 'Inter', sans-serif; background-color: #0b1326; color: #dae2fd; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .glass-panel { background: rgba(45, 52, 73, 0.4); backdrop-filter: blur(20px); }
+    .gradient-text { background: linear-gradient(135deg, #c3c0ff 0%, #4f46e5 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .line-graph-path { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: dash 3s ease-in-out forwards; }
+    @keyframes dash { to { stroke-dashoffset: 0; } }
+  </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary/30 min-h-screen">
+<!-- TopNavBar Navigation Shell -->
+<nav class="bg-[#0b1326]/80 backdrop-blur-lg fixed top-0 w-full z-50 flex justify-between items-center px-8 h-16 shadow-[0_20px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(195,192,255,0.05)]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-[#c3c0ff]">AlumniConnect AI</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-200 font-['Inter'] tracking-tight" href="#">Explore</a>
+<a class="text-[#c3c0ff] font-semibold transition-colors duration-200 font-['Inter'] tracking-tight" href="#">Dashboard</a>
+<a class="text-[#c7c4d8] hover:text-[#c3c0ff] transition-colors duration-200 font-['Inter'] tracking-tight" href="#">Resources</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-[#c7c4d8] hover:text-[#c3c0ff] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-[#c7c4d8] hover:text-[#c3c0ff] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/20">
+<img alt="User Profile" data-alt="close-up portrait of a young man with short dark hair in a professional setting with soft blue lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsfaiLbH6-wSeQd-nrhP6s7ElSu3pPWTpV3CWrbcGcuP3W3kxu5LzKjCCKrvrdwxR2PjY8KH8uWBetZbAKHzAVJ_2BrG_lDPxWo1iUUZHQ1LOtxdUxuJE2WlkocET4hWuEwTBq9N-R8bINbH0bCgdH6Vew8sVFkMKHJFWAJ3wHTRmlHS9yfaAYecfdHTK543afaUJrmaKbjbutBLOfRUeTx9FeBe-fWAamKS2GWe20_LtsoAG_2wN10Jpg-b2eK92g2USRAKSdEYxi"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar Navigation Shell -->
+<aside class="fixed left-0 top-0 h-screen w-64 z-40 bg-[#131b2e] hidden lg:flex flex-col gap-2 p-6 pt-24">
+<div class="mb-8">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-xl">psychology</span>
+</div>
+<span class="text-[#c3c0ff] font-bold text-lg">AlumniConnect</span>
+</div>
+<p class="text-[11px] uppercase tracking-[0.05em] font-medium text-on-surface-variant px-1">Digital Curator</p>
+</div>
+<div class="flex flex-col gap-1">
+<a class="bg-[#222a3d] text-[#c3c0ff] rounded-[14px] flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[11px] font-medium">Dashboard</span>
+</a>
+<a class="text-[#c7c4d8] hover:bg-[#171f33] hover:text-[#c3c0ff] rounded-[14px] flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">event_note</span>
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[11px] font-medium">Interviews</span>
+</a>
+<a class="text-[#c7c4d8] hover:bg-[#171f33] hover:text-[#c3c0ff] rounded-[14px] flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[11px] font-medium">Talent Insights</span>
+</a>
+<a class="text-[#c7c4d8] hover:bg-[#171f33] hover:text-[#c3c0ff] rounded-[14px] flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">hub</span>
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[11px] font-medium">Network</span>
+</a>
+<a class="text-[#c7c4d8] hover:bg-[#171f33] hover:text-[#c3c0ff] rounded-[14px] flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Inter'] uppercase tracking-[0.05em] text-[11px] font-medium">Settings</span>
+</a>
+</div>
+<div class="mt-auto pt-6">
+<button class="w-full bg-gradient-to-br from-primary-container to-primary text-on-primary-container rounded-xl py-3 px-4 text-[11px] font-bold uppercase tracking-widest active:scale-95 transition-transform">
+        Upgrade to Pro
+      </button>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="lg:ml-64 pt-24 pb-12 px-8 lg:px-12">
+<!-- Header Section -->
+<header class="mb-12 max-w-4xl">
+<h1 class="text-5xl md:text-6xl font-extrabold tracking-[-0.04em] mb-4 text-on-surface">
+        Your Growth <span class="gradient-text">Journey</span>
+</h1>
+<p class="text-xl text-on-surface-variant font-normal leading-relaxed">
+        Track your mock interview performance, identify weak spots, and watch your confidence soar.
+      </p>
+</header>
+<!-- Key Metrics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<div class="bg-surface-container rounded-xl p-8 shadow-sm border border-outline-variant/10">
+<p class="text-[11px] uppercase tracking-[0.05em] font-semibold text-on-surface-variant mb-2">Average Score</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-bold text-primary">82%</span>
+<span class="text-secondary text-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">arrow_upward</span>
+            12%
+          </span>
+</div>
+</div>
+<div class="bg-surface-container rounded-xl p-8 shadow-sm border border-outline-variant/10">
+<p class="text-[11px] uppercase tracking-[0.05em] font-semibold text-on-surface-variant mb-2">Total Mock Interviews</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-bold text-on-surface">14</span>
+<span class="text-on-surface-variant text-sm">This Term</span>
+</div>
+</div>
+<div class="bg-surface-container rounded-xl p-8 shadow-sm border border-outline-variant/10 relative overflow-hidden">
+<div class="absolute top-0 left-0 h-full w-1 bg-primary blur-[2px]"></div>
+<p class="text-[11px] uppercase tracking-[0.05em] font-semibold text-on-surface-variant mb-2">Top Improvement Area</p>
+<div class="flex items-center gap-2">
+<span class="text-2xl font-bold text-tertiary">STAR Structure</span>
+</div>
+</div>
+</div>
+<!-- Analytics Section -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+<!-- Continuous Line Graph -->
+<div class="xl:col-span-2 bg-surface-container-low rounded-xl p-8 border border-outline-variant/5">
+<div class="flex justify-between items-center mb-10">
+<h2 class="text-xl font-bold tracking-tight">Performance Trend</h2>
+<div class="flex gap-2">
+<span class="px-3 py-1 rounded-full bg-surface-container-highest text-[10px] uppercase font-bold tracking-wider">Interview Score</span>
+</div>
+</div>
+<div class="relative h-[300px] w-full">
+<!-- Graph Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between opacity-10">
+<div class="border-b border-on-surface"></div>
+<div class="border-b border-on-surface"></div>
+<div class="border-b border-on-surface"></div>
+<div class="border-b border-on-surface"></div>
+<div class="border-b border-on-surface"></div>
+</div>
+<!-- SVG Line Graph -->
+<svg class="absolute inset-0 h-full w-full overflow-visible" preserveaspectratio="none">
+<defs>
+<lineargradient id="lineGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#c3c0ff;stop-opacity:1"></stop>
+</lineargradient>
+</defs>
+<!-- Line -->
+<path class="line-graph-path" d="M 0 240 Q 150 220 300 160 T 600 120 T 900 60 T 1200 40" fill="none" stroke="url(#lineGradient)" stroke-linecap="round" stroke-width="4"></path>
+<!-- Data Points -->
+<circle cx="0" cy="240" fill="#4f46e5" r="6" stroke="#0b1326" stroke-width="2"></circle>
+<circle cx="300" cy="160" fill="#4f46e5" r="6" stroke="#0b1326" stroke-width="2"></circle>
+<circle cx="600" cy="120" fill="#c3c0ff" r="6" stroke="#0b1326" stroke-width="2"></circle>
+<circle cx="900" cy="60" fill="#c3c0ff" r="6" stroke="#0b1326" stroke-width="2"></circle>
+<circle cx="1200" cy="40" fill="#c3c0ff" r="6" stroke="#0b1326" stroke-width="2"></circle>
+</svg>
+<!-- X-Axis Labels -->
+<div class="absolute -bottom-8 left-0 right-0 flex justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+<span>Int 01</span>
+<span>Int 02</span>
+<span>Int 03</span>
+<span>Int 04</span>
+<span>Int 05</span>
+</div>
+</div>
+</div>
+<!-- Actionable Insights Sidebar (Part of Grid) -->
+<div class="bg-surface-container-high rounded-xl p-6 border border-outline-variant/10 self-start">
+<h2 class="text-lg font-bold tracking-tight mb-6">Past Interviews</h2>
+<div class="space-y-4">
+<!-- Expanded Interview -->
+<div class="bg-surface-container rounded-xl overflow-hidden shadow-lg ring-1 ring-primary/20">
+<div class="p-4 flex items-center justify-between border-b border-outline-variant/10">
+<div>
+<p class="text-xs font-bold text-primary uppercase">Current Focus</p>
+<h3 class="font-semibold text-on-surface">Mock Interview #05</h3>
+</div>
+<span class="material-symbols-outlined text-primary">expand_less</span>
+</div>
+<div class="p-4 space-y-4">
+<p class="text-[11px] font-medium text-on-surface-variant uppercase tracking-widest">Feedback Checklist</p>
+<ul class="space-y-3">
+<li class="flex items-start gap-3">
+<div class="w-5 h-5 rounded bg-secondary/20 flex items-center justify-center text-secondary mt-0.5">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="text-sm text-on-surface">Improve eye contact</span>
+</li>
+<li class="flex items-start gap-3">
+<div class="w-5 h-5 rounded border border-outline-variant/30 flex items-center justify-center text-on-surface-variant mt-0.5"></div>
+<span class="text-sm text-on-surface-variant">Structure STAR responses better</span>
+</li>
+<li class="flex items-start gap-3">
+<div class="w-5 h-5 rounded border border-outline-variant/30 flex items-center justify-center text-on-surface-variant mt-0.5"></div>
+<span class="text-sm text-on-surface-variant">Reduce filler words (e.g., 'like', 'um')</span>
+</li>
+<li class="flex items-start gap-3">
+<div class="w-5 h-5 rounded border border-outline-variant/30 flex items-center justify-center text-on-surface-variant mt-0.5"></div>
+<span class="text-sm text-on-surface-variant">Clarify technical project details</span>
+</li>
+</ul>
+<button class="w-full mt-2 py-2 rounded-lg bg-surface-container-highest text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/10 transition-colors">
+                View Detailed Report
+              </button>
+</div>
+</div>
+<!-- Collapsed Interview -->
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+<h3 class="font-medium text-sm">Mock Interview #04</h3>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+<!-- Collapsed Interview -->
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+<h3 class="font-medium text-sm">Mock Interview #03</h3>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Recommendations / AI Insights -->
+<section class="mt-16">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary text-3xl">auto_awesome</span>
+<h2 class="text-2xl font-bold tracking-tight">AI Curator Insights</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="group relative bg-surface-container rounded-xl p-6 transition-all hover:-translate-y-1">
+<div class="absolute top-0 left-0 w-1 h-0 bg-secondary transition-all group-hover:h-full"></div>
+<span class="material-symbols-outlined text-secondary mb-4">record_voice_over</span>
+<h4 class="font-bold mb-2">Vocal Clarity</h4>
+<p class="text-sm text-on-surface-variant">Your pacing has improved by 15% in the last two sessions. Focus on ending sentences with conviction.</p>
+</div>
+<div class="group relative bg-surface-container rounded-xl p-6 transition-all hover:-translate-y-1">
+<div class="absolute top-0 left-0 w-1 h-0 bg-primary transition-all group-hover:h-full"></div>
+<span class="material-symbols-outlined text-primary mb-4">analytics</span>
+<h4 class="font-bold mb-2">Narrative Arc</h4>
+<p class="text-sm text-on-surface-variant">Use more quantitative results in your STAR method 'Results' phase to increase your score.</p>
+</div>
+<div class="group relative bg-surface-container rounded-xl p-6 transition-all hover:-translate-y-1">
+<div class="absolute top-0 left-0 w-1 h-0 bg-tertiary transition-all group-hover:h-full"></div>
+<span class="material-symbols-outlined text-tertiary mb-4">diversity_3</span>
+<h4 class="font-bold mb-2">Cultural Fit</h4>
+<p class="text-sm text-on-surface-variant">You're excelling in collaborative stories. Try to showcase more leadership in your next mock.</p>
+</div>
+<div class="group relative bg-surface-container rounded-xl p-6 transition-all hover:-translate-y-1">
+<div class="absolute top-0 left-0 w-1 h-0 bg-error transition-all group-hover:h-full"></div>
+<span class="material-symbols-outlined text-error mb-4">history</span>
+<h4 class="font-bold mb-2">Consistency</h4>
+<p class="text-sm text-on-surface-variant">Session frequency has dipped. Schedule a follow-up mock to maintain your upward momentum.</p>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Navigation Shell (Mobile only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-high/90 backdrop-blur-xl flex justify-around items-center py-4 px-2 z-50 border-t border-outline-variant/10">
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Dash</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Stats</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">event_note</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Interv</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">hub</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Net</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Set</span>
+</a>
+</nav>
+</body></html>

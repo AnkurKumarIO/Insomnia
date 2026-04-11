@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Student Onboarding | AlumniConnect AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#dae2fd",
+                    "on-primary-container": "#dad7ff",
+                    "tertiary-container": "#885500",
+                    "on-primary": "#1d00a5",
+                    "primary-container": "#4f46e5",
+                    "on-secondary-container": "#00311f",
+                    "surface-dim": "#0b1326",
+                    "surface-container": "#171f33",
+                    "on-tertiary-fixed": "#2a1700",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "secondary-fixed-dim": "#4edea3",
+                    "inverse-primary": "#4d44e3",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "on-secondary": "#003824",
+                    "background": "#0b1326",
+                    "surface": "#0b1326",
+                    "on-surface-variant": "#c7c4d8",
+                    "on-surface": "#dae2fd",
+                    "secondary": "#4edea3",
+                    "on-secondary-fixed-variant": "#005236",
+                    "tertiary-fixed": "#ffddb8",
+                    "on-tertiary": "#472a00",
+                    "surface-container-low": "#131b2e",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "surface-bright": "#31394d",
+                    "secondary-container": "#00a572",
+                    "on-error-container": "#ffdad6",
+                    "surface-variant": "#2d3449",
+                    "primary-fixed": "#e2dfff",
+                    "inverse-on-surface": "#283044",
+                    "on-primary-fixed": "#0f0069",
+                    "outline-variant": "#464555",
+                    "surface-tint": "#c3c0ff",
+                    "error": "#ffb4ab",
+                    "tertiary": "#ffb95f",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-tertiary-container": "#ffd4a4",
+                    "outline": "#918fa1",
+                    "inverse-surface": "#dae2fd",
+                    "primary": "#c3c0ff",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed": "#002113",
+                    "secondary-fixed": "#6ffbbe",
+                    "surface-container-high": "#222a3d",
+                    "on-error": "#690005",
+                    "surface-container-lowest": "#060e20",
+                    "surface-container-highest": "#2d3449"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b1326; color: #dae2fd; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { backdrop-filter: blur(20px); }
+        .gradient-glow { background: linear-gradient(135deg, #4f46e5 0%, #c3c0ff 100%); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center">
+<!-- Top Navigation (Shell Implementation) -->
+<header class="flex justify-between items-center px-8 h-20 w-full fixed top-0 bg-[#0b1326]/80 backdrop-blur-2xl z-50">
+<div class="text-2xl font-bold tracking-[-0.04em] text-[#c3c0ff]">AlumniConnect AI</div>
+<div class="hidden md:flex gap-x-8">
+<span class="text-[#c7c4d8] font-['Inter'] tracking-tight text-sm font-medium uppercase tracking-[0.05em] transition-colors duration-300">Dashboard</span>
+<span class="text-[#c7c4d8] font-['Inter'] tracking-tight text-sm font-medium uppercase tracking-[0.05em] transition-colors duration-300">Alumni</span>
+<span class="text-[#c7c4d8] font-['Inter'] tracking-tight text-sm font-medium uppercase tracking-[0.05em] transition-colors duration-300">Mentorship</span>
+<span class="text-[#c7c4d8] font-['Inter'] tracking-tight text-sm font-medium uppercase tracking-[0.05em] transition-colors duration-300">Events</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#c3c0ff] scale-95 active:scale-100 transition-transform">notifications</button>
+<button class="material-symbols-outlined text-[#c3c0ff] scale-95 active:scale-100 transition-transform">settings</button>
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden border border-outline-variant/20">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a professional male student in a dark studio setting with moody lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAv3l5n7HjdeKSMEWmPmJ1s-5KXiES_g1lfVug4vKc0AuXOrM33rb_UuqcqRsjSRQ44f9quryKWV_WDQtc4D4Rk_IVnXNaQvJC4p3JhxpIY6JMUYrebZgkXtb7lHlC_DfxcSI8peewIox7JMHE07fgRHRA3W7hjemlPKQ2gisihP1HkECsbcMgkLH-3WAGs679VUAqQLfjYF0osBam3EenvMSNjU1Cr2Iuk9Z8F_NSENyCcU1D1L2RUSc7ZjRz0vT4HN7pTZF794mEY"/>
+</div>
+</div>
+</header>
+<!-- Side Navigation (Suppressed for focused onboarding as per Rule: Shell Visibility & Relevance) -->
+<!-- Main Content Canvas -->
+<main class="w-full max-w-4xl pt-32 pb-20 px-6 flex flex-col items-center">
+<!-- Progress Stepper -->
+<div class="w-full max-w-2xl mb-12">
+<div class="flex justify-between items-end mb-4">
+<div>
+<h1 class="text-3xl font-extrabold tracking-[-0.04em] text-white">Create Your Profile</h1>
+<p class="text-on-surface-variant text-sm mt-1">Join the network of future-shapers</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-bold uppercase tracking-[0.1em] text-primary">Step 3 of 7</span>
+</div>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full w-[42.8%] gradient-glow rounded-full shadow-[0_0_15px_rgba(79,70,229,0.5)]"></div>
+</div>
+</div>
+<!-- Wizard Card (Intentional Asymmetry & Layered Depth) -->
+<div class="w-full bg-surface-container-low rounded-[14px] shadow-[0_20px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(195,192,255,0.05)] overflow-hidden flex flex-col md:flex-row">
+<!-- Context Side Pane -->
+<div class="w-full md:w-64 bg-surface-container-lowest p-8 border-r border-outline-variant/10">
+<h3 class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant mb-6">Wizard Menu</h3>
+<nav class="space-y-4">
+<div class="flex items-center gap-3 text-on-surface-variant opacity-60">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span class="text-sm">Personal Info</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant opacity-60">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span class="text-sm">Academic Info</span>
+</div>
+<div class="flex items-center gap-3 text-primary font-bold">
+<span class="material-symbols-outlined text-sm">blur_on</span>
+<span class="text-sm">Skills &amp; Stack</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+<span class="text-sm">Resume</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+<span class="text-sm">Project Showcase</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+<span class="text-sm">Links</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+<span class="text-sm">Preferences</span>
+</div>
+</nav>
+</div>
+<!-- Active Step Canvas: Skills (Example for visual demonstration) -->
+<div class="flex-1 p-10 bg-surface-container">
+<div class="max-w-md mx-auto">
+<div class="mb-8">
+<h2 class="text-xl font-bold text-white mb-2">Technical Proficiency</h2>
+<p class="text-on-surface-variant text-sm">Add tags that define your expertise. Our AI uses these to match you with mentorship opportunities.</p>
+</div>
+<div class="space-y-8">
+<!-- Interactive Skill Input -->
+<div class="space-y-4">
+<label class="text-xs font-bold uppercase tracking-[0.05em] text-on-surface-variant block">Primary Skills</label>
+<div class="flex flex-wrap gap-2 mb-3">
+<div class="bg-secondary-container px-3 py-1 rounded-full flex items-center gap-2">
+<span class="text-xs font-medium text-on-secondary-container">Full-Stack Development</span>
+<button class="material-symbols-outlined text-[14px] text-on-secondary-container">close</button>
+</div>
+<div class="bg-secondary-container px-3 py-1 rounded-full flex items-center gap-2">
+<span class="text-xs font-medium text-on-secondary-container">Python AI/ML</span>
+<button class="material-symbols-outlined text-[14px] text-on-secondary-container">close</button>
+</div>
+<div class="bg-secondary-container px-3 py-1 rounded-full flex items-center gap-2">
+<span class="text-xs font-medium text-on-secondary-container">UI/UX Design</span>
+<button class="material-symbols-outlined text-[14px] text-on-secondary-container">close</button>
+</div>
+</div>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border-none rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary transition-all text-on-surface" placeholder="Add a skill (e.g. React, Cloud Computing...)" type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-primary-fixed-dim">add_circle</button>
+</div>
+</div>
+<!-- Skill Level Visualization (Bento Pattern) -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-high p-4 rounded-xl border-l-2 border-primary">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary block mb-1">Top Strength</span>
+<span class="text-sm font-semibold text-white">Algorithm Design</span>
+</div>
+<div class="bg-surface-container-high p-4 rounded-xl opacity-50">
+<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Learning</span>
+<span class="text-sm font-semibold text-white">Blockchain Arch.</span>
+</div>
+</div>
+<!-- AI Insight Component -->
+<div class="bg-surface-variant/30 p-5 rounded-xl border-l-4 border-primary-container relative overflow-hidden">
+<div class="flex gap-3 relative z-10">
+<span class="material-symbols-outlined text-primary-fixed-dim">auto_awesome</span>
+<div>
+<h4 class="text-sm font-bold text-primary-fixed-dim mb-1">AI Recommendation</h4>
+<p class="text-xs text-on-surface-variant leading-relaxed">Based on your "Full-Stack" skill, we recommend adding "PostgreSQL" or "Redis" for better match rates with top alumni mentors.</p>
+</div>
+</div>
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-7xl" style="font-variation-settings: 'FILL' 1;">insights</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Interaction Bar -->
+<div class="w-full max-w-4xl mt-8 flex justify-between items-center px-4">
+<button class="px-6 py-2.5 rounded-xl border border-outline-variant/20 text-on-surface-variant text-sm font-bold uppercase tracking-wider hover:bg-surface-container-high transition-colors">
+                Previous
+            </button>
+<div class="flex items-center gap-6">
+<span class="text-xs text-on-surface-variant hidden md:block">All changes saved automatically</span>
+<button class="px-8 py-3 rounded-xl gradient-glow text-on-primary text-sm font-bold uppercase tracking-[0.05em] shadow-[0_10px_20px_rgba(79,70,229,0.3)] hover:shadow-[0_15px_30px_rgba(79,70,229,0.4)] active:scale-95 transition-all">
+                    Next: Resume Upload
+                </button>
+</div>
+</div>
+<!-- Decorative Asymmetric Background Elements -->
+<div class="fixed top-1/4 -right-20 w-96 h-96 bg-primary-container/10 blur-[120px] rounded-full -z-10"></div>
+<div class="fixed bottom-1/4 -left-20 w-80 h-80 bg-secondary/10 blur-[100px] rounded-full -z-10"></div>
+</main>
+<!-- Visual Example of Next Step Overlay (Pre-rendered for Context) -->
+<!-- This section shows a preview of Step 4 (Resume Upload) when in draft mode -->
+<div class="w-full max-w-4xl opacity-20 pointer-events-none mt-20 scale-95 grayscale">
+<div class="bg-surface-container p-10 rounded-[14px]">
+<div class="border-2 border-dashed border-outline-variant/30 rounded-2xl h-64 flex flex-col items-center justify-center gap-4">
+<span class="material-symbols-outlined text-5xl text-on-surface-variant">upload_file</span>
+<p class="text-on-surface-variant font-medium">Drag and drop your Resume/CV here</p>
+<div class="bg-primary/10 px-4 py-2 rounded-lg text-primary text-xs font-bold uppercase">Supported: PDF, DOCX (Max 10MB)</div>
+</div>
+</div>
+</div>
+</body></html>
