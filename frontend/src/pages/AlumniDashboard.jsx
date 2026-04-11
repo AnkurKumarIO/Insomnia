@@ -1061,7 +1061,7 @@ export default function AlumniDashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>Interview Requests</span>
-                <span style={{ background: 'rgba(195,192,255,0.1)', color: '#c3c0ff', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{liveRequests.length} Pending</span>
+                <span style={{ background: 'rgba(195,192,255,0.1)', color: '#c3c0ff', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{liveRequests.filter(r => r.status === 'pending').length} Pending</span>
               </div>
               <button onClick={() => setActiveTab('requests')} style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c7c4d8', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</button>
             </div>
@@ -1072,25 +1072,65 @@ export default function AlumniDashboard() {
                 <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 4 }}>Students can find you in the Alumni Directory</p>
               </div>
             ) : liveRequests.slice(0, 2).map(r => (
-              <div key={r.id} style={{ background: '#171f33', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(70,69,85,0.2)' }}>
-                <div style={{ display: 'flex', gap: '1.5rem' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '1rem' }}>{r.studentName}</div>
-                        <div style={{ fontSize: '0.65rem', color: '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{r.topic}</div>
+              <div key={r.id} style={{ background: '#171f33', borderRadius: 16, padding: '1.25rem 1.5rem', border: `1px solid ${r.status === 'accepted' || r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(70,69,85,0.2)'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  {/* Avatar */}
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 2 }}>{r.studentName}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{r.topic}</div>
+                  </div>
+
+                  {/* Status-aware actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {r.status === 'pending' && (
+                      <>
+                        <button onClick={() => setViewingRequest(r)} style={{ padding: '0.4rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: 'none', cursor: 'pointer' }}>
+                          Accept
+                        </button>
+                        <button onClick={() => handleDeclineRequest(r.id)} style={{ padding: '0.4rem 0.75rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                          Decline
+                        </button>
+                      </>
+                    )}
+                    {(r.status === 'accepted' || r.status === 'slot_booked') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {/* ✓ Accepted badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.12)', border: '1px solid rgba(78,222,163,0.25)', borderRadius: 8 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#4edea3', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            {r.status === 'slot_booked' ? 'Booked' : 'Accepted'}
+                          </span>
+                        </div>
+                        {/* Book Slot / View button */}
+                        {r.status === 'accepted' && (
+                          <button onClick={() => setBookingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>calendar_month</span> Book Slot
+                          </button>
+                        )}
+                        {r.status === 'slot_booked' && (() => {
+                          const canJoin = Date.now() >= new Date(r.scheduledTime).getTime() - 5 * 60 * 1000;
+                          return canJoin ? (
+                            <a href={`/interview/${r.roomId}`} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam</span> Join
+                            </a>
+                          ) : (
+                            <div style={{ fontSize: '0.65rem', color: '#4edea3', fontWeight: 600 }}>
+                              📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setViewingRequest(r)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Accept</button>
-                        <button onClick={() => handleDeclineRequest(r.id)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Decline</button>
-                      </div>
-                    </div>
-                    {r.message && (
-                      <p style={{ fontSize: '0.75rem', color: 'rgba(218,226,253,0.7)', fontStyle: 'italic', lineHeight: 1.5 }}>"{r.message}"</p>
                     )}
                   </div>
                 </div>
+                {r.message && r.status === 'pending' && (
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: 'rgba(218,226,253,0.6)', fontStyle: 'italic', lineHeight: 1.5, paddingLeft: 62 }}>
+                    "{r.message.slice(0, 80)}{r.message.length > 80 ? '...' : ''}"
+                  </div>
+                )}
               </div>
             ))}
           </div>
