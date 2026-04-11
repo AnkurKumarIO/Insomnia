@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import { api } from '../api';
 
 const STEPS = ['Personal Info', 'Skills & Academics', 'Resume & Projects', 'Career Goals', 'Review'];
 const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
@@ -204,11 +205,28 @@ export default function ProfileSetup() {
     </div>,
   ];
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
     const fullProfile = { ...pending, ...profile, photoPreview };
     localStorage.setItem('alumniconnect_profile', JSON.stringify(fullProfile));
-    const userData = { id: `stu-${Date.now()}`, name: pending.name || 'Student', role: 'STUDENT', department: profile.department || pending.department, profileComplete: true };
+
+    const userData = {
+      id: pending.id || `stu-${Date.now()}`,
+      name: pending.name || 'Student',
+      role: 'STUDENT',
+      department: profile.department || pending.department,
+      profileComplete: true,
+    };
+
+    // Save to Supabase if we have a real user id
+    if (pending.id) {
+      await api.saveProfile(pending.id, {
+        ...profile,
+        name: pending.name,
+        profileComplete: true,
+      });
+    }
+
     login(userData, `token-${Date.now()}`);
     navigate('/dashboard');
   };

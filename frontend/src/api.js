@@ -205,6 +205,22 @@ export const api = {
     }).then(r => r.json()),
     () => MOCK_API.markNotifsRead(userId)
   ),
+
+  // ── User Profile ────────────────────────────────────────────
+
+  saveProfile: (userId, profileData) => callOrMock(
+    () => fetch(`${API_BASE}/users/${userId}/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profileData),
+    }).then(r => r.json()),
+    async () => { await mockDelay(400); return { message: 'Profile saved (mock)' }; }
+  ),
+
+  getUser: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/users/${userId}`).then(r => r.json()),
+    async () => { await mockDelay(300); return null; }
+  ),
 };
 
 export const SOCKET_URL = API_BASE;
