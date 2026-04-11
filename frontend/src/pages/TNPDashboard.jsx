@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
@@ -34,7 +34,83 @@ export default function TNPDashboard() {
   const [credModal, setCredModal] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [queueSearch, setQueueSearch] = useState(''); // PDF-style search for verification queue
+  const [queueSearch, setQueueSearch] = useState('');
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [tnpNotifs, setTnpNotifs] = useState([]);
+  const [seenNotifIds, setSeenNotifIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tnp_seen_notifs') || '[]'); } catch { return []; }
+  });
+
+  // Poll for new approval requests every 3s
+  useEffect(() => {
+    const buildNotifs = () => {
+      const notifs = [];
+      // Pending student registrations (awaiting TNP approval)
+      try {
+        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+        if (pending.username && pending.name) {
+          notifs.push({
+            id: `pending-${pending.username}`,
+            type: 'student_register',
+            title: 'New Student Registration',
+            desc: `${pending.name} (${pending.department || 'Student'}) is awaiting verification`,
+            time: pending.createdAt || new Date().toISOString(),
+            icon: 'school',
+            color: '#c3c0ff',
+          });
+        }
+      } catch {}
+      // Approved accounts that were recently created (alumni/student)
+      try {
+        const approved = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+        approved.slice(-5).forEach(acc => {
+          notifs.push({
+            id: `approved-${acc.username}`,
+            type: acc.role === 'ALUMNI' ? 'alumni_register' : 'student_register',
+            title: acc.role === 'ALUMNI' ? 'Alumni Applied for Verification' : 'Student Account Created',
+            desc: `${acc.name} (${acc.role}) — ${acc.email}`,
+            time: new Date().toISOString(),
+            icon: acc.role === 'ALUMNI' ? 'psychology' : 'school',
+            color: acc.role === 'ALUMNI' ? '#4edea3' : '#c3c0ff',
+          });
+        });
+      } catch {}
+      // Hardcoded demo notifications (always present for demo)
+      const DEMO = [
+        { id: 'demo-1', type: 'student_register', title: 'New Student Registration', desc: 'Arjun Malhotra (CS, 2024) submitted documents for verification', time: new Date(Date.now() - 5 * 60000).toISOString(), icon: 'school', color: '#c3c0ff' },
+        { id: 'demo-2', type: 'alumni_register', title: 'Alumni Approval Request', desc: 'Sarah Jenkins (Senior Dev, Google) applied for mentor verification', time: new Date(Date.now() - 62 * 60000).toISOString(), icon: 'psychology', color: '#4edea3' },
+        { id: 'demo-3', type: 'alumni_register', title: 'Alumni Approval Request', desc: 'Dr. Elena Rodriguez (PhD AI Ethics) submitted academic credentials', time: new Date(Date.now() - 3 * 3600000).toISOString(), icon: 'psychology', color: '#4edea3' },
+      ];
+      // Merge demo + dynamic, deduplicate by id
+      const all = [...DEMO, ...notifs.filter(n => !DEMO.find(d => d.id === n.id))];
+      setTnpNotifs(all);
+    };
+    buildNotifs();
+    const interval = setInterval(buildNotifs, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const unreadCount = tnpNotifs.filter(n => !seenNotifIds.includes(n.id)).length;
+
+  const openNotifPanel = () => {
+    setShowNotifPanel(v => !v);
+    setShowProfile(false);
+    // Mark all as seen
+    const ids = tnpNotifs.map(n => n.id);
+    setSeenNotifIds(ids);
+    localStorage.setItem('tnp_seen_notifs', JSON.stringify(ids));
+  };
+
+  const timeAgo = (iso) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
   // Settings state
   const [commSettings, setCommSettings] = useState({ emailNotifs: true, smsAlerts: false, weeklyReport: true, instantApproval: false, mentorMatchAlert: true });
   const [roles, setRoles] = useState([
@@ -258,7 +334,66 @@ export default function TNPDashboard() {
             </nav>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>notifications</span>
+            {/* Notification Bell */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={openNotifPanel} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: showNotifPanel ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifPanel ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
+                {unreadCount > 0 && (
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
+                )}
+              </button>
+
+              {showNotifPanel && (
+                <>
+                  <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, width: 360, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Approval Requests</span>
+                        {unreadCount > 0 && (
+                          <span style={{ background: '#ff4444', color: 'white', borderRadius: 999, fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.4rem' }}>{unreadCount} new</span>
+                        )}
+                      </div>
+                      <button onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }} style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>View Queue</button>
+                    </div>
+                    <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                      {tnpNotifs.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
+                          <p style={{ fontSize: '0.875rem' }}>No pending approvals</p>
+                        </div>
+                      ) : tnpNotifs.map((n) => {
+                        const isNew = !seenNotifIds.includes(n.id);
+                        return (
+                          <div key={n.id} onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }}
+                            style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: isNew ? 'rgba(195,192,255,0.04)' : 'transparent', cursor: 'pointer', transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,192,255,0.07)'}
+                            onMouseLeave={e => e.currentTarget.style.background = isNew ? 'rgba(195,192,255,0.04)' : 'transparent'}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: `${n.color}15`, border: `1px solid ${n.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 19, color: n.color, fontVariationSettings: "'FILL' 1" }}>{n.icon}</span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: isNew ? '#dae2fd' : '#c7c4d8' }}>{n.title}</span>
+                                {isNew && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0 }} />}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.4, marginBottom: 4 }}>{n.desc}</div>
+                              <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', fontWeight: 600 }}>{timeAgo(n.time)}</div>
+                            </div>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#c7c4d8', flexShrink: 0, marginTop: 4 }}>chevron_right</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid rgba(70,69,85,0.15)', textAlign: 'center' }}>
+                      <button onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        Go to Verification Queue →
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
 
             {/* Profile button */}
