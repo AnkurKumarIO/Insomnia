@@ -253,8 +253,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
-          {/* Resume CTA */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+          {/* Resume CTA — full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -285,52 +285,21 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Mentor */}
-          <div style={{ ...glass, borderLeft: '2px solid #c3c0ff' }}>
-            <div style={{ ...label, marginBottom: '1.5rem' }}>Recommended Mentor</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1rem' }}>
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#4edea3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700, color: 'white', border: '2px solid #c3c0ff' }}>PS</div>
+          {/* Recommended Mentor CTA — clean button, no profile preview */}
+          <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 24, fontVariationSettings: "'FILL' 1" }}>psychology</span>
+              </div>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: 2 }}>Priya Sharma</div>
-                <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>Senior Engineer at Google</div>
+                <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd', marginBottom: 3 }}>Recommended Mentor</div>
+                <div style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>Get matched with a top alumni mentor for your mock interview</div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
-                {['React','System Design','Big Tech'].map(t => (
-                  <span key={t} style={{ padding: '0.2rem 0.6rem', background: 'rgba(78,222,163,0.1)', color: '#4edea3', fontSize: '0.65rem', borderRadius: 999, fontWeight: 500 }}>{t}</span>
-                ))}
-              </div>
-              {/* Status-aware button — same as AlumniDiscovery BookButton */}
-              {(() => {
-                const myRequests = getRequestsByStudent(user?.name || '');
-                const existing = myRequests.find(r => r.alumniName === RECOMMENDED_MENTOR.name);
-                if (existing?.status === 'pending') {
-                  return (
-                    <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 10, textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ffb95f', marginBottom: 2 }}>⏳ Request Pending</div>
-                      <div style={{ fontSize: '0.7rem', color: '#c7c4d8' }}>Waiting for Priya to accept</div>
-                    </div>
-                  );
-                }
-                if (existing?.status === 'accepted') {
-                  const canJoin = Date.now() >= new Date(existing.scheduledTime).getTime() - 5 * 60 * 1000;
-                  if (canJoin) {
-                    return <a href={`/interview/${existing.roomId}`} style={{ width: '100%', padding: '0.6rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center', display: 'block' }}>Join Mock Interview</a>;
-                  }
-                  const fmt = new Date(existing.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                  return (
-                    <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 10, textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', marginBottom: 2 }}>✓ Scheduled</div>
-                      <div style={{ fontSize: '0.7rem', color: '#dae2fd', fontWeight: 600 }}>{fmt}</div>
-                    </div>
-                  );
-                }
-                return (
-                  <button onClick={() => setShowMentorBook(true)} style={{ width: '100%', padding: '0.6rem', background: 'rgba(79,70,229,0.15)', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', fontSize: '0.75rem', fontWeight: 700, borderRadius: 10, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    {existing?.status === 'declined' ? 'Request Again' : 'Book Mock Interview'}
-                  </button>
-                );
-              })()}
             </div>
+            <button onClick={() => setShowMentorBook(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.65rem 1.5rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person_search</span>
+              View Mentor
+            </button>
           </div>
         </div>
       </>
@@ -439,6 +408,21 @@ export default function Dashboard() {
                             <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
                               {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
+                            {/* Join Now button for slot_booked notifications */}
+                            {n.type === 'slot_booked' && (() => {
+                              const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                              if (!req?.roomId) return null;
+                              const canJoin = req.scheduledTime && Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
+                              return canJoin ? (
+                                <a href={`/interview/${req.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
+                                </a>
+                              ) : (
+                                <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600 }}>
+                                  🕐 {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              );
+                            })()}
                           </div>
                           {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0, marginTop: 6 }} />}
                         </div>

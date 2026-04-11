@@ -194,13 +194,20 @@ function BookButton({ alumni, studentName, onBook }) {
   const myRequests = getRequestsByStudent(studentName);
   const existing = myRequests.find(r => r.alumniName === alumni.name);
 
+  // No request or declined → show Book / Send Again
   if (!existing || existing.status === 'declined') {
     return (
-      <button onClick={onBook} style={{ width: '100%', padding: '0.6rem', background: 'rgba(79,70,229,0.15)', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.15)', borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        {existing?.status === 'declined' ? 'Request Again' : 'Book Mock Interview'}
+      <button onClick={onBook} style={{ width: '100%', padding: '0.6rem', background: existing?.status === 'declined' ? 'rgba(255,180,171,0.1)' : 'rgba(79,70,229,0.15)', color: existing?.status === 'declined' ? '#ffb4ab' : '#c3c0ff', border: `1px solid ${existing?.status === 'declined' ? 'rgba(255,180,171,0.3)' : 'rgba(195,192,255,0.15)'}`, borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {existing?.status === 'declined' ? (
+          <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span> Send Again</>
+        ) : (
+          <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>send</span> Book Mock Interview</>
+        )}
       </button>
     );
   }
+
+  // Pending
   if (existing.status === 'pending') {
     return (
       <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 10, textAlign: 'center' }}>
@@ -209,8 +216,23 @@ function BookButton({ alumni, studentName, onBook }) {
       </div>
     );
   }
+
+  // Accepted (slot not yet booked)
   if (existing.status === 'accepted') {
-    const canJoin = Date.now() >= new Date(existing.scheduledTime).getTime() - 5 * 60 * 1000;
+    return (
+      <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(195,192,255,0.08)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 10, textAlign: 'center' }}>
+        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>✓ Accepted</div>
+        <div style={{ fontSize: '0.7rem', color: '#c7c4d8' }}>Alumni is selecting a time slot...</div>
+      </div>
+    );
+  }
+
+  // Slot booked
+  if (existing.status === 'slot_booked') {
+    const now = Date.now();
+    const scheduledMs = new Date(existing.scheduledTime).getTime();
+    const canJoin = now >= scheduledMs - 5 * 60 * 1000 && now <= scheduledMs + 2 * 60 * 60 * 1000;
+
     if (canJoin) {
       return (
         <a href={`/interview/${existing.roomId}`} style={{ width: '100%', padding: '0.6rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', border: 'none', borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none', boxSizing: 'border-box' }}>
@@ -218,14 +240,19 @@ function BookButton({ alumni, studentName, onBook }) {
         </a>
       );
     }
-    const formatted = new Date(existing.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const formatted = new Date(existing.scheduledTime).toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
     return (
       <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 10, textAlign: 'center' }}>
-        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>✓ Scheduled</div>
-        <div style={{ fontSize: '0.7rem', color: '#dae2fd', fontWeight: 600 }}>{formatted}</div>
+        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>📅 Scheduled</div>
+        <div style={{ fontSize: '0.75rem', color: '#dae2fd', fontWeight: 700 }}>{formatted}</div>
+        <div style={{ fontSize: '0.65rem', color: '#c7c4d8', marginTop: 2 }}>Join button activates 5 min before</div>
       </div>
     );
   }
+
   return null;
 }
 

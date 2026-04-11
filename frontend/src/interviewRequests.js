@@ -101,6 +101,26 @@ export function bookSlot(requestId, scheduledTime) {
   return requests[idx];
 }
 
+// Alumni reschedules a booked slot
+export function rescheduleSlot(requestId, newScheduledTime) {
+  const requests = load();
+  const idx = requests.findIndex(r => r.id === requestId);
+  if (idx === -1) return null;
+  requests[idx] = { ...requests[idx], scheduledTime: newScheduledTime };
+  save(requests);
+  const formatted = new Date(newScheduledTime).toLocaleString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  pushStudentNotification({
+    studentName: requests[idx].studentName,
+    type: 'slot_booked',
+    title: 'Interview Rescheduled 🔄',
+    message: `Your interview has been rescheduled to ${formatted}.`,
+    requestId,
+  });
+  return requests[idx];
+}
+
 // Legacy — kept for backward compat
 export function acceptRequest(requestId, scheduledTime) {
   return bookSlot(requestId, scheduledTime);

@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
-import { getRequests, acceptRequestOnly, bookSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
+import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import SettingsPage from './SettingsPage';
 
 // ── Student Detail + Accept Modal ────────────────────────────────────────────
@@ -294,6 +294,95 @@ function BookSlotModal({ request, onClose, onBooked }) {
   );
 }
 
+// ── Reschedule Modal ──────────────────────────────────────────────────────────
+function RescheduleModal({ request, onClose, onRescheduled }) {
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [viewYear, setViewYear]   = useState(today.getFullYear());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState('10:00');
+  const [done, setDone] = useState(false);
+
+  const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayStr = today.toDateString();
+  const isPast = (day) => new Date(viewYear, viewMonth, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const handleReschedule = () => {
+    const newTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${selectedTime}`).toISOString();
+    rescheduleSlot(request.id, newTime);
+    setDone(true);
+    setTimeout(() => { onRescheduled(newTime); onClose(); }, 1600);
+  };
+
+  const formattedSelected = selectedDate ? new Date(viewYear, viewMonth, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(255,185,95,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+        {done ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔄</div>
+            <h3 style={{ fontWeight: 700, color: '#ffb95f', marginBottom: 8 }}>Slot Rescheduled!</h3>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified of the new time.</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#ffb95f', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Reschedule Interview</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>with {request.studentName}</h3>
+                {request.scheduledTime && <div style={{ fontSize: '0.72rem', color: '#c7c4d8', marginTop: 2 }}>Current: {new Date(request.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>}
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span></button>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{MONTHS[viewMonth]} {viewYear}</span>
+                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span></button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
+                {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#c7c4d8', padding: '0.25rem 0' }}>{d}</div>)}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.25rem' }}>
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                  const past = isPast(day); const isToday = new Date(viewYear, viewMonth, day).toDateString() === todayStr; const selected = selectedDate === day;
+                  return <button key={day} onClick={() => !past && setSelectedDate(day)} disabled={past} style={{ aspectRatio: '1', borderRadius: 8, border: 'none', cursor: past ? 'not-allowed' : 'pointer', fontWeight: selected ? 700 : 500, fontSize: '0.8rem', background: selected ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : isToday ? 'rgba(78,222,163,0.15)' : 'transparent', color: selected ? '#1d00a5' : past ? 'rgba(199,196,216,0.25)' : isToday ? '#4edea3' : '#dae2fd' }}>{day}</button>;
+                })}
+              </div>
+              {selectedDate && (
+                <>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time — {formattedSelected}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
+                    {TIME_SLOTS.map(t => <button key={t} onClick={() => setSelectedTime(t)} style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, background: selectedTime === t ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: selectedTime === t ? '#1d00a5' : '#c7c4d8' }}>{t}</button>)}
+                  </div>
+                  <div style={{ background: 'rgba(255,185,95,0.08)', border: '1px solid rgba(255,185,95,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#ffb95f', marginBottom: 4 }}>New Slot</div>
+                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {selectedTime}</div>
+                  </div>
+                  <button onClick={handleReschedule} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#e07b00,#ffb95f)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_repeat</span> Confirm Reschedule & Notify Student
+                  </button>
+                </>
+              )}
+              {!selectedDate && <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>Select a new date to reschedule</div>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Modal to add an availability slot
 function AddSlotModal({ onClose, onAdd }) {
   const [date, setDate] = useState('');
@@ -356,8 +445,9 @@ export default function AlumniDashboard() {
   const [extraSlots, setExtraSlots] = useState([]);
   const [viewingRequest, setViewingRequest] = useState(null);
   const [bookingRequest, setBookingRequest] = useState(null);
+  const [reschedulingRequest, setReschedulingRequest] = useState(null);
   const [liveRequests, setLiveRequests] = useState([]);
-  const [globalSearch, setGlobalSearch] = useState('');  // alumni portal search
+  const [globalSearch, setGlobalSearch] = useState('');
 
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
@@ -383,8 +473,8 @@ export default function AlumniDashboard() {
   useEffect(() => {
     const load = () => {
       const all = getRequests();
-      // Show pending + accepted (waiting for slot booking)
-      setLiveRequests(all.filter(r => r.alumniName === user.name && (r.status === 'pending' || r.status === 'accepted')));
+      // Show pending + accepted + slot_booked
+      setLiveRequests(all.filter(r => r.alumniName === user.name && (r.status === 'pending' || r.status === 'accepted' || r.status === 'slot_booked')));
     };
     load();
     const interval = setInterval(load, 3000);
@@ -436,17 +526,30 @@ export default function AlumniDashboard() {
   };
 
   const handleSlotBooked = (requestId, scheduledTime) => {
-    setLiveRequests(prev => prev.filter(r => r.id !== requestId));
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId: `room-${requestId.slice(-8)}-${Date.now()}` } : r));
     const formatted = formatScheduledTime(scheduledTime);
     const req = liveRequests.find(r => r.id === requestId);
+    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
     setExtraSlots(s => [...s, {
       when: formatted,
       title: `Mock Interview: ${req?.studentName || 'Student'}`,
       sub: req?.topic || 'Mock Interview',
       active: true,
-      roomId: `room-${requestId.slice(-8)}-${Date.now()}`,
+      roomId,
       scheduledTime,
     }]);
+  };
+
+  const handleRescheduled = (requestId, newScheduledTime) => {
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, scheduledTime: newScheduledTime } : r));
+    const formatted = formatScheduledTime(newScheduledTime);
+    setExtraSlots(s => s.map(slot => {
+      const req = liveRequests.find(r => r.id === requestId);
+      if (req && slot.title === `Mock Interview: ${req.studentName}`) {
+        return { ...slot, when: formatted, scheduledTime: newScheduledTime };
+      }
+      return slot;
+    }));
   };
 
   // ── Highlight matching text (like PDF search) ────────────────────────────
@@ -770,10 +873,10 @@ export default function AlumniDashboard() {
                   <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.studentName}</span>
                   {/* Status badge */}
                   <span style={{ padding: '0.15rem 0.5rem', borderRadius: 999, fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-                    background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : 'rgba(195,192,255,0.1)',
-                    color: r.status === 'accepted' ? '#ffb95f' : '#c3c0ff',
+                    background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
+                    color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
                   }}>
-                    {r.status === 'accepted' ? '✓ Accepted' : '⏳ Pending'}
+                    {r.status === 'slot_booked' ? '📅 Booked' : r.status === 'accepted' ? '✓ Accepted' : '⏳ Pending'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
@@ -797,6 +900,27 @@ export default function AlumniDashboard() {
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_month</span> Book Slot
                   </button>
                 )}
+                {r.status === 'slot_booked' && (() => {
+                  const now = Date.now();
+                  const scheduledMs = new Date(r.scheduledTime).getTime();
+                  const canJoin = now >= scheduledMs - 5 * 60 * 1000 && now <= scheduledMs + 2 * 60 * 60 * 1000;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                      {canJoin ? (
+                        <a href={`/interview/${r.roomId}`} style={{ padding: '0.45rem 1rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
+                        </a>
+                      ) : (
+                        <div style={{ padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textAlign: 'right' }}>
+                          📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                      <button onClick={() => setReschedulingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, color: '#ffb95f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>event_repeat</span> Reschedule
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -944,6 +1068,13 @@ export default function AlumniDashboard() {
           request={bookingRequest}
           onClose={() => setBookingRequest(null)}
           onBooked={(scheduledTime) => handleSlotBooked(bookingRequest.id, scheduledTime)}
+        />
+      )}
+      {reschedulingRequest && (
+        <RescheduleModal
+          request={reschedulingRequest}
+          onClose={() => setReschedulingRequest(null)}
+          onRescheduled={(newTime) => handleRescheduled(reschedulingRequest.id, newTime)}
         />
       )}
 
