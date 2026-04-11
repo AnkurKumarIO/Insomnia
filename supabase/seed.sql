@@ -1,0 +1,23 @@
+-- ============================================================
+-- AlumniConnect Seed Data
+-- Run AFTER schema.sql in the Supabase SQL Editor
+-- NOTE: For users, create them via the Auth dashboard or
+--       the backend /auth routes — these are profile-only inserts
+--       and require matching auth.users rows to exist first.
+-- ============================================================
+
+-- College registry is already seeded in schema.sql
+-- This file seeds additional test data once auth users exist.
+
+-- Example: after creating auth users manually, insert profiles like:
+--
+-- insert into public.users (id, role, name, email, department, verification_status) values
+--   ('<auth-user-uuid-1>', 'ALUMNI',  'Priya Sharma',     'priya.sharma@google.com',     'Computer Science',       'VERIFIED'),
+--   ('<auth-user-uuid-2>', 'ALUMNI',  'Rahul Verma',      'rahul.verma@microsoft.com',   'Electrical Engineering', 'VERIFIED'),
+--   ('<auth-user-uuid-3>', 'STUDENT', 'Alice Johnson',    'stu1001@alumniconnect.edu',   'Computer Science',       'VERIFIED'),
+--   ('<auth-user-uuid-4>', 'TNP',     'TNP Coordinator',  'tnp@alumniconnect.edu',       null,                     'VERIFIED');
+--
+-- Then add schedule slots:
+-- insert into public.schedule_slots (alumni_id, start_time, end_time, status) values
+--   ('<priya-uuid>', now() + interval '1 day', now() + interval '1 day' + interval '1 hour', 'OPEN'),
+--   ('<rahul-uuid>', now() + interval '2 days', now() + interval '2 days' + interval '1 hour', 'OPEN');

@@ -11,38 +11,42 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Routes
-const authRoutes = require('./routes/auth');
-const aiRoutes = require('./routes/aiRoutes');
-app.use('/auth', authRoutes);
-app.use('/ai', aiRoutes);
+app.use('/auth',          require('./routes/auth'));
+app.use('/ai',            require('./routes/aiRoutes'));
+app.use('/requests',      require('./routes/requests'));
+app.use('/notifications', require('./routes/notifications'));
 
 // HTTP Server + Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 
-// Socket handlers
-const socketInterviewRoom = require('./socket/interviewRoom');
-socketInterviewRoom(io);
+require('./socket/interviewRoom')(io);
 
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'AlumniConnect Backend is running' });
 });
 
-// API info
 app.get('/api', (req, res) => {
   res.json({
     name: 'AlumniConnect AI API',
-    version: '1.0.0',
+    version: '2.0.0',
+    database: 'Supabase (PostgreSQL)',
     endpoints: {
-      health: 'GET /health',
-      studentVerify: 'POST /auth/student/verify',
-      tnpLogin: 'POST /auth/tnp/login',
-      resumeAnalyze: 'POST /ai/resume-analyze',
-      interviewAnalytics: 'POST /ai/interview-analytics'
-    }
+      health:              'GET  /health',
+      studentVerify:       'POST /auth/student/verify',
+      tnpLogin:            'POST /auth/tnp/login',
+      alumniLogin:         'POST /auth/alumni/login',
+      resumeAnalyze:       'POST /ai/resume-analyze',
+      interviewAnalytics:  'POST /ai/interview-analytics',
+      getRequests:         'GET  /requests?alumniId=&studentId=',
+      createRequest:       'POST /requests',
+      updateRequest:       'PATCH /requests/:id',
+      getNotifications:    'GET  /notifications?userId=',
+      markNotifsRead:      'PATCH /notifications/read',
+    },
   });
 });
 
@@ -50,5 +54,5 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`\n🚀 AlumniConnect Backend running on http://localhost:${PORT}`);
   console.log(`📡 Socket.io ready on ws://localhost:${PORT}/interview`);
-  console.log(`🔗 API docs at http://localhost:${PORT}/api\n`);
+  console.log(`🗄️  Database: Supabase (PostgreSQL)\n`);
 });

@@ -3,63 +3,74 @@ const router = express.Router();
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
-const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+const supabase = require('../supabase');
 
-const prisma = new PrismaClient();
 const upload = multer({ dest: 'uploads/' });
 
-// Simulate OCR extraction (mock for hackathon)
-const simulateOCRExtraction = async (file) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        extracted_name: "Alice Johnson",
-        extracted_college_id: "STU1001"
-      });
-    }, 500);
-  });
-};
-
-const collegeDbPath = path.join(__dirname, '..', 'college_db.json');
+// Simulate OCR extraction (mock)
+const simulateOCRExtraction = async () => ({
+  extracted_name: 'Alice Johnson',
+  extracted_college_id: 'STU1001',
+});
 
 // POST /auth/student/verify
 router.post('/student/verify', upload.single('idDocument'), async (req, res) => {
   try {
     const file = req.file;
-    if (!file) {
-      return res.status(400).json({ error: 'No document uploaded.' });
-    }
+    if (!file) return res.status(400).json({ error: 'No document uploaded.' });
 
     const ocrData = await simulateOCRExtraction(file);
-    const collegeDb = JSON.parse(fs.readFileSync(collegeDbPath, 'utf8'));
 
-    const match = collegeDb.find(
-      (s) => s.college_id === ocrData.extracted_college_id && s.name === ocrData.extracted_name
-    );
+    // Look up student in college_registry table
+    const { data: match, error: regErr } = await supabase
+      .from('college_registry')
+      .select('*')
+      .eq('college_id', ocrData.extracted_college_id)
+      .eq('name', ocrData.extracted_name)
+      .single();
 
-    if (!match) {
+    if (regErr || !match) {
       return res.status(401).json({ error: 'Verification failed. Student not found in college registry.' });
     }
 
     const email = `${match.college_id.toLowerCase()}@alumniconnect.edu`;
-    let user = await prisma.user.findFirst({ where: { email } });
+
+    // Check if user already exists
+    let { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
     if (!user) {
-      user = await prisma.user.create({
-        data: {
+      // Create auth user + profile row
+      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+        email,
+        password: `${match.college_id}_auto_${Date.now()}`,
+        email_confirm: true,
+      });
+      if (authErr) throw authErr;
+
+      const { data: newUser, error: insertErr } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
           role: 'STUDENT',
           name: match.name,
           email,
           department: match.department,
-          verification_status: 'VERIFIED'
-        }
-      });
+          college_id: match.college_id,
+          verification_status: 'VERIFIED',
+        })
+        .select()
+        .single();
+      if (insertErr) throw insertErr;
+      user = newUser;
     } else {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { verification_status: 'VERIFIED' }
-      });
+      await supabase
+        .from('users')
+        .update({ verification_status: 'VERIFIED' })
+        .eq('id', user.id);
     }
 
     const token = jwt.sign(
@@ -68,14 +79,16 @@ router.post('/student/verify', upload.single('idDocument'), async (req, res) => 
       { expiresIn: '24h' }
     );
 
-    return res.json({ message: 'Verification successful', token, user: { id: user.id, name: user.name, role: user.role } });
+    return res.json({
+      message: 'Verification successful',
+      token,
+      user: { id: user.id, name: user.name, role: user.role },
+    });
   } catch (error) {
     console.error('OCR Verification Error:', error);
     res.status(500).json({ error: 'Internal Server Error during verification.' });
   } finally {
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
   }
 });
 
@@ -90,17 +103,34 @@ router.post('/tnp/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid TNP credentials.' });
     }
 
-    let tnpUser = await prisma.user.findUnique({ where: { email: 'tnp@alumniconnect.edu' } });
+    const tnpEmail = 'tnp@alumniconnect.edu';
+    let { data: tnpUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', tnpEmail)
+      .single();
 
     if (!tnpUser) {
-      tnpUser = await prisma.user.create({
-        data: {
+      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+        email: tnpEmail,
+        password: validPassword,
+        email_confirm: true,
+      });
+      if (authErr) throw authErr;
+
+      const { data: newUser, error: insertErr } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
           role: 'TNP',
           name: 'TNP Coordinator',
-          email: 'tnp@alumniconnect.edu',
-          verification_status: 'VERIFIED'
-        }
-      });
+          email: tnpEmail,
+          verification_status: 'VERIFIED',
+        })
+        .select()
+        .single();
+      if (insertErr) throw insertErr;
+      tnpUser = newUser;
     }
 
     const token = jwt.sign(
@@ -109,34 +139,51 @@ router.post('/tnp/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    return res.json({ message: 'TNP Login successful', token, user: { id: tnpUser.id, role: tnpUser.role } });
+    return res.json({
+      message: 'TNP Login successful',
+      token,
+      user: { id: tnpUser.id, role: tnpUser.role },
+    });
   } catch (error) {
     console.error('TNP Login Error:', error);
     res.status(500).json({ error: 'Internal Server Error.' });
   }
 });
 
-// POST /auth/alumni/login (simple email-based for demo)
+// POST /auth/alumni/login
 router.post('/alumni/login', async (req, res) => {
   try {
     const { name, email, department } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required.' });
 
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Name and email are required.' });
-    }
-
-    let user = await prisma.user.findUnique({ where: { email } });
+    let { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
     if (!user) {
-      user = await prisma.user.create({
-        data: {
+      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+        email,
+        password: `alumni_${Date.now()}`,
+        email_confirm: true,
+      });
+      if (authErr) throw authErr;
+
+      const { data: newUser, error: insertErr } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
           role: 'ALUMNI',
           name,
           email,
           department: department || 'General',
-          verification_status: 'VERIFIED'
-        }
-      });
+          verification_status: 'VERIFIED',
+        })
+        .select()
+        .single();
+      if (insertErr) throw insertErr;
+      user = newUser;
     }
 
     const token = jwt.sign(
@@ -145,7 +192,11 @@ router.post('/alumni/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    return res.json({ message: 'Alumni login successful', token, user: { id: user.id, name: user.name, role: user.role } });
+    return res.json({
+      message: 'Alumni login successful',
+      token,
+      user: { id: user.id, name: user.name, role: user.role },
+    });
   } catch (error) {
     console.error('Alumni Login Error:', error);
     res.status(500).json({ error: 'Internal Server Error.' });

@@ -2,47 +2,32 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // ─── Mock data (used when backend is unreachable) ───────────────────────────
 
-const MOCK_USERS = {
-  students: [
-    { id: 'stu-001', name: 'Alice Johnson', role: 'STUDENT', department: 'Computer Science' },
-    { id: 'stu-002', name: 'Bob Smith',     role: 'STUDENT', department: 'Electrical Engineering' },
-  ],
-  alumni: [
-    { id: 'alm-001', name: 'Priya Sharma',  role: 'ALUMNI', department: 'Computer Science' },
-    { id: 'alm-002', name: 'Rahul Verma',   role: 'ALUMNI', department: 'Electrical Engineering' },
-  ],
-  tnp: { id: 'tnp-001', name: 'TNP Coordinator', role: 'TNP' },
-};
-
 const MOCK_TOKEN = 'mock-jwt-token-for-local-dev';
-
 const mockDelay = (ms = 600) => new Promise(r => setTimeout(r, ms));
 
 const MOCK_API = {
   health: async () => ({ status: 'ok (mock)', message: 'Running in offline/mock mode' }),
 
-  studentVerify: async (_file) => {
+  studentVerify: async () => {
     await mockDelay();
-    const user = MOCK_USERS.students[0]; // Always verifies as Alice Johnson
-    return { token: MOCK_TOKEN, user };
+    return { token: MOCK_TOKEN, user: { id: 'stu-001', name: 'Alice Johnson', role: 'STUDENT', department: 'Computer Science' } };
   },
 
   tnpLogin: async (username, password) => {
     await mockDelay();
     if (username === 'admin' && password === 'tnp_secure_123') {
-      return { token: MOCK_TOKEN, user: MOCK_USERS.tnp };
+      return { token: MOCK_TOKEN, user: { id: 'tnp-001', name: 'TNP Coordinator', role: 'TNP' } };
     }
     return { error: 'Invalid credentials. Use admin / tnp_secure_123' };
   },
 
-  alumniLogin: async (name, email, _department) => {
+  alumniLogin: async (name, email, department) => {
     await mockDelay();
     if (!name || !email) return { error: 'Name and email are required.' };
-    const user = { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: _department || 'General' };
-    return { token: MOCK_TOKEN, user };
+    return { token: MOCK_TOKEN, user: { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: department || 'General' } };
   },
 
-  resumeAnalyze: async (_file) => {
+  resumeAnalyze: async () => {
     await mockDelay(1200);
     return {
       message: 'Resume analyzed (mock)',
@@ -57,7 +42,7 @@ const MOCK_API = {
     };
   },
 
-  interviewAnalytics: async (_data) => {
+  interviewAnalytics: async () => {
     await mockDelay(1500);
     return {
       message: 'Analytics generated (mock)',
@@ -74,11 +59,36 @@ const MOCK_API = {
       },
     };
   },
+
+  getRequests: async ({ alumniId, studentId } = {}) => {
+    await mockDelay(400);
+    return [];
+  },
+
+  createRequest: async (payload) => {
+    await mockDelay(400);
+    return { request_id: `mock-${Date.now()}`, ...payload, status: 'PENDING' };
+  },
+
+  updateRequest: async (id, updates) => {
+    await mockDelay(400);
+    return { request_id: id, ...updates };
+  },
+
+  getNotifications: async () => {
+    await mockDelay(300);
+    return [];
+  },
+
+  markNotifsRead: async () => {
+    await mockDelay(200);
+    return { success: true };
+  },
 };
 
-// ─── Try real backend, fall back to mock ────────────────────────────────────
+// ─── Backend availability check ─────────────────────────────────────────────
 
-let _backendAvailable = null; // null = unknown, true/false after first check
+let _backendAvailable = null;
 
 async function isBackendUp() {
   if (_backendAvailable !== null) return _backendAvailable;
@@ -93,11 +103,7 @@ async function isBackendUp() {
 
 async function callOrMock(realFn, mockFn) {
   if (await isBackendUp()) {
-    try {
-      return await realFn();
-    } catch {
-      return await mockFn();
-    }
+    try { return await realFn(); } catch { return await mockFn(); }
   }
   return await mockFn();
 }
@@ -137,10 +143,11 @@ export const api = {
     () => MOCK_API.alumniLogin(name, email, department)
   ),
 
-  resumeAnalyze: (file) => callOrMock(
+  resumeAnalyze: (file, userId) => callOrMock(
     () => {
       const fd = new FormData();
       fd.append('resume', file);
+      if (userId) fd.append('userId', userId);
       return fetch(`${API_BASE}/ai/resume-analyze`, { method: 'POST', body: fd }).then(r => r.json());
     },
     () => MOCK_API.resumeAnalyze(file)
@@ -153,6 +160,50 @@ export const api = {
       body: JSON.stringify(data),
     }).then(r => r.json()),
     () => MOCK_API.interviewAnalytics(data)
+  ),
+
+  // ── Interview Requests ──────────────────────────────────────
+
+  getRequests: (params = {}) => callOrMock(
+    () => {
+      const qs = new URLSearchParams(params).toString();
+      return fetch(`${API_BASE}/requests?${qs}`).then(r => r.json());
+    },
+    () => MOCK_API.getRequests(params)
+  ),
+
+  createRequest: (payload) => callOrMock(
+    () => fetch(`${API_BASE}/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json()),
+    () => MOCK_API.createRequest(payload)
+  ),
+
+  updateRequest: (id, updates) => callOrMock(
+    () => fetch(`${API_BASE}/requests/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }).then(r => r.json()),
+    () => MOCK_API.updateRequest(id, updates)
+  ),
+
+  // ── Notifications ───────────────────────────────────────────
+
+  getNotifications: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/notifications?userId=${userId}`).then(r => r.json()),
+    () => MOCK_API.getNotifications(userId)
+  ),
+
+  markNotifsRead: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/notifications/read`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }).then(r => r.json()),
+    () => MOCK_API.markNotifsRead(userId)
   ),
 };
 
