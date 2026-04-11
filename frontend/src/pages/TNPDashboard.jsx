@@ -26,11 +26,36 @@ export default function TNPDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [queueStatus, setQueueStatus] = useState({});
+  const [credModal, setCredModal] = useState(null); // { name, username, password, email }
 
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  const handleApprove = (name) => setQueueStatus(s => ({ ...s, [name]: 'approved' }));
-  const handleReview  = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
+  function genPassword() {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
+    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+  function genUsername(name) {
+    const parts = name.trim().toLowerCase().split(/\s+/);
+    const base = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
+    return base.replace(/[^a-z.]/g, '') + Math.floor(Math.random() * 90 + 10);
+  }
+
+  const handleApprove = (q) => {
+    const username = genUsername(q.name);
+    const password = genPassword();
+    const email = `${username}@alumniconnect.edu`;
+    const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
+
+    // Save to approved accounts store
+    const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+    existing.push({ username, password, role, name: q.name, email, department: q.sub });
+    localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
+
+    setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
+    setCredModal({ name: q.name, username, password, email, role });
+  };
+
+  const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
 
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
@@ -61,7 +86,7 @@ export default function TNPDashboard() {
                   {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
                 </span>
                 {!st && <>
-                  <button onClick={() => handleApprove(q.name)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                  <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
                   <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                 </>}
               </div>
@@ -89,6 +114,37 @@ export default function TNPDashboard() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Credentials Modal */}
+      {credModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(78,222,163,0.25)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
+              <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#4edea3', marginBottom: 6 }}>Account Approved!</h3>
+              <p style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>
+                Credentials for <strong style={{ color: '#dae2fd' }}>{credModal.name}</strong> have been generated.<br />
+                <span style={{ color: '#ffb95f' }}>In production, these would be emailed to {credModal.email}</span>
+              </p>
+            </div>
+            {[['Username', credModal.username], ['Password', credModal.password], ['Email', credModal.email], ['Role', credModal.role]].map(([label, val]) => (
+              <div key={label} style={{ background: '#131b2e', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(70,69,85,0.2)' }}>
+                <div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: '#c3c0ff' }}>{val}</div>
+                </div>
+                <button onClick={() => navigator.clipboard.writeText(val)} style={{ background: 'rgba(195,192,255,0.1)', border: 'none', borderRadius: 6, padding: '0.3rem 0.6rem', color: '#c3c0ff', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}>Copy</button>
+              </div>
+            ))}
+            <div style={{ background: 'rgba(255,185,95,0.08)', border: '1px solid rgba(255,185,95,0.2)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.75rem', color: '#ffb95f', lineHeight: 1.6 }}>📧 Simulated email sent to {credModal.email}. User can now log in at <strong>/login</strong></p>
+            </div>
+            <button onClick={() => setCredModal(null)} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem' }}>
@@ -114,7 +170,7 @@ export default function TNPDashboard() {
           <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
             Generate Report
           </button>
-          <a href="#" onClick={e => { e.preventDefault(); logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
+          <a href="#" onClick={e => { e.preventDefault(); logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
           </a>
         </div>
@@ -214,7 +270,7 @@ export default function TNPDashboard() {
                           {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
                         </span>
                         {!st && <>
-                          <button onClick={() => handleApprove(q.name)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                          <button onClick={() => handleApprove(q)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
                           <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                         </>}
                       </div>

@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import StudentAuth from './pages/StudentAuth';
 import StudentRegistration from './pages/StudentRegistration';
 import StudentLogin from './pages/StudentLogin';
+import UnifiedLogin from './pages/UnifiedLogin';
 import ProfileSetup from './pages/ProfileSetup';
 import TNPLogin from './pages/TNPLogin';
 import AlumniLogin from './pages/AlumniLogin';
@@ -45,10 +46,10 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Smart dashboard redirect based on role
+// Smart dashboard redirect based on role — requires login
 function DashboardRouter() {
   const { user } = useContext(AuthContext);
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'ALUMNI') return <AlumniDashboard />;
   if (user.role === 'TNP') return <TNPDashboard />;
   return <Dashboard />;
@@ -75,9 +76,8 @@ function PublicNavbar() {
         🎓 <span>AlumniConnect</span> AI
       </Link>
       <div className="navbar-links">
-        <Link to="/auth/student">Student</Link>
-        <Link to="/auth/alumni">Alumni</Link>
-        <Link to="/auth/tnp" className="nav-cta">Admin Login</Link>
+        <Link to="/login">Sign In</Link>
+        <Link to="/auth/student/register" className="nav-cta">Register</Link>
       </div>
     </nav>
   );
@@ -90,6 +90,7 @@ function App() {
         <PublicNavbar />
         <Routes>
           <Route path="/" element={<LandingGuard />} />
+          <Route path="/login" element={<UnifiedLogin />} />
           <Route path="/auth/student" element={<StudentAuth />} />
           <Route path="/auth/student/register" element={<StudentRegistration />} />
           <Route path="/auth/student/login" element={<StudentLogin />} />
@@ -99,7 +100,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardRouter />} />
           <Route path="/interview/:roomId" element={<InterviewRoom />} />
           <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

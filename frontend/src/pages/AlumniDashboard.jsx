@@ -558,7 +558,7 @@ export default function AlumniDashboard() {
         </nav>
         {/* Only Sign Out at bottom — no "New Mentorship" button */}
         <div style={{ marginTop: 'auto' }}>
-          <button onClick={() => { logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+          <button onClick={() => { logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
           </button>
         </div>
@@ -672,7 +672,7 @@ export default function AlumniDashboard() {
                           <button onClick={() => setEditProfile(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                             Edit Profile
                           </button>
-                          <button onClick={() => { setShowProfile(false); logout(); navigate('/'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <button onClick={() => { setShowProfile(false); logout(); navigate('/login'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                             Sign Out
                           </button>
                         </div>

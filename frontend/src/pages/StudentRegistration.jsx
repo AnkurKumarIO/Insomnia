@@ -77,7 +77,7 @@ export default function StudentRegistration() {
           <p style={{ fontSize: '0.78rem', color: '#ffb95f', lineHeight: 1.6 }}>⚠️ Screenshot or note these credentials. They won't be shown again.</p>
         </div>
 
-        <button onClick={() => navigate('/auth/student/login')} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button onClick={() => navigate('/login')} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           Continue to Login
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
         </button>

@@ -224,7 +224,7 @@ export default function Dashboard() {
             <a href="mailto:support@alumniconnect.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>help</span> Support
             </a>
-            <button onClick={() => { logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+            <button onClick={() => { logout(); navigate('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
             </button>
           </div>
@@ -299,7 +299,7 @@ export default function Dashboard() {
                     <button onClick={() => { setShowProfile(false); setActiveTab('settings'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Edit Profile
                     </button>
-                    <button onClick={() => { setShowProfile(false); logout(); navigate('/'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                    <button onClick={() => { setShowProfile(false); logout(); navigate('/login'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Sign Out
                     </button>
                   </div>
