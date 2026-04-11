@@ -24,7 +24,12 @@ export async function getUserById(id) {
   return data || null;
 }
 
-export async function createUser({ id, role, name, email, department, college, year, username }) {
+export async function createUser({ id, role, name, email, department, college, year, username, password }) {
+  // Sign in first to get an authenticated session so RLS allows the insert
+  if (password) {
+    await supabase.auth.signInWithPassword({ email, password }).catch(() => {});
+  }
+
   const { data, error } = await supabase
     .from('users')
     .insert({
@@ -43,13 +48,18 @@ export async function createUser({ id, role, name, email, department, college, y
 }
 
 export async function updateUserProfile(userId, profileData) {
+  // Try with current session first
   const { data, error } = await supabase
     .from('users')
-    .update({ profile_data: profileData, department: profileData.department || undefined })
+    .update({ profile_data: profileData, ...(profileData.department ? { department: profileData.department } : {}) })
     .eq('id', userId)
     .select()
     .single();
-  if (error) throw error;
+
+  if (error) {
+    console.warn('updateUserProfile error:', error.message);
+    throw error;
+  }
   return data;
 }
 

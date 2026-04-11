@@ -67,7 +67,7 @@ export default function StudentRegistration() {
       const userId = authData.user?.id;
       if (!userId) throw new Error('Failed to create auth user');
 
-      // 3. Insert profile row into users table
+      // 3. Insert profile row into users table (signs in first for RLS)
       await createUser({
         id:         userId,
         role:       'STUDENT',
@@ -77,6 +77,7 @@ export default function StudentRegistration() {
         college:    form.college,
         year:       form.year,
         username,
+        password,
       });
 
       // 4. Store pending profile locally

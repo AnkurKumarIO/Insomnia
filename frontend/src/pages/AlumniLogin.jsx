@@ -23,12 +23,16 @@ export default function AlumniLogin() {
 
       if (!dbUser) {
         // 2. Create Supabase Auth + users row
+        const tempPassword = `alumni_${Date.now()}`;
         const { data: authData, error: authErr } = await supabase.auth.signUp({
           email,
-          password: `alumni_${Date.now()}`,
+          password: tempPassword,
           options: { data: { name, role: 'ALUMNI' } },
         });
         if (authErr) throw authErr;
+
+        // Sign in immediately to get session for RLS
+        await supabase.auth.signInWithPassword({ email, password: tempPassword }).catch(() => {});
 
         dbUser = await createUser({
           id:         authData.user.id,
@@ -36,7 +40,11 @@ export default function AlumniLogin() {
           name,
           email,
           department: department || 'General',
+          password:   tempPassword,
         });
+      } else {
+        // Existing user — sign in with Supabase Auth if possible
+        // (we don't have their password, so just proceed with the profile data)
       }
 
       if (!dbUser) throw new Error('Failed to create or find user');
