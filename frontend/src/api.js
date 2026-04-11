@@ -154,6 +154,54 @@ export const api = {
     }).then(r => r.json()),
     () => MOCK_API.interviewAnalytics(data)
   ),
+
+  // Agent 4: Document Verifier
+  verifyDocument: (file) => callOrMock(
+    () => {
+      const fd = new FormData();
+      fd.append('document', file);
+      return fetch(`${API_BASE}/ai/verify-document`, { method: 'POST', body: fd }).then(r => r.json());
+    },
+    async () => ({ result: { verified: true, confidence: 96, extracted: { name: 'Alice Johnson', college_id: 'STU1001' }, message: 'Document verified (mock)' } })
+  ),
+
+  // Agent 5: Student Profile Summarizer
+  summarizeProfile: (profileData) => callOrMock(
+    () => fetch(`${API_BASE}/ai/summarize-profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileData }),
+    }).then(r => r.json()),
+    async () => ({
+      summary: {
+        summary: 'Strong full-stack developer with React and Node.js experience. Led a team of 4 on a distributed systems project. Seeking guidance on system architecture.',
+        top_skills: ['React', 'Node.js', 'System Design', 'Python'],
+        experience_level: 'Mid-level',
+        interview_focus_areas: ['System design at scale', 'Node.js performance', 'Leadership'],
+        match_score: 88,
+      }
+    })
+  ),
+
+  // Agent 6: Speech Analysis
+  analyzeSpeech: (metrics) => callOrMock(
+    () => fetch(`${API_BASE}/ai/analyze-speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metrics),
+    }).then(r => r.json()),
+    async () => ({ result: { confidence: 82, clarity: 76, energy: 85, coaching_tip: 'Good pace. Keep it up!' } })
+  ),
+
+  // Agent 7: Fact Checker
+  factCheck: (claim) => callOrMock(
+    () => fetch(`${API_BASE}/ai/fact-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim }),
+    }).then(r => r.json()),
+    async () => ({ claim, result: { verified: true, confidence: 95, note: 'Claim verified (mock)' } })
+  ),
 };
 
 export const SOCKET_URL = API_BASE;
