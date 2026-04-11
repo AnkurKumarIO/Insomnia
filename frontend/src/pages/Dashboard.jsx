@@ -5,7 +5,103 @@ import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
-import { getStudentNotifications, markStudentNotifsRead } from '../interviewRequests';
+import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
+
+// ── Inline BookModal for Recommended Mentor ───────────────────────────────────
+const RECOMMENDED_MENTOR = {
+  name: 'Priya Sharma', title: 'Senior Software Engineer', company: 'Google',
+  tags: ['React', 'System Design', 'Big Tech'],
+};
+const TOPICS = [
+  'Mock Interview – General', 'Mock Interview – System Design',
+  'Mock Interview – Frontend', 'Mock Interview – Backend',
+  'Career Guidance', 'Resume Review',
+];
+
+function MentorBookModal({ studentName, onClose, onSent }) {
+  const [topic, setTopic] = useState(TOPICS[0]);
+  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const handleSend = () => {
+    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    sendRequest({
+      studentName,
+      studentId: studentName,
+      alumniName: RECOMMENDED_MENTOR.name,
+      alumniRole: `${RECOMMENDED_MENTOR.title} • ${RECOMMENDED_MENTOR.company}`,
+      topic,
+      message,
+      studentProfile: {
+        name: profile.name || studentName,
+        college: profile.college || '',
+        department: profile.department || '',
+        year: profile.year || '',
+        cgpa: profile.cgpa || '',
+        linkedin: profile.linkedin || '',
+        github: profile.github || '',
+        resumeName: profile.resumeName || '',
+        skills: profile.skills || [],
+        bio: profile.bio || '',
+      },
+    });
+    setSent(true);
+    setTimeout(() => { onSent(); onClose(); }, 1800);
+  };
+
+  const inp = { width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+        {sent ? (
+          <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+            <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Sent!</h3>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
+              Your request has been sent to <strong style={{ color: '#dae2fd' }}>{RECOMMENDED_MENTOR.name}</strong>.<br />
+              You'll see the scheduled time once they accept.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Book Mock Interview</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{RECOMMENDED_MENTOR.name}</h3>
+                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{RECOMMENDED_MENTOR.title} • {RECOMMENDED_MENTOR.company}</p>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.25rem' }}>
+              {RECOMMENDED_MENTOR.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Session Type</label>
+                <select value={topic} onChange={e => setTopic(e.target.value)} style={inp}>
+                  {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Message <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+                <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={`Hi Priya, I'd love to practice ${topic.toLowerCase()} with you...`} rows={3} style={{ ...inp, resize: 'none' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem' }}>
+              <button onClick={onClose} style={{ flex: 1, padding: '0.75rem', background: '#222a3d', color: '#c7c4d8', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSend} style={{ flex: 2, padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span> Send Request
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const SKILLS = [
   { label: 'Data Architecture', pct: 92, color: '#c3c0ff' },
@@ -33,6 +129,8 @@ export default function Dashboard() {
   const [showProfile, setShowProfile] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [studentNotifs, setStudentNotifs] = useState([]);
+  const [showMentorBook, setShowMentorBook] = useState(false);
+  const [mentorBookSent, setMentorBookSent] = useState(false);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -200,9 +298,37 @@ export default function Dashboard() {
                   <span key={t} style={{ padding: '0.2rem 0.6rem', background: 'rgba(78,222,163,0.1)', color: '#4edea3', fontSize: '0.65rem', borderRadius: 999, fontWeight: 500 }}>{t}</span>
                 ))}
               </div>
-              <button onClick={() => setActiveTab('directory')} style={{ width: '100%', padding: '0.6rem', background: '#222a3d', color: '#dae2fd', fontSize: '0.75rem', fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'center', display: 'block' }}>
-                Book Mock Interview
-              </button>
+              {/* Status-aware button — same as AlumniDiscovery BookButton */}
+              {(() => {
+                const myRequests = getRequestsByStudent(user?.name || '');
+                const existing = myRequests.find(r => r.alumniName === RECOMMENDED_MENTOR.name);
+                if (existing?.status === 'pending') {
+                  return (
+                    <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ffb95f', marginBottom: 2 }}>⏳ Request Pending</div>
+                      <div style={{ fontSize: '0.7rem', color: '#c7c4d8' }}>Waiting for Priya to accept</div>
+                    </div>
+                  );
+                }
+                if (existing?.status === 'accepted') {
+                  const canJoin = Date.now() >= new Date(existing.scheduledTime).getTime() - 5 * 60 * 1000;
+                  if (canJoin) {
+                    return <a href={`/interview/${existing.roomId}`} style={{ width: '100%', padding: '0.6rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center', display: 'block' }}>Join Mock Interview</a>;
+                  }
+                  const fmt = new Date(existing.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', marginBottom: 2 }}>✓ Scheduled</div>
+                      <div style={{ fontSize: '0.7rem', color: '#dae2fd', fontWeight: 600 }}>{fmt}</div>
+                    </div>
+                  );
+                }
+                return (
+                  <button onClick={() => setShowMentorBook(true)} style={{ width: '100%', padding: '0.6rem', background: 'rgba(79,70,229,0.15)', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', fontSize: '0.75rem', fontWeight: 700, borderRadius: 10, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    {existing?.status === 'declined' ? 'Request Again' : 'Book Mock Interview'}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -212,6 +338,13 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
+      {showMentorBook && (
+        <MentorBookModal
+          studentName={user?.name || 'Student'}
+          onClose={() => setShowMentorBook(false)}
+          onSent={() => setMentorBookSent(true)}
+        />
+      )}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1rem', zIndex: 50 }}>
         <div style={{ padding: '1.5rem 1rem 1rem' }}>
           <div style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#c3c0ff' }}>AlumniConnect</div>

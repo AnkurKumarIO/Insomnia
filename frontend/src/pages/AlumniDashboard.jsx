@@ -353,9 +353,10 @@ export default function AlumniDashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [extraSlots, setExtraSlots] = useState([]);
-  const [viewingRequest, setViewingRequest] = useState(null);   // StudentDetailModal
-  const [bookingRequest, setBookingRequest] = useState(null);   // BookSlotModal
-  const [liveRequests, setLiveRequests] = useState([]);         // pending + accepted
+  const [viewingRequest, setViewingRequest] = useState(null);
+  const [bookingRequest, setBookingRequest] = useState(null);
+  const [liveRequests, setLiveRequests] = useState([]);
+  const [globalSearch, setGlobalSearch] = useState('');  // alumni portal search
 
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
@@ -445,6 +446,139 @@ export default function AlumniDashboard() {
       roomId: `room-${requestId.slice(-8)}-${Date.now()}`,
       scheduledTime,
     }]);
+  };
+
+  // ── Highlight matching text (like PDF search) ────────────────────────────
+  const highlight = (text, query) => {
+    if (!text || !query) return text;
+    const str = String(text);
+    const idx = str.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return str;
+    return (
+      <>
+        {str.slice(0, idx)}
+        <mark style={{ background: 'rgba(195,192,255,0.35)', color: '#dae2fd', borderRadius: 3, padding: '0 2px' }}>{str.slice(idx, idx + query.length)}</mark>
+        {str.slice(idx + query.length)}
+      </>
+    );
+  };
+
+  const renderSearchResults = (q) => {
+    const ql = q.toLowerCase();
+
+    // Search requests — include all statuses for this alumni
+    const allRequests = (() => {
+      try {
+        return getRequests().filter(r => r.alumniName === user.name);
+      } catch { return liveRequests; }
+    })();
+
+    const matchedRequests = allRequests.filter(r =>
+      r.studentName?.toLowerCase().includes(ql) ||
+      r.topic?.toLowerCase().includes(ql) ||
+      r.message?.toLowerCase().includes(ql) ||
+      r.studentProfile?.college?.toLowerCase().includes(ql) ||
+      r.studentProfile?.department?.toLowerCase().includes(ql) ||
+      r.studentProfile?.skills?.some(s => s.toLowerCase().includes(ql)) ||
+      r.status?.toLowerCase().includes(ql)
+    );
+
+    // Search schedule
+    const allSlots = [...SCHEDULE, ...extraSlots];
+    const matchedSlots = allSlots.filter(s =>
+      s.title?.toLowerCase().includes(ql) ||
+      s.sub?.toLowerCase().includes(ql) ||
+      s.when?.toLowerCase().includes(ql)
+    );
+
+    const total = matchedRequests.length + matchedSlots.length;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Search header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="material-symbols-outlined" style={{ color: '#c3c0ff', fontSize: 22 }}>search</span>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+              Search results for "<span style={{ color: '#c3c0ff' }}>{q}</span>"
+            </h2>
+            <p style={{ fontSize: '0.78rem', color: '#c7c4d8', marginTop: 3 }}>{total} result{total !== 1 ? 's' : ''} found across requests and schedule</p>
+          </div>
+        </div>
+
+        {total === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16, border: '1px solid rgba(70,69,85,0.15)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }}>search_off</span>
+            <p style={{ fontWeight: 600 }}>No results found</p>
+            <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 4 }}>Try different keywords</p>
+          </div>
+        )}
+
+        {/* Matched Requests */}
+        {matchedRequests.length > 0 && (
+          <div>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#c7c4d8', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c3c0ff' }}>person</span>
+              Interview Requests ({matchedRequests.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {matchedRequests.map(r => (
+                <div key={r.id} style={{ background: '#131b2e', borderRadius: 14, padding: '1rem 1.25rem', border: '1px solid rgba(70,69,85,0.15)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>{highlight(r.studentName, q)}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{highlight(r.topic, q)}</div>
+                    {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 1 }}>{highlight(r.studentProfile.college, q)}</div>}
+                    {r.message && <div style={{ fontSize: '0.7rem', color: '#c7c4d8', fontStyle: 'italic', marginTop: 4 }}>"{highlight(r.message.slice(0, 80), q)}{r.message.length > 80 ? '...' : ''}"</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: 999, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+                      background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
+                      color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
+                    }}>{r.status === 'slot_booked' ? '✓ Booked' : r.status === 'accepted' ? 'Accepted' : 'Pending'}</span>
+                    {r.status === 'pending' && (
+                      <button onClick={() => { setViewingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>View</button>
+                    )}
+                    {r.status === 'accepted' && (
+                      <button onClick={() => { setBookingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(78,222,163,0.15)', color: '#4edea3', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>Book Slot</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Matched Schedule */}
+        {matchedSlots.length > 0 && (
+          <div>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#c7c4d8', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#4edea3' }}>calendar_today</span>
+              Schedule ({matchedSlots.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {matchedSlots.map((s, i) => (
+                <div key={i} style={{ background: '#131b2e', borderRadius: 14, padding: '1rem 1.25rem', border: `1px solid ${s.active ? 'rgba(195,192,255,0.15)' : 'rgba(70,69,85,0.15)'}`, display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: s.active ? 'rgba(195,192,255,0.1)' : '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? '#c3c0ff' : '#c7c4d8' }}>event</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>{highlight(s.title, q)}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{highlight(s.sub, q)}</div>
+                    <div style={{ fontSize: '0.68rem', color: s.active ? '#c3c0ff' : 'rgba(199,196,216,0.5)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{highlight(s.when, q)}</div>
+                  </div>
+                  {s.active && s.roomId && (
+                    <a href={`/interview/${s.roomId}`} style={{ padding: '0.35rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderContent = () => {
@@ -847,7 +981,17 @@ export default function AlumniDashboard() {
           {/* Search bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#131b2e', padding: '0.4rem 1rem', borderRadius: 999, width: 300 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c7c4d8' }}>search</span>
-            <input placeholder="Search candidates or sessions..." style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }} />
+            <input
+              value={globalSearch}
+              onChange={e => setGlobalSearch(e.target.value)}
+              placeholder="Search anything — names, sessions, topics..."
+              style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }}
+            />
+            {globalSearch && (
+              <button onClick={() => setGlobalSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 0, display: 'flex' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -997,7 +1141,7 @@ export default function AlumniDashboard() {
         </header>
 
         <section style={{ marginTop: 64, padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-          {renderContent()}
+          {globalSearch.trim() ? renderSearchResults(globalSearch.trim()) : renderContent()}
         </section>
       </main>
       {/* FAB removed */}
