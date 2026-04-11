@@ -1,17 +1,18 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import { api } from '../api';
 
 export default function StudentLogin() {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!username.trim() || !password.trim()) {
@@ -20,16 +21,47 @@ export default function StudentLogin() {
     }
     setLoading(true);
 
-    setTimeout(() => {
-      const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
-      if (pending.username === username.trim() && pending.password === password.trim()) {
-        // Credentials match — go to profile setup
-        navigate('/profile-setup');
-      } else {
-        setError('Invalid username or password. Check your credentials and try again.');
+    // Check credentials against localStorage pending profile
+    const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+
+    if (pending.username === username.trim() && pending.password === password.trim()) {
+      // Credentials match — fetch real user from Supabase if we have an id
+      let userData = {
+        id:         pending.id   || null,
+        name:       pending.name || 'Student',
+        role:       'STUDENT',
+        department: pending.department || '',
+        email:      pending.email || '',
+      };
+
+      // Try to get the latest user data from Supabase
+      if (pending.id) {
+        const dbUser = await api.getUser(pending.id).catch(() => null);
+        if (dbUser && !dbUser.error) {
+          userData = {
+            id:         dbUser.id,
+            name:       dbUser.name,
+            role:       dbUser.role,
+            department: dbUser.department,
+            email:      dbUser.email,
+          };
+          // Sync profile_data to localStorage
+          if (dbUser.profile_data) {
+            const existing = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+            localStorage.setItem('alumniconnect_profile', JSON.stringify({ ...existing, ...dbUser.profile_data }));
+          }
+        }
       }
-      setLoading(false);
-    }, 600);
+
+      login(userData, `token-${Date.now()}`);
+
+      // If profile not yet completed, go to profile setup
+      const profileComplete = pending.profileComplete || userData.profileComplete;
+      navigate(profileComplete ? '/dashboard' : '/profile-setup');
+    } else {
+      setError('Invalid username or password. Check your credentials and try again.');
+    }
+    setLoading(false);
   };
 
   const inp = {

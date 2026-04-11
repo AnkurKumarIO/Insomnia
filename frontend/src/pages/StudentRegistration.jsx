@@ -16,21 +16,22 @@ function genUsername(name) {
 
 export default function StudentRegistration() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', college: '', year: '', department: '' });
-  const [creds, setCreds] = useState(null);
+  const [form, setForm]     = useState({ name: '', email: '', college: '', year: '', department: '' });
+  const [creds, setCreds]   = useState(null);
   const [copied, setCopied] = useState({});
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [regError, setRegError] = useState('');
 
   const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgraduate'];
   const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim()) e.name = 'Required';
+    if (!form.name.trim())  e.name  = 'Required';
     if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = 'Valid email required';
     if (!form.college.trim()) e.college = 'Required';
-    if (!form.year) e.year = 'Required';
+    if (!form.year)       e.year       = 'Required';
     if (!form.department) e.department = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -40,30 +41,35 @@ export default function StudentRegistration() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
+    setRegError('');
+
     const username = genUsername(form.name);
     const password = genPassword();
 
-    // Register in Supabase via backend
-    const result = await api.alumniLogin(form.name, form.email, form.department)
-      .catch(() => null);
-    // We reuse alumniLogin endpoint but override role via a dedicated register call
-    // Use the student register endpoint
-    const regResult = await api.studentRegister({
-      name: form.name,
-      email: form.email,
+    // Register directly via the student endpoint — creates Supabase auth + users row
+    const result = await api.studentRegister({
+      name:       form.name,
+      email:      form.email,
       department: form.department,
-      college: form.college,
-      year: form.year,
+      college:    form.college,
+      year:       form.year,
       username,
       password,
-    }).catch(() => null);
+    }).catch(err => ({ error: err.message }));
 
+    if (result?.error) {
+      setRegError(result.error);
+      setLoading(false);
+      return;
+    }
+
+    // Store pending profile with the real Supabase user id
     const pending = {
       ...form,
       username,
       password,
       role: 'STUDENT',
-      id: regResult?.user?.id || null,
+      id: result?.user?.id || null,
     };
     localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(pending));
     setCreds({ username, password });
@@ -85,7 +91,7 @@ export default function StudentRegistration() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🎉</div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 8 }}>Account Created!</h2>
-          <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Save these credentials — you'll need them to log in.</p>
+          <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Your account is saved. Use these credentials to log in.</p>
         </div>
 
         {[['Username', creds.username, 'user'], ['Password', creds.password, 'pass']].map(([label, val, key]) => (
@@ -125,11 +131,17 @@ export default function StudentRegistration() {
           <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Join AlumNex and start your career journey.</p>
         </div>
 
+        {regError && (
+          <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#ffb4ab' }}>
+            {regError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {[
-            { key: 'name', label: 'Full Name', placeholder: 'Alice Johnson', type: 'text' },
-            { key: 'email', label: 'Email Address', placeholder: 'alice@college.edu', type: 'email' },
-            { key: 'college', label: 'College / University', placeholder: 'MIT', type: 'text' },
+            { key: 'name',    label: 'Full Name',           placeholder: 'Alice Johnson',    type: 'text'  },
+            { key: 'email',   label: 'Email Address',       placeholder: 'alice@college.edu', type: 'email' },
+            { key: 'college', label: 'College / University', placeholder: 'MIT',              type: 'text'  },
           ].map(({ key, label, placeholder, type }) => (
             <div key={key}>
               <label style={lbl}>{label}</label>
@@ -158,14 +170,17 @@ export default function StudentRegistration() {
           </div>
 
           <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.875rem', background: loading ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: loading ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {loading ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Creating...</> : 'Generate Credentials & Continue'}
+            {loading
+              ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Creating account...</>
+              : 'Create Account & Continue'}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#c7c4d8', marginTop: '1.5rem' }}>
           Already have an account?{' '}
-          <a href="/auth/student" style={{ color: '#c3c0ff', textDecoration: 'none', fontWeight: 600 }}>Sign in</a>
+          <a href="/login" style={{ color: '#c3c0ff', textDecoration: 'none', fontWeight: 600 }}>Sign in</a>
         </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
   );

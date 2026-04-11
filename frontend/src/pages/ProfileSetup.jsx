@@ -207,25 +207,36 @@ export default function ProfileSetup() {
 
   const handleComplete = async () => {
     const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
-    const fullProfile = { ...pending, ...profile, photoPreview };
+    const fullProfile = { ...pending, ...profile, photoPreview, profileComplete: true };
     localStorage.setItem('alumniconnect_profile', JSON.stringify(fullProfile));
 
+    const userId = pending.id;
+    const profilePayload = {
+      ...profile,
+      name:            pending.name,
+      college:         pending.college || profile.college,
+      year:            pending.year    || profile.year,
+      profileComplete: true,
+      profileCompletedAt: new Date().toISOString(),
+    };
+
+    // Save to Supabase
+    if (userId) {
+      await api.saveProfile(userId, profilePayload).catch(err =>
+        console.warn('Profile save failed:', err)
+      );
+    }
+
     const userData = {
-      id: pending.id || `stu-${Date.now()}`,
-      name: pending.name || 'Student',
-      role: 'STUDENT',
-      department: profile.department || pending.department,
+      id:              userId || `stu-${Date.now()}`,
+      name:            pending.name || 'Student',
+      role:            'STUDENT',
+      department:      profile.department || pending.department,
       profileComplete: true,
     };
 
-    // Save to Supabase if we have a real user id
-    if (pending.id) {
-      await api.saveProfile(pending.id, {
-        ...profile,
-        name: pending.name,
-        profileComplete: true,
-      });
-    }
+    // Update pending profile to mark as complete
+    localStorage.setItem('alumniconnect_pending_profile', JSON.stringify({ ...pending, profileComplete: true }));
 
     login(userData, `token-${Date.now()}`);
     navigate('/dashboard');

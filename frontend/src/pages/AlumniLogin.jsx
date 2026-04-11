@@ -20,7 +20,23 @@ export default function AlumniLogin() {
       const result = await api.alumniLogin(name, email, department);
       if (result.token) {
         setStatus({ type: 'success', message: `Welcome, ${result.user.name}!` });
-        login(result.user, result.token);
+        // Store full user including DB id
+        const userData = {
+          id:         result.user.id,
+          name:       result.user.name,
+          role:       result.user.role || 'ALUMNI',
+          department: result.user.department || department,
+          email,
+        };
+        login(userData, result.token);
+        // Sync profile_data from Supabase to localStorage
+        if (result.user.id) {
+          api.getUser(result.user.id).then(dbUser => {
+            if (dbUser?.profile_data) {
+              localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
+            }
+          }).catch(() => {});
+        }
         setTimeout(() => navigate('/dashboard'), 1000);
       } else {
         setStatus({ type: 'error', message: result.error || 'Login failed.' });
