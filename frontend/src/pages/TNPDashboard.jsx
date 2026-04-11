@@ -1,8 +1,11 @@
 import React, { useContext, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import AnalyticsTab from './TNPAnalytics';
+import SystemSettingsTab from './TNPSettings';
+import ComplianceTab from './TNPCompliance';
 
 const QUEUE = [
   { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
@@ -30,6 +33,19 @@ export default function TNPDashboard() {
   const [queueStatus, setQueueStatus] = useState({});
   const [credModal, setCredModal] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  // Settings state
+  const [commSettings, setCommSettings] = useState({ emailNotifs: true, smsAlerts: false, weeklyReport: true, instantApproval: false, mentorMatchAlert: true });
+  const [roles, setRoles] = useState([
+    { id: 1, name: 'TNP Coordinator', permissions: ['approve', 'reports', 'settings', 'logs'], active: true },
+    { id: 2, name: 'Placement Officer', permissions: ['approve', 'reports'], active: true },
+    { id: 3, name: 'Alumni Verifier', permissions: ['approve'], active: false },
+    { id: 4, name: 'Analytics Viewer', permissions: ['reports'], active: true },
+  ]);
+  // Logs filter state
+  const [logRole, setLogRole] = useState('');
+  const [logAction, setLogAction] = useState('');
+  const [logDate, setLogDate] = useState('');
 
   if (!user) return <Navigate to="/login" replace />;
 
@@ -64,6 +80,7 @@ export default function TNPDashboard() {
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
     { icon: 'rule',            label: 'Verification Queue', tab: 'queue' },
     { icon: 'analytics',       label: 'Analytics',          tab: 'analytics' },
+    { icon: 'policy',          label: 'Compliance & Logs',  tab: 'compliance' },
     { icon: 'settings_suggest',label: 'System Settings',    tab: 'settings' },
   ];
 
@@ -98,20 +115,9 @@ export default function TNPDashboard() {
         })}
       </div>
     );
-    if (activeTab === 'analytics') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>analytics</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Advanced Analytics</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Placement trends, cohort analysis, and predictive insights</p>
-      </div>
-    );
-    if (activeTab === 'settings') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>settings_suggest</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>System Settings</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Configure platform rules, roles, and integrations</p>
-      </div>
-    );
+    if (activeTab === 'analytics') return <AnalyticsTab />;
+    if (activeTab === 'compliance') return <ComplianceTab logRole={logRole} setLogRole={setLogRole} logAction={logAction} setLogAction={setLogAction} logDate={logDate} setLogDate={setLogDate} />;
+    if (activeTab === 'settings') return <SystemSettingsTab commSettings={commSettings} setCommSettings={setCommSettings} roles={roles} setRoles={setRoles} />;
     return null; // home rendered below
   };
 
@@ -192,18 +198,71 @@ export default function TNPDashboard() {
               <input placeholder="Search students, alumni, or companies..." style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 320, outline: 'none' }} />
             </div>
             <nav style={{ display: 'flex', gap: '1.5rem' }}>
-              {['Overview','Compliance','Logs'].map((t,i) => (
-                <a key={t} href="#" style={{ fontSize: '0.875rem', fontWeight: i===0?600:400, color: i===0?'#c3c0ff':'#c7c4d8', textDecoration: 'none' }}>{t}</a>
+              {[
+                { label: 'Overview',   tab: 'home' },
+                { label: 'Compliance', tab: 'compliance' },
+                { label: 'Logs',       tab: 'compliance' },
+              ].map((t, i) => (
+                <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: activeTab === t.tab ? 600 : 400, color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'none' }}>{t.label}</button>
               ))}
             </nav>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>notifications</span>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>settings</span>
             <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dae2fd' }}>Coordinator Profile</div>
-              <div style={{ fontSize: '0.6rem', color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senior Lead</div>
+
+            {/* Profile button */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setShowProfile(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dae2fd' }}>TNP Coordinator</div>
+                  <div style={{ fontSize: '0.6rem', color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senior Lead</div>
+                </div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1d00a5', fontSize: '0.85rem', border: showProfile ? '2px solid #c3c0ff' : '2px solid transparent', transition: 'border 0.2s' }}>T</div>
+              </button>
+
+              {showProfile && (
+                <>
+                  <div onClick={() => setShowProfile(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 48, right: 0, width: 260, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    {/* Profile header */}
+                    <div style={{ padding: '1.25rem', background: 'linear-gradient(135deg,rgba(79,70,229,0.2),rgba(11,19,38,0.8))', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem', color: '#1d00a5' }}>T</div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#dae2fd' }}>TNP Coordinator</div>
+                          <div style={{ fontSize: '0.65rem', color: '#c3c0ff', marginTop: 2 }}>Senior Lead</div>
+                          <div style={{ fontSize: '0.62rem', color: '#c7c4d8', marginTop: 1 }}>tnp@alumnex.edu</div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Menu items */}
+                    <div style={{ padding: '0.5rem' }}>
+                      {[
+                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); } },
+                        { icon: 'settings', label: 'Account Settings', sub: 'Configure your preferences', action: () => { setShowProfile(false); setActiveTab('settings'); } },
+                      ].map(item => (
+                        <button key={item.label} onClick={item.action} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, textAlign: 'left', transition: 'background 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,192,255,0.06)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(195,192,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#c3c0ff' }}>{item.icon}</span>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#dae2fd' }}>{item.label}</div>
+                            <div style={{ fontSize: '0.65rem', color: '#c7c4d8', marginTop: 1 }}>{item.sub}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ padding: '0.5rem', borderTop: '1px solid rgba(70,69,85,0.15)' }}>
+                      <button onClick={() => { setShowProfile(false); setShowLogoutConfirm(true); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, color: '#ffb4ab', fontSize: '0.8rem', fontWeight: 600 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>logout</span> Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -363,10 +422,6 @@ export default function TNPDashboard() {
         </section>
       </main>
 
-      {/* FAB */}
-      <button style={{ position: 'fixed', bottom: 32, right: 32, width: 56, height: 56, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(79,70,229,0.4)', zIndex: 50, border: 'none', cursor: 'pointer' }}>
-        <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 24, fontVariationSettings: "'FILL' 1" }}>add</span>
-      </button>
     </div>
   );
 }
