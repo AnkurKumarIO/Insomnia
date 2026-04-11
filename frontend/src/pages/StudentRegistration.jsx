@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AlumNexLogo from '../AlumNexLogo';
+import { api } from '../api';
 
 function genPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -19,6 +20,7 @@ export default function StudentRegistration() {
   const [creds, setCreds] = useState(null);
   const [copied, setCopied] = useState({});
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgraduate'];
   const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
@@ -34,14 +36,38 @@ export default function StudentRegistration() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    setLoading(true);
     const username = genUsername(form.name);
     const password = genPassword();
-    const pending = { ...form, username, password, role: 'STUDENT' };
+
+    // Register in Supabase via backend
+    const result = await api.alumniLogin(form.name, form.email, form.department)
+      .catch(() => null);
+    // We reuse alumniLogin endpoint but override role via a dedicated register call
+    // Use the student register endpoint
+    const regResult = await api.studentRegister({
+      name: form.name,
+      email: form.email,
+      department: form.department,
+      college: form.college,
+      year: form.year,
+      username,
+      password,
+    }).catch(() => null);
+
+    const pending = {
+      ...form,
+      username,
+      password,
+      role: 'STUDENT',
+      id: regResult?.user?.id || null,
+    };
     localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(pending));
     setCreds({ username, password });
+    setLoading(false);
   };
 
   const copy = (key, val) => {
@@ -131,8 +157,8 @@ export default function StudentRegistration() {
             </div>
           </div>
 
-          <button type="submit" style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', marginTop: 8 }}>
-            Generate Credentials & Continue
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.875rem', background: loading ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: loading ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {loading ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Creating...</> : 'Generate Credentials & Continue'}
           </button>
         </form>
 

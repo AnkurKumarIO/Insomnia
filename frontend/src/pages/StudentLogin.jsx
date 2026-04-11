@@ -20,7 +20,6 @@ export default function StudentLogin() {
     }
     setLoading(true);
 
-    // Check against stored pending profile credentials
     setTimeout(() => {
       const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
       if (pending.username === username.trim() && pending.password === password.trim()) {

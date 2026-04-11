@@ -222,6 +222,17 @@ export const api = {
     async () => { await mockDelay(300); return null; }
   ),
 
+  // ── Student Register ────────────────────────────────────────
+
+  studentRegister: (payload) => callOrMock(
+    () => fetch(`${API_BASE}/register/student`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json()),
+    async () => { await mockDelay(500); return { user: { id: `stu-${Date.now()}` } }; }
+  ),
+
   // ── Alumni ──────────────────────────────────────────────────
 
   getAlumni: () => callOrMock(
