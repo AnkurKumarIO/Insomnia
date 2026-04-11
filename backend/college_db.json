@@ -1,0 +1,17 @@
+[
+  {
+    "college_id": "STU1001",
+    "name": "Alice Johnson",
+    "department": "Computer Science"
+  },
+  {
+    "college_id": "STU1002",
+    "name": "Bob Smith",
+    "department": "Electrical Engineering"
+  },
+  {
+    "college_id": "STU1003",
+    "name": "Charlie Davis",
+    "department": "Mechanical Engineering"
+  }
+]

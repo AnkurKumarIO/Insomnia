@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  role                String   @default("STUDENT")
+  name                String
+  email               String   @unique
+  department          String?
+  verification_status String   @default("PENDING")
+  profile_data        String?
+
+  given_slots         ScheduleSlot[]    @relation("AlumniSlots")
+  booked_slots        ScheduleSlot[]    @relation("StudentBookings")
+  student_interviews  InterviewRecord[] @relation("StudentInterviews")
+  alumni_interviews   InterviewRecord[] @relation("AlumniInterviews")
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model ScheduleSlot {
+  slot_id    String   @id @default(uuid())
+  alumni_id  String
+  student_id String?
+  start_time DateTime
+  end_time   DateTime
+  status     String   @default("OPEN")
+
+  alumni     User     @relation("AlumniSlots", fields: [alumni_id], references: [id])
+  student    User?    @relation("StudentBookings", fields: [student_id], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model InterviewRecord {
+  interview_id    String   @id @default(uuid())
+  student_id      String
+  alumni_id       String
+  transcript      String?
+  student_score   Float?
+  alumni_feedback String?
+  ai_action_items String?
+
+  student         User     @relation("StudentInterviews", fields: [student_id], references: [id])
+  alumni          User     @relation("AlumniInterviews", fields: [alumni_id], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
