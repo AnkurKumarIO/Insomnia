@@ -78,6 +78,9 @@ export default function DualAgentInterviewRoom() {
   const metricsRef     = useRef(null);
   const makingOffer    = useRef(false);
 
+  // Camera permission state
+  const [camPermission, setCamPermission] = useState('pending'); // pending | granted | denied | unavailable
+
   const myId = user?.name || user?.role || 'User';
 
   useEffect(() => {
@@ -88,12 +91,28 @@ export default function DualAgentInterviewRoom() {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then(stream => {
         streamRef.current = stream;
+        setCamPermission('granted');
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         initPeerConnection(stream);
       })
       .catch(err => {
-        console.warn('Camera unavailable, using audio-only or no media:', err);
-        initPeerConnection(null);
+        console.warn('Camera/mic error:', err.name, err.message);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setCamPermission('denied');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setCamPermission('unavailable');
+        } else {
+          setCamPermission('unavailable');
+        }
+        // Try audio-only fallback
+        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+          .then(audioStream => {
+            streamRef.current = audioStream;
+            initPeerConnection(audioStream);
+          })
+          .catch(() => {
+            initPeerConnection(null);
+          });
       });
 
     // ── Socket events ────────────────────────────────────────────────────
@@ -241,8 +260,45 @@ export default function DualAgentInterviewRoom() {
     streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
     setMicOn(m => !m);
   };
-  const toggleCam = () => {
-    streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
+
+  const toggleCam = async () => {
+    if (camPermission === 'denied') {
+      // Prompt user to allow camera in browser settings
+      alert('Camera access was denied. Please allow camera access in your browser settings and refresh the page.');
+      return;
+    }
+    if (camPermission === 'unavailable') {
+      alert('No camera found on this device.');
+      return;
+    }
+    if (!camOn) {
+      // Turning camera back ON — re-request if stream lost video tracks
+      const videoTracks = streamRef.current?.getVideoTracks() || [];
+      if (videoTracks.length === 0) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const newTrack = newStream.getVideoTracks()[0];
+          streamRef.current?.addTrack(newTrack);
+          const sender = pcRef.current?.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(newTrack);
+          if (localVideoRef.current) {
+            const combined = new MediaStream([
+              ...(streamRef.current?.getAudioTracks() || []),
+              newTrack,
+            ]);
+            localVideoRef.current.srcObject = combined;
+          }
+          setCamOn(true);
+          return;
+        } catch (e) {
+          console.warn('Could not re-enable camera:', e);
+          return;
+        }
+      }
+      videoTracks.forEach(t => { t.enabled = true; });
+    } else {
+      streamRef.current?.getVideoTracks().forEach(t => { t.enabled = false; });
+    }
     setCamOn(c => !c);
   };
 
@@ -413,6 +469,18 @@ export default function DualAgentInterviewRoom() {
             </span>
           </div>
           <span style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>Room: <strong style={{ color: '#c3c0ff' }}>{roomId}</strong></span>
+          {camPermission === 'denied' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', padding: '0.25rem 0.75rem', borderRadius: 999 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#ffb4ab' }}>no_photography</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#ffb4ab', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Camera Blocked</span>
+            </div>
+          )}
+          {camPermission === 'unavailable' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(70,69,85,0.2)', border: '1px solid rgba(70,69,85,0.3)', padding: '0.25rem 0.75rem', borderRadius: 999 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#c7c4d8' }}>videocam_off</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Audio Only</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>Logged in as <strong style={{ color: '#c3c0ff' }}>{myId}</strong></span>
@@ -432,9 +500,39 @@ export default function DualAgentInterviewRoom() {
             {/* Local */}
             <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#131b2e', border: `1px solid ${isSharing ? 'rgba(78,222,163,0.4)' : 'rgba(70,69,85,0.2)'}`, transition: 'border-color 0.3s' }}>
               <video ref={localVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              {!camOn && !isSharing && (
-                <div style={{ position: 'absolute', inset: 0, background: '#131b2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+              {/* Camera off overlay */}
+              {!camOn && !isSharing && camPermission === 'granted' && (
+                <div style={{ position: 'absolute', inset: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 48, color: '#464555' }}>videocam_off</span>
+                  <span style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>Camera off</span>
+                </div>
+              )}
+
+              {/* Camera permission denied */}
+              {camPermission === 'denied' && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,19,38,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '1rem' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#ffb4ab' }}>no_photography</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#ffb4ab', marginBottom: 4 }}>Camera Access Denied</div>
+                    <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.5, maxWidth: 200 }}>
+                      Click the camera icon in your browser's address bar to allow access, then refresh.
+                    </div>
+                  </div>
+                  <button onClick={() => window.location.reload()} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Camera unavailable */}
+              {camPermission === 'unavailable' && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,19,38,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#464555' }}>videocam_off</span>
+                  <div style={{ fontSize: '0.75rem', color: '#c7c4d8', textAlign: 'center' }}>No camera detected</div>
+                  <div style={{ fontSize: '0.65rem', color: '#c7c4d8', opacity: 0.6 }}>Audio only mode</div>
                 </div>
               )}
               {isSharing && (
@@ -706,7 +804,7 @@ export default function DualAgentInterviewRoom() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {[
             { icon: micOn ? 'mic' : 'mic_off', action: toggleMic, on: micOn, title: micOn ? 'Mute' : 'Unmute' },
-            { icon: camOn ? 'videocam' : 'videocam_off', action: toggleCam, on: camOn, title: camOn ? 'Stop Video' : 'Start Video' },
+            { icon: camPermission === 'denied' ? 'no_photography' : camOn ? 'videocam' : 'videocam_off', action: toggleCam, on: camOn && camPermission === 'granted', title: camPermission === 'denied' ? 'Camera denied — click to retry' : camOn ? 'Stop Video' : 'Start Video' },
             { icon: isSharing ? 'stop_screen_share' : 'present_to_all', action: shareScreen, on: !isSharing, title: isSharing ? 'Sharing Screen' : 'Share Screen', active: isSharing },
           ].map((c, i) => (
             <button key={i} onClick={c.action} title={c.title} style={{ width: 42, height: 42, borderRadius: '50%', background: c.active ? 'rgba(78,222,163,0.2)' : c.on ? '#222a3d' : 'rgba(255,107,107,0.15)', border: `1px solid ${c.active ? 'rgba(78,222,163,0.4)' : c.on ? 'rgba(255,255,255,0.06)' : 'rgba(255,107,107,0.3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: c.active ? '#4edea3' : c.on ? '#dae2fd' : '#ffb4ab', transition: 'all 0.2s' }}>
