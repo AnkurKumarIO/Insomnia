@@ -16,6 +16,7 @@ app.use('/ai',            require('./routes/aiRoutes'));
 app.use('/requests',      require('./routes/requests'));
 app.use('/notifications', require('./routes/notifications'));
 app.use('/users',         require('./routes/users'));
+app.use('/alumni',        require('./routes/alumni'));
 
 // HTTP Server + Socket.io
 const server = http.createServer(app);

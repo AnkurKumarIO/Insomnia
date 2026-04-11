@@ -221,6 +221,23 @@ export const api = {
     () => fetch(`${API_BASE}/users/${userId}`).then(r => r.json()),
     async () => { await mockDelay(300); return null; }
   ),
+
+  // ── Alumni ──────────────────────────────────────────────────
+
+  getAlumni: () => callOrMock(
+    () => fetch(`${API_BASE}/alumni`).then(r => r.json()),
+    async () => {
+      await mockDelay(500);
+      return [
+        { id: 'alm-1', name: 'Priya Sharma',  company: 'Google',    department: 'Computer Science',       batch_year: 2019, profile_data: { bio: 'Senior SWE at Google. Expert in distributed systems.', skills: ['System Design','Go','Python','Kubernetes'], openTo: ['Mock Interviews','Resume Review'] } },
+        { id: 'alm-2', name: 'Rahul Verma',   company: 'Microsoft', department: 'Electrical Engineering', batch_year: 2018, profile_data: { bio: 'Principal Engineer at Azure. Cloud & DevOps specialist.', skills: ['Azure','DevOps','C#','Terraform'], openTo: ['Mock Interviews','Career Guidance'] } },
+        { id: 'alm-3', name: 'Ananya Iyer',   company: 'Stripe',    department: 'Computer Science',       batch_year: 2020, profile_data: { bio: 'Full Stack Engineer at Stripe. React & Node.js expert.', skills: ['React','TypeScript','Node.js','GraphQL'], openTo: ['Mock Interviews','Resume Review'] } },
+        { id: 'alm-4', name: 'Karan Mehta',   company: 'Amazon',    department: 'Information Technology', batch_year: 2017, profile_data: { bio: 'Engineering Manager at Amazon. Leadership & system design.', skills: ['Leadership','Java','AWS','Agile'], openTo: ['Mock Interviews','Career Guidance'] } },
+        { id: 'alm-5', name: 'Sneha Patel',   company: 'Atlassian', department: 'Computer Science',       batch_year: 2021, profile_data: { bio: 'Product Engineer at Atlassian. Frontend & product thinking.', skills: ['React','JavaScript','Figma','Jest'], openTo: ['Mock Interviews','Internship Guidance'] } },
+        { id: 'alm-6', name: 'Arjun Nair',    company: 'Uber',      department: 'Electronics & Communication', batch_year: 2016, profile_data: { bio: 'Staff Engineer at Uber Maps. DSA & competitive programming mentor.', skills: ['C++','Python','Kafka','DSA'], openTo: ['Mock Interviews','DSA Coaching'] } },
+      ];
+    }
+  ),
 };
 
 export const SOCKET_URL = API_BASE;

@@ -1,104 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../App';
 import { sendRequest, getRequestsByStudent } from '../interviewRequests';
+import { api } from '../api';
 
-// Each alumni has explicit fields for accurate filtering
-const ALL_ALUMNI = [
-  {
-    name: 'Sarah Chen', title: 'Senior Product Manager', company: 'Google',
-    experience: '8 years', expRange: '5-10 Years',
-    score: 98, scoreColor: '#4edea3',
-    tags: ['Strategy', 'Growth', 'AI/ML', 'Product Management'],
-    bio: 'Expert in scaling AI consumer products from 0 to 1. Mentoring early-stage founders and product enthusiasts.',
-  },
-  {
-    name: 'David Miller', title: 'Engineering Director', company: 'Stripe',
-    experience: '12 years', expRange: '10+ Years',
-    score: 85, scoreColor: '#ffb95f',
-    tags: ['Fintech', 'Architecture', 'Leadership', 'Engineering'],
-    bio: 'Passionate about building resilient engineering cultures and complex fintech infrastructure systems.',
-  },
-  {
-    name: 'Elena Rodriguez', title: 'Design Lead', company: 'Airbnb',
-    experience: '7 years', expRange: '5-10 Years',
-    score: 92, scoreColor: '#4edea3',
-    tags: ['UX Research', 'UI Systems', 'Storytelling', 'Design'],
-    bio: 'Focusing on emotional design and systemic UX. Helping designers bridge the gap between UI and UX.',
-  },
-  {
-    name: 'Marcus Thorne', title: 'Founder & CEO', company: 'Stealth Startup',
-    experience: '9 years', expRange: '5-10 Years',
-    score: 79, scoreColor: '#4edea3',
-    tags: ['Venture Capital', 'Sustainability', 'Fundraising', 'Engineering'],
-    bio: 'Serial entrepreneur with a focus on sustainable energy tech. Helping alumni navigate the startup ecosystem.',
-  },
-  {
-    name: 'Jasmine Patel', title: 'Senior Data Scientist', company: 'Meta',
-    experience: '6 years', expRange: '5-10 Years',
-    score: 94, scoreColor: '#4edea3',
-    tags: ['Python', 'Big Data', 'Algorithms', 'Data Science'],
-    bio: 'Specializing in large scale recommendation engines. Happy to discuss careers in Data Science and ML.',
-  },
-  {
-    name: 'Robert Vance', title: 'VP of Operations', company: 'Amazon',
-    experience: '14 years', expRange: '10+ Years',
-    score: 88, scoreColor: '#ffb95f',
-    tags: ['Logistics', 'Scaling', 'Operations', 'Engineering'],
-    bio: 'Decade of experience in logistics and supply chain optimization. Mentoring for leadership roles in ops.',
-  },
-  {
-    name: 'Aisha Okonkwo', title: 'ML Engineer', company: 'DeepMind',
-    experience: '4 years', expRange: '1-5 Years',
-    score: 96, scoreColor: '#4edea3',
-    tags: ['AI Research', 'PyTorch', 'NLP', 'Data Science'],
-    bio: 'Working on large language model alignment. Passionate about responsible AI and mentoring underrepresented talent.',
-  },
-  {
-    name: 'Carlos Mendez', title: 'Staff Software Engineer', company: 'Netflix',
-    experience: '11 years', expRange: '10+ Years',
-    score: 91, scoreColor: '#4edea3',
-    tags: ['Distributed Systems', 'Java', 'Scale', 'Engineering'],
-    bio: 'Built streaming infrastructure serving 200M+ users. Loves helping engineers navigate senior IC career paths.',
-  },
-  {
-    name: 'Priya Nair', title: 'Product Director', company: 'Figma',
-    experience: '8 years', expRange: '5-10 Years',
-    score: 89, scoreColor: '#ffb95f',
-    tags: ['Design Systems', 'B2B', 'PLG', 'Product Management'],
-    bio: "Led Figma's enterprise product expansion. Mentoring PMs transitioning from engineering backgrounds.",
-  },
-  {
-    name: 'James Liu', title: 'Software Engineer II', company: 'Google',
-    experience: '3 years', expRange: '1-5 Years',
-    score: 82, scoreColor: '#4edea3',
-    tags: ['Frontend', 'React', 'TypeScript', 'Engineering'],
-    bio: 'Working on Google Search infrastructure. Loves helping new grads crack FAANG interviews.',
-  },
-  {
-    name: 'Neha Kapoor', title: 'Product Manager', company: 'Microsoft',
-    experience: '5 years', expRange: '5-10 Years',
-    score: 87, scoreColor: '#4edea3',
-    tags: ['Product Management', 'B2B SaaS', 'Roadmapping'],
-    bio: 'PM on Microsoft Teams. Specializes in enterprise product strategy and stakeholder management.',
-  },
-  {
-    name: 'Ravi Shankar', title: 'Backend Engineer', company: 'Uber',
-    experience: '6 years', expRange: '5-10 Years',
-    score: 83, scoreColor: '#ffb95f',
-    tags: ['Go', 'Microservices', 'Engineering', 'System Design'],
-    bio: 'Building real-time dispatch systems at Uber. Passionate about distributed systems and mentoring junior engineers.',
-  },
-];
-
-// Derive filter options dynamically from data
-const ALL_COMPANIES   = [...new Set(ALL_ALUMNI.map(a => a.company))].sort();
-const ALL_ROLES       = [...new Set(ALL_ALUMNI.map(a => {
-  if (a.tags.includes('Product Management')) return 'Product Management';
-  if (a.tags.includes('Data Science'))       return 'Data Science';
-  if (a.tags.includes('Design'))             return 'Design';
-  if (a.tags.includes('Engineering'))        return 'Engineering';
-  return 'Other';
-}))].filter((v, i, a) => a.indexOf(v) === i).sort();
 const EXP_RANGES = ['1-5 Years', '5-10 Years', '10+ Years'];
 
 const TOPICS = [
@@ -107,14 +11,46 @@ const TOPICS = [
   'Mock Interview – Data Science', 'Career Guidance', 'Resume Review', 'Salary Negotiation',
 ];
 
+// Derive experience range from batch year
+function expRange(batchYear) {
+  if (!batchYear) return '1-5 Years';
+  const yrs = new Date().getFullYear() - batchYear;
+  if (yrs >= 10) return '10+ Years';
+  if (yrs >= 5)  return '5-10 Years';
+  return '1-5 Years';
+}
+
+// Map a raw Supabase user row → display shape
+function toDisplayAlumni(u) {
+  const p = u.profile_data || {};
+  const skills = p.skills || [];
+  const yrs = u.batch_year ? new Date().getFullYear() - u.batch_year : null;
+  return {
+    id:         u.id,
+    name:       u.name,
+    company:    u.company || 'Alumni',
+    department: u.department || '',
+    batch_year: u.batch_year,
+    title:      p.title || (u.company ? `Alumni at ${u.company}` : 'Alumni'),
+    experience: yrs ? `${yrs} year${yrs !== 1 ? 's' : ''}` : '',
+    expRange:   expRange(u.batch_year),
+    bio:        p.bio || '',
+    tags:       skills.slice(0, 5),
+    openTo:     p.openTo || [],
+    linkedin:   p.linkedin || '',
+    github:     p.github || '',
+    score:      Math.min(99, 70 + (skills.length * 3) + (yrs || 0)),
+    scoreColor: yrs >= 8 ? '#ffb95f' : '#4edea3',
+  };
+}
+
 // ── Book Request Modal ────────────────────────────────────────────────────────
 function BookModal({ alumni, studentName, onClose, onSent }) {
-  const [topic, setTopic] = useState(TOPICS[0]);
+  const [topic, setTopic]     = useState(TOPICS[0]);
   const [message, setMessage] = useState('');
-  const [sent, setSent] = useState(false);
+  const [sent, setSent]       = useState(false);
 
   const handleSend = () => {
-    // Attach student profile from localStorage if available
     const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
     sendRequest({
       studentName,
@@ -124,16 +60,16 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
       topic,
       message,
       studentProfile: {
-        name: profile.name || studentName,
-        college: profile.college || '',
+        name:       profile.name       || studentName,
+        college:    profile.college    || '',
         department: profile.department || '',
-        year: profile.year || '',
-        cgpa: profile.cgpa || '',
-        linkedin: profile.linkedin || '',
-        github: profile.github || '',
+        year:       profile.year       || '',
+        cgpa:       profile.cgpa       || '',
+        linkedin:   profile.linkedin   || '',
+        github:     profile.github     || '',
         resumeName: profile.resumeName || '',
-        skills: profile.skills || [],
-        bio: profile.bio || '',
+        skills:     profile.skills     || [],
+        bio:        profile.bio        || '',
       },
     });
     setSent(true);
@@ -161,9 +97,11 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.5rem' }}>
-              {alumni.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
-            </div>
+            {alumni.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.5rem' }}>
+                {alumni.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Session Type</label>
@@ -192,22 +130,17 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
 // ── Book Button ───────────────────────────────────────────────────────────────
 function BookButton({ alumni, studentName, onBook }) {
   const myRequests = getRequestsByStudent(studentName);
-  const existing = myRequests.find(r => r.alumniName === alumni.name);
+  const existing   = myRequests.find(r => r.alumniName === alumni.name);
 
-  // No request or declined → show Book / Send Again
   if (!existing || existing.status === 'declined') {
     return (
       <button onClick={onBook} style={{ width: '100%', padding: '0.6rem', background: existing?.status === 'declined' ? 'rgba(255,180,171,0.1)' : 'rgba(79,70,229,0.15)', color: existing?.status === 'declined' ? '#ffb4ab' : '#c3c0ff', border: `1px solid ${existing?.status === 'declined' ? 'rgba(255,180,171,0.3)' : 'rgba(195,192,255,0.15)'}`, borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        {existing?.status === 'declined' ? (
-          <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span> Send Again</>
-        ) : (
-          <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>send</span> Book Mock Interview</>
-        )}
+        {existing?.status === 'declined'
+          ? <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span> Send Again</>
+          : <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>send</span> Book Mock Interview</>}
       </button>
     );
   }
-
-  // Pending
   if (existing.status === 'pending') {
     return (
       <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 10, textAlign: 'center' }}>
@@ -216,8 +149,6 @@ function BookButton({ alumni, studentName, onBook }) {
       </div>
     );
   }
-
-  // Accepted (slot not yet booked)
   if (existing.status === 'accepted') {
     return (
       <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(195,192,255,0.08)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 10, textAlign: 'center' }}>
@@ -226,13 +157,8 @@ function BookButton({ alumni, studentName, onBook }) {
       </div>
     );
   }
-
-  // Slot booked
   if (existing.status === 'slot_booked') {
-    const now = Date.now();
-    const scheduledMs = new Date(existing.scheduledTime).getTime();
-    const canJoin = now >= scheduledMs - 5 * 60 * 1000 && now <= scheduledMs + 2 * 60 * 60 * 1000;
-
+    const canJoin = Date.now() >= new Date(existing.scheduledTime).getTime() - 5 * 60 * 1000;
     if (canJoin) {
       return (
         <a href={`/interview/${existing.roomId}`} style={{ width: '100%', padding: '0.6rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', border: 'none', borderRadius: 10, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none', boxSizing: 'border-box' }}>
@@ -240,10 +166,7 @@ function BookButton({ alumni, studentName, onBook }) {
         </a>
       );
     }
-
-    const formatted = new Date(existing.scheduledTime).toLocaleString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+    const formatted = new Date(existing.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     return (
       <div style={{ width: '100%', padding: '0.6rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 10, textAlign: 'center' }}>
         <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>📅 Scheduled</div>
@@ -252,44 +175,59 @@ function BookButton({ alumni, studentName, onBook }) {
       </div>
     );
   }
-
   return null;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AlumniDiscovery({ searchQuery = '' }) {
   const { user } = useContext(AuthContext);
+
+  const [allAlumni, setAllAlumni]       = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [roleFilter, setRoleFilter]       = useState('');
-  const [expFilter, setExpFilter]         = useState('');
-  const [visibleCount, setVisibleCount]   = useState(6);
+  const [roleFilter, setRoleFilter]     = useState('');
+  const [expFilter, setExpFilter]       = useState('');
+  const [visibleCount, setVisibleCount] = useState(6);
   const [bookingAlumni, setBookingAlumni] = useState(null);
-  const [refreshKey, setRefreshKey]       = useState(0);
+  const [refreshKey, setRefreshKey]     = useState(0);
+
+  // Fetch alumni from backend / Supabase
+  useEffect(() => {
+    api.getAlumni().then(data => {
+      if (Array.isArray(data)) setAllAlumni(data.map(toDisplayAlumni));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const companies = [...new Set(allAlumni.map(a => a.company))].sort();
+  const roles     = [...new Set(allAlumni.map(a => {
+    const t = (a.tags || []).join(' ').toLowerCase();
+    if (t.includes('product'))    return 'Product Management';
+    if (t.includes('data') || t.includes('ml') || t.includes('python')) return 'Data Science';
+    if (t.includes('design') || t.includes('figma')) return 'Design';
+    return 'Engineering';
+  }))].filter((v, i, a) => a.indexOf(v) === i).sort();
 
   const q = searchQuery.toLowerCase().trim();
 
   React.useEffect(() => { setVisibleCount(6); }, [searchQuery, companyFilter, roleFilter, expFilter]);
 
-  const filteredAlumni = ALL_ALUMNI.filter(a => {
-    const matchesSearch = !q ||
+  const filtered = allAlumni.filter(a => {
+    const matchSearch = !q ||
       a.name.toLowerCase().includes(q) ||
-      a.title.toLowerCase().includes(q) ||
       a.company.toLowerCase().includes(q) ||
-      a.tags.some(t => t.toLowerCase().includes(q)) ||
-      a.bio.toLowerCase().includes(q);
-
-    const matchesCompany = !companyFilter || a.company === companyFilter;
-    const matchesRole    = !roleFilter    || a.tags.some(t => t.toLowerCase().includes(roleFilter.toLowerCase())) || a.title.toLowerCase().includes(roleFilter.toLowerCase());
-    const matchesExp     = !expFilter     || a.expRange === expFilter;
-
-    return matchesSearch && matchesCompany && matchesRole && matchesExp;
+      a.bio.toLowerCase().includes(q) ||
+      a.tags.some(t => t.toLowerCase().includes(q));
+    const matchCompany = !companyFilter || a.company === companyFilter;
+    const matchRole    = !roleFilter    || a.tags.some(t => t.toLowerCase().includes(roleFilter.toLowerCase()));
+    const matchExp     = !expFilter     || a.expRange === expFilter;
+    return matchSearch && matchCompany && matchRole && matchExp;
   });
 
-  const visibleAlumni = filteredAlumni.slice(0, visibleCount);
-  const studentName   = user?.name || 'Student';
-  const hasFilters    = companyFilter || roleFilter || expFilter;
-
-  const clearAll = () => { setCompanyFilter(''); setRoleFilter(''); setExpFilter(''); };
+  const visible     = filtered.slice(0, visibleCount);
+  const studentName = user?.name || 'Student';
+  const hasFilters  = companyFilter || roleFilter || expFilter;
+  const clearAll    = () => { setCompanyFilter(''); setRoleFilter(''); setExpFilter(''); };
 
   const selStyle = (active) => ({
     padding: '0.4rem 0.875rem', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600,
@@ -299,48 +237,42 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
     outline: active ? '1px solid rgba(195,192,255,0.35)' : 'none',
   });
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#c7c4d8', gap: 12 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 28, opacity: 0.4, animation: 'spin 1s linear infinite' }}>progress_activity</span>
+      Loading alumni...
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   return (
     <div key={refreshKey}>
       {bookingAlumni && (
         <BookModal alumni={bookingAlumni} studentName={studentName} onClose={() => setBookingAlumni(null)} onSent={() => setRefreshKey(k => k + 1)} />
       )}
 
-      {/* ── Filter bar ── */}
+      {/* Filter bar */}
       <div style={{ background: '#131b2e', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '1.5rem', border: '1px solid rgba(70,69,85,0.15)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start' }}>
-
-          {/* Company filter */}
           <div>
             <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#c7c4d8', marginBottom: 8 }}>Company</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {ALL_COMPANIES.map(c => (
-                <button key={c} onClick={() => setCompanyFilter(companyFilter === c ? '' : c)} style={selStyle(companyFilter === c)}>{c}</button>
-              ))}
+              {companies.map(c => <button key={c} onClick={() => setCompanyFilter(companyFilter === c ? '' : c)} style={selStyle(companyFilter === c)}>{c}</button>)}
             </div>
           </div>
-
-          {/* Role filter */}
           <div>
             <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#c7c4d8', marginBottom: 8 }}>Role</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {ALL_ROLES.map(r => (
-                <button key={r} onClick={() => setRoleFilter(roleFilter === r ? '' : r)} style={selStyle(roleFilter === r)}>{r}</button>
-              ))}
+              {roles.map(r => <button key={r} onClick={() => setRoleFilter(roleFilter === r ? '' : r)} style={selStyle(roleFilter === r)}>{r}</button>)}
             </div>
           </div>
-
-          {/* Experience filter */}
           <div>
             <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#c7c4d8', marginBottom: 8 }}>Experience</div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {EXP_RANGES.map(e => (
-                <button key={e} onClick={() => setExpFilter(expFilter === e ? '' : e)} style={selStyle(expFilter === e)}>{e}</button>
-              ))}
+              {EXP_RANGES.map(e => <button key={e} onClick={() => setExpFilter(expFilter === e ? '' : e)} style={selStyle(expFilter === e)}>{e}</button>)}
             </div>
           </div>
         </div>
-
-        {/* Active filters + count */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(70,69,85,0.15)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {[companyFilter, roleFilter, expFilter].filter(Boolean).map(f => (
@@ -351,14 +283,14 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
             ))}
             {hasFilters && <button onClick={clearAll} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 600 }}>Clear all</button>}
           </div>
-          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8' }}>{filteredAlumni.length} Alumni Found</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8' }}>{filtered.length} Alumni Found</span>
         </div>
       </div>
 
-      {/* ── Grid ── */}
+      {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '1.5rem' }}>
-        {visibleAlumni.map((a) => (
-          <div key={a.name} style={{ background: '#131b2e', borderRadius: 16, padding: '1.5rem', border: '1px solid transparent', transition: 'all 0.3s' }}
+        {visible.map(a => (
+          <div key={a.id} style={{ background: '#131b2e', borderRadius: 16, padding: '1.5rem', border: '1px solid transparent', transition: 'all 0.3s' }}
             onMouseEnter={e => { e.currentTarget.style.border = '1px solid rgba(195,192,255,0.15)'; e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.4)'; }}
             onMouseLeave={e => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -367,7 +299,7 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{a.name}</div>
                   <div style={{ fontSize: '0.78rem', color: '#c7c4d8' }}>{a.title}</div>
-                  <div style={{ fontSize: '0.72rem', color: a.scoreColor, fontWeight: 600, marginTop: 1 }}>{a.company} • {a.experience}</div>
+                  <div style={{ fontSize: '0.72rem', color: a.scoreColor, fontWeight: 600, marginTop: 1 }}>{a.company}{a.experience ? ` • ${a.experience}` : ''}</div>
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -376,9 +308,11 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
               </div>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6, marginBottom: '1rem' }}>{a.bio}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1rem' }}>
-              {a.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
-            </div>
+            {a.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1rem' }}>
+                {a.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
+              </div>
+            )}
             <div style={{ height: 4, background: '#2d3449', borderRadius: 999, overflow: 'hidden', marginBottom: '1rem' }}>
               <div style={{ height: '100%', width: `${a.score}%`, background: `linear-gradient(90deg,#4f46e5,${a.scoreColor})`, borderRadius: 999 }} />
             </div>
@@ -387,17 +321,17 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
         ))}
       </div>
 
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <p style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>
-          Showing <strong style={{ color: '#dae2fd' }}>{visibleAlumni.length}</strong> of <strong style={{ color: '#dae2fd' }}>{filteredAlumni.length}</strong> alumni
+          Showing <strong style={{ color: '#dae2fd' }}>{visible.length}</strong> of <strong style={{ color: '#dae2fd' }}>{filtered.length}</strong> alumni
         </p>
         <div style={{ display: 'flex', gap: 12 }}>
-          {visibleCount < filteredAlumni.length && (
-            <button onClick={() => setVisibleCount(c => Math.min(c + 3, filteredAlumni.length))}
+          {visibleCount < filtered.length && (
+            <button onClick={() => setVisibleCount(c => Math.min(c + 3, filtered.length))}
               style={{ padding: '0.75rem 3rem', background: '#131b2e', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 12, color: '#c3c0ff', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>expand_more</span>
-              Show More ({filteredAlumni.length - visibleCount} remaining)
+              Show More ({filtered.length - visibleCount} remaining)
             </button>
           )}
           {visibleCount > 6 && (
@@ -406,7 +340,7 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
             </button>
           )}
         </div>
-        {filteredAlumni.length === 0 && (
+        {filtered.length === 0 && !loading && (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#c7c4d8' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }}>search_off</span>
             <p style={{ fontWeight: 600 }}>No alumni found</p>
