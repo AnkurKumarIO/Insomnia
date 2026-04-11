@@ -25,10 +25,14 @@ export async function getUserById(id) {
 }
 
 export async function createUser({ id, role, name, email, department, college, year, username, password }) {
-  // Sign in first to get an authenticated session so RLS allows the insert
+  // Must be signed in for RLS to allow insert (auth.uid() = id)
   if (password) {
-    await supabase.auth.signInWithPassword({ email, password }).catch(() => {});
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) console.warn('createUser signIn error:', error.message);
   }
+
+  // Small delay to ensure session is set
+  await new Promise(r => setTimeout(r, 300));
 
   const { data, error } = await supabase
     .from('users')
@@ -43,6 +47,7 @@ export async function createUser({ id, role, name, email, department, college, y
     })
     .select()
     .single();
+
   if (error) throw error;
   return data;
 }

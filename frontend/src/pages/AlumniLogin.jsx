@@ -121,6 +121,10 @@ export default function AlumniLogin() {
             {loading ? <><div className="spinner"></div> Joining...</> : 'Join as Mentor'}
           </button>
         </form>
+        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#c7c4d8', marginTop: '1.25rem' }}>
+          New alumni?{' '}
+          <a href="/auth/alumni/register" style={{ color: '#ffb95f', textDecoration: 'none', fontWeight: 600 }}>Create an account</a>
+        </p>
       </div>
     </div>
   );
