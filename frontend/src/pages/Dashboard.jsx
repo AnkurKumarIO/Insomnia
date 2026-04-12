@@ -26,10 +26,11 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
   if (!mentor) return null;
 
   const handleSend = () => {
-    const profile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
+    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
-      studentId: studentName,
+      studentId: authUser.id || studentName,
       alumniName: mentor.name,
       alumniId:   mentor.id,
       alumniRole: `${mentor.title} • ${mentor.company}`,

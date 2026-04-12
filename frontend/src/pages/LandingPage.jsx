@@ -49,7 +49,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/student/login" style={btnCard}>Enter Student Portal</Link>
+              <Link to="/auth/student/register" style={btnCard}>Create Student Account</Link>
             </div>
           </div>
 
@@ -72,7 +72,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/alumni/login" style={{ ...btnCard, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', boxShadow: '0 8px 24px rgba(79,70,229,0.3)' }}>Access Alumni Suite</Link>
+              <Link to="/auth/alumni/register" style={{ ...btnCard, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', boxShadow: '0 8px 24px rgba(79,70,229,0.3)' }}>Create Alumni Account</Link>
             </div>
           </div>
 
@@ -94,7 +94,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/tnp/login" style={btnCard}>Launch Dashboard</Link>
+              <Link to="/login" style={btnCard}>Launch Dashboard</Link>
             </div>
           </div>
         </div>

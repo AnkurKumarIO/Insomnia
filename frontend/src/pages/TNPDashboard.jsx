@@ -7,7 +7,7 @@ import AnalyticsTab from './TNPAnalytics';
 import SystemSettingsTab from './TNPSettings';
 import ComplianceTab from './TNPCompliance';
 
-const QUEUE = [
+const STATIC_QUEUE = [
   { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
   { name: 'Sarah Jenkins', sub: 'Alumni • Senior Dev at Google • Batch 2018', status: 'ID Verification', color: '#ffb95f', icon: 'history_edu' },
   { name: 'Dr. Elena Rodriguez', sub: 'Alumni Mentor • PhD in AI Ethics • Batch 2015', status: 'Academic Check', color: '#c3c0ff', icon: 'psychology' },
@@ -124,31 +124,110 @@ export default function TNPDashboard() {
   const [logAction, setLogAction] = useState('');
   const [logDate, setLogDate] = useState('');
 
+  // Dynamic queue — merges static demo items + real pending submissions from localStorage
+  const [liveQueue, setLiveQueue] = useState(STATIC_QUEUE);
+
+  useEffect(() => {
+    const buildQueue = () => {
+      const dynamic = [];
+      try {
+        // Pending alumni from 4-step registration
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        pendingAlumni.filter(a => a.status === 'pending').forEach(a => {
+          dynamic.push({
+            name: a.name,
+            email: a.email,
+            sub: `Alumni • ${a.company || 'N/A'} • Batch ${a.batchYear || 'N/A'} • ${a.department || ''}`,
+            status: 'Document Submitted',
+            color: '#4edea3',
+            icon: 'psychology',
+          });
+        });
+      } catch {}
+      try {
+        // Pending student from 3-step registration
+        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+        if (pending.name && pending.role === 'STUDENT') {
+          dynamic.push({
+            name: pending.name,
+            email: pending.email,
+            sub: `${pending.department || 'Student'} • ${pending.college || ''} • ${pending.year || ''}`,
+            status: 'Awaiting Approval',
+            color: '#c3c0ff',
+            icon: 'school',
+          });
+        }
+      } catch {}
+      // Merge: real submissions first, then static demo (deduplicate by name)
+      const allNames = new Set(dynamic.map(d => d.name));
+      const merged = [...dynamic, ...STATIC_QUEUE.filter(s => !allNames.has(s.name))];
+      setLiveQueue(merged);
+    };
+    buildQueue();
+    const interval = setInterval(buildQueue, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Pending approval item waiting for credential setup
+  const [pendingApproval, setPendingApproval] = useState(null); // { name, email, role, sub }
+  // Credential setup modal state
+  const [setupCreds, setSetupCreds] = useState({ username: '', password: '', confirmPassword: '' });
+  const [setupUsernameStatus, setSetupUsernameStatus] = useState(null); // null|checking|available|taken
+  const [setupUsernameTimer, setSetupUsernameTimer] = useState(null);
+  const [setupErrors, setSetupErrors] = useState({});
+  const [setupLoading, setSetupLoading] = useState(false);
+
   if (!user) return <Navigate to="/login" replace />;
 
-  function genPassword() {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
-    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  }
-  function genUsername(name) {
-    const parts = name.trim().toLowerCase().split(/\s+/);
-    const base = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
-    return base.replace(/[^a-z.]/g, '') + Math.floor(Math.random() * 90 + 10);
-  }
+  // Username availability check for credential setup
+  const handleSetupUsernameChange = (val) => {
+    setSetupCreds(c => ({ ...c, username: val }));
+    setSetupUsernameStatus(null);
+    if (setupUsernameTimer) clearTimeout(setupUsernameTimer);
+    if (!val || val.length < 4 || !/^[a-z0-9._]+$/.test(val)) return;
+    setSetupUsernameStatus('checking');
+    const t = setTimeout(() => {
+      // Check against already approved accounts
+      const approved = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+      const taken = approved.some(a => a.username === val);
+      setSetupUsernameStatus(taken ? 'taken' : 'available');
+    }, 500);
+    setSetupUsernameTimer(t);
+  };
 
   const handleApprove = (q) => {
-    const username = genUsername(q.name);
-    const password = genPassword();
-    const email = `${username}@alumnex.edu`;
     const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
+    const email = q.email || `${q.name.toLowerCase().replace(/\s+/g, '.')}@alumniconnect.edu`;
+    // Open credential setup modal instead of auto-generating
+    setPendingApproval({ name: q.name, email, role, sub: q.sub });
+    setSetupCreds({ username: '', password: '', confirmPassword: '' });
+    setSetupUsernameStatus(null);
+    setSetupErrors({});
+  };
 
-    // Save to approved accounts store
-    const existing = JSON.parse(localStorage.getItem('alumnex_approved_accounts') || '[]');
-    existing.push({ username, password, role, name: q.name, email, department: q.sub });
-    localStorage.setItem('alumnex_approved_accounts', JSON.stringify(existing));
+  const handleSetupSubmit = () => {
+    const e = {};
+    if (!setupCreds.username || setupCreds.username.length < 4) e.username = 'Min 4 characters';
+    else if (!/^[a-z0-9._]+$/.test(setupCreds.username)) e.username = 'Lowercase letters, numbers, dots, underscores only';
+    else if (setupUsernameStatus !== 'available') e.username = 'Choose an available username';
+    if (setupCreds.password.length < 8) e.password = 'Min 8 characters';
+    if (setupCreds.password !== setupCreds.confirmPassword) e.confirmPassword = 'Passwords do not match';
+    setSetupErrors(e);
+    if (Object.keys(e).length > 0) return;
 
-    setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
-    setCredModal({ name: q.name, username, password, email, role });
+    setSetupLoading(true);
+    setTimeout(() => {
+      const { name, email, role, sub } = pendingApproval;
+      // Save to approved accounts
+      const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+      existing.push({ username: setupCreds.username, password: setupCreds.password, role, name, email, department: sub, id: `${role.toLowerCase()}-${Date.now()}` });
+      localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
+
+      setQueueStatus(s => ({ ...s, [name]: 'approved' }));
+      setCredModal({ name, username: setupCreds.username, password: setupCreds.password, email, role });
+      setPendingApproval(null);
+      setSetupLoading(false);
+    }, 600);
   };
 
   const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
@@ -165,12 +244,12 @@ export default function TNPDashboard() {
     if (activeTab === 'queue') {
       const q = queueSearch.toLowerCase().trim();
       const filteredQueue = q
-        ? QUEUE.filter(item =>
+        ? liveQueue.filter(item =>
             item.name.toLowerCase().includes(q) ||
             item.sub.toLowerCase().includes(q) ||
             item.status.toLowerCase().includes(q)
           )
-        : QUEUE;
+        : liveQueue;
 
       const highlight = (text) => {
         if (!q) return text;
@@ -192,7 +271,7 @@ export default function TNPDashboard() {
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
             {q && (
               <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>
-                <span style={{ color: '#c3c0ff', fontWeight: 700 }}>{filteredQueue.length}</span> of {QUEUE.length} results for "<span style={{ color: '#c3c0ff' }}>{queueSearch}</span>"
+                <span style={{ color: '#c3c0ff', fontWeight: 700 }}>{filteredQueue.length}</span> of {liveQueue.length} results for "<span style={{ color: '#c3c0ff' }}>{queueSearch}</span>"
               </div>
             )}
           </div>
@@ -238,6 +317,69 @@ export default function TNPDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
 
+      {/* ── Credential Setup Modal (shown when TNP approves) ── */}
+      {pendingApproval && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 48, color: '#c3c0ff', display: 'block', marginBottom: 8 }}>manage_accounts</span>
+              <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd', marginBottom: 6 }}>Set Login Credentials</h3>
+              <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6 }}>
+                Approving <strong style={{ color: '#c3c0ff' }}>{pendingApproval.name}</strong> ({pendingApproval.role})<br />
+                Set a username and password for their account.
+              </p>
+            </div>
+
+            {/* Username */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Username</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={setupCreds.username}
+                  onChange={e => handleSetupUsernameChange(e.target.value.toLowerCase())}
+                  placeholder="e.g. priya.sharma"
+                  style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.username ? 'rgba(255,107,107,0.5)' : setupUsernameStatus === 'available' ? 'rgba(78,222,163,0.5)' : setupUsernameStatus === 'taken' ? 'rgba(255,107,107,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 2.5rem 0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }}
+                />
+                <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
+                  {setupUsernameStatus === 'checking' && <div style={{ width: 14, height: 14, border: '2px solid rgba(195,192,255,0.3)', borderTop: '2px solid #c3c0ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+                  {setupUsernameStatus === 'available' && <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#4edea3' }}>check_circle</span>}
+                  {setupUsernameStatus === 'taken' && <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ffb4ab' }}>cancel</span>}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.68rem', marginTop: 4, color: setupErrors.username ? '#ffb4ab' : setupUsernameStatus === 'available' ? '#4edea3' : setupUsernameStatus === 'taken' ? '#ffb4ab' : '#c7c4d8' }}>
+                {setupErrors.username || (setupUsernameStatus === 'available' ? '✓ Username is available' : setupUsernameStatus === 'taken' ? '✗ Already taken' : 'Lowercase letters, numbers, dots and underscores only')}
+              </div>
+            </div>
+
+            {/* Password */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Password</label>
+              <input type="password" value={setupCreds.password} onChange={e => setSetupCreds(c => ({ ...c, password: e.target.value }))} placeholder="Min 8 characters"
+                style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.password ? 'rgba(255,107,107,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }} />
+              {setupErrors.password && <div style={{ fontSize: '0.68rem', color: '#ffb4ab', marginTop: 4 }}>{setupErrors.password}</div>}
+            </div>
+
+            {/* Confirm Password */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Confirm Password</label>
+              <input type="password" value={setupCreds.confirmPassword} onChange={e => setSetupCreds(c => ({ ...c, confirmPassword: e.target.value }))} placeholder="Re-enter password"
+                style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.confirmPassword ? 'rgba(255,107,107,0.5)' : setupCreds.confirmPassword && setupCreds.password === setupCreds.confirmPassword ? 'rgba(78,222,163,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }} />
+              {setupErrors.confirmPassword && <div style={{ fontSize: '0.68rem', color: '#ffb4ab', marginTop: 4 }}>{setupErrors.confirmPassword}</div>}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setPendingApproval(null)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(70,69,85,0.2)', border: '1px solid rgba(70,69,85,0.3)', borderRadius: 12, color: '#c7c4d8', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSetupSubmit} disabled={setupLoading || setupUsernameStatus !== 'available'}
+                style={{ flex: 2, padding: '0.75rem', background: setupLoading || setupUsernameStatus !== 'available' ? '#2d3449' : 'linear-gradient(135deg,#4edea3,#3bc490)', color: setupLoading || setupUsernameStatus !== 'available' ? '#c7c4d8' : '#0b1326', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: setupLoading || setupUsernameStatus !== 'available' ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {setupLoading ? <div style={{ width: 16, height: 16, border: '2px solid rgba(11,19,38,0.3)', borderTop: '2px solid #0b1326', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>Approve & Set Credentials</>}
+              </button>
+            </div>
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {/* ── Credentials Confirmation Modal ── */}
       {credModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(78,222,163,0.25)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
@@ -245,7 +387,7 @@ export default function TNPDashboard() {
               <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
               <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#4edea3', marginBottom: 6 }}>Account Approved!</h3>
               <p style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>
-                Credentials for <strong style={{ color: '#dae2fd' }}>{credModal.name}</strong> have been generated.<br />
+                Credentials for <strong style={{ color: '#dae2fd' }}>{credModal.name}</strong> have been set.<br />
                 <span style={{ color: '#ffb95f' }}>In production, these would be emailed to {credModal.email}</span>
               </p>
             </div>
@@ -505,7 +647,7 @@ export default function TNPDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {(() => {
                     const sq = queueSearch.toLowerCase().trim();
-                    const filtered = sq ? QUEUE.filter(item => item.name.toLowerCase().includes(sq) || item.sub.toLowerCase().includes(sq) || item.status.toLowerCase().includes(sq)) : QUEUE;
+                    const filtered = sq ? liveQueue.filter(item => item.name.toLowerCase().includes(sq) || item.sub.toLowerCase().includes(sq) || item.status.toLowerCase().includes(sq)) : liveQueue;
                     const hl = (text) => {
                       if (!sq) return text;
                       const str = String(text);

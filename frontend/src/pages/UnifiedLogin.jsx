@@ -2,8 +2,38 @@ import React, { useState, useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
-import { supabase } from '../lib/supabaseClient';
-import { getUserByEmail } from '../lib/db';
+
+// ── Hardcoded credential store ──
+const CREDENTIAL_STORE = [
+  { username: 'admin',           password: 'tnp_secure_123', role: 'TNP',     name: 'TNP Coordinator',  department: 'Administration',         id: 'tnp-admin' },
+  { username: 'alice.johnson42', password: 'Xk7mP2qR9n',    role: 'STUDENT', name: 'Alice Johnson',    department: 'Computer Science',       id: 'stu-alice-johnson' },
+  { username: 'bob.smith18',     password: 'Ry4nQ8wL3v',    role: 'STUDENT', name: 'Bob Smith',        department: 'Electrical Engineering', id: 'stu-bob-smith' },
+  { username: 'priya.sharma',    password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Priya Sharma',     department: 'Computer Science',       id: 'alm-priya-sharma' },
+  { username: 'rahul.verma',     password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Rahul Verma',      department: 'Electrical Engineering', id: 'alm-rahul-verma' },
+  { username: 'sarah.chen',      password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Sarah Chen',       department: 'Computer Science',       id: 'alm-sarah-chen' },
+  { username: 'jasmine.patel',   password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Jasmine Patel',    department: 'Computer Science',       id: 'alm-jasmine-patel' },
+  { username: 'aisha.okonkwo',   password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Aisha Okonkwo',    department: 'Computer Science',       id: 'alm-aisha-okonkwo' },
+];
+
+// Also check dynamically generated credentials from registration flow
+function findCredential(username, password) {
+  // Check hardcoded store first
+  const found = CREDENTIAL_STORE.find(c => c.username === username.trim() && c.password === password.trim());
+  if (found) return found;
+
+  // Check localStorage for TNP-approved pending profiles
+  try {
+    const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+    if (pending.username === username.trim() && pending.password === password.trim()) {
+      return { ...pending, role: pending.role || 'STUDENT' };
+    }
+    // Check approved accounts store
+    const approved = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+    return approved.find(c => c.username === username.trim() && c.password === password.trim()) || null;
+  } catch {
+    return null;
+  }
+}
 
 export default function UnifiedLogin() {
   const { user, login } = useContext(AuthContext);
@@ -26,6 +56,21 @@ export default function UnifiedLogin() {
       return;
     }
     setLoading(true);
+    setTimeout(() => {
+      const cred = findCredential(username, password);
+      if (!cred) {
+        setError('Invalid username or password. Check your credentials and try again.');
+        setLoading(false);
+        return;
+      }
+      // Role mismatch check
+      if (cred.role !== role) {
+        setError(`These credentials belong to a ${cred.role.toLowerCase()} account. Please select the correct role tab.`);
+        setLoading(false);
+        return;
+      }
+      const userData = { id: cred.id || `${cred.role.toLowerCase()}-${Date.now()}`, name: cred.name, role: cred.role, department: cred.department };
+      login(userData, `token-${Date.now()}`);
 
     try {
       // TNP uses hardcoded credentials (no Supabase Auth)
@@ -85,7 +130,17 @@ export default function UnifiedLogin() {
     { id: 'TNP',     label: 'TNP Admin', icon: 'admin_panel_settings' },
   ];
 
-  const inp = { width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.75rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' };
+  const DEMO_HINTS = {
+    STUDENT: 'Demo: alice.johnson42 / Xk7mP2qR9n',
+    ALUMNI:  'Demo: priya.sharma / Alumni@2026  (also: sarah.chen, jasmine.patel, aisha.okonkwo)',
+    TNP:     'Demo: admin / tnp_secure_123',
+  };
+
+  const inp = {
+    width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)',
+    borderRadius: 10, padding: '0.75rem 0.875rem', color: '#dae2fd',
+    fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif',
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#0b1326', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: 'Inter, sans-serif', color: '#dae2fd' }}>
@@ -157,17 +212,9 @@ export default function UnifiedLogin() {
             )}
             {role === 'ALUMNI' && (
               <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#c7c4d8', marginTop: '1.25rem' }}>
-                New alumni?{' '}
-                <a href="/alumni/register" style={{ color: '#ffb95f', textDecoration: 'none', fontWeight: 600 }}>Create an account</a>
+                New alumni mentor?{' '}
+                <a href="/auth/alumni/register" style={{ color: '#4edea3', textDecoration: 'none', fontWeight: 600 }}>Create account</a>
               </p>
-            )}
-            {role === 'TNP' && (
-              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#131b2e', borderRadius: 10, border: '1px solid rgba(70,69,85,0.2)' }}>
-                <p style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#ffb95f', verticalAlign: 'middle', marginRight: 4 }}>info</span>
-                  Use: admin / tnp_secure_123
-                </p>
-              </div>
             )}
           </div>
         </div>

@@ -33,9 +33,11 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
   const [sent, setSent] = useState(false);
 
   const handleSend = () => {
+    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
-      studentId: studentName,
+      studentId: authUser.id || studentName,
       alumniName: alumni.name,
       alumniRole: alumni.role,
       topic,
@@ -177,40 +179,30 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const FILTER_OPTIONS = ['Google', 'Product Management', '5-10 Years', 'Engineering', 'Design'];
 
-  // 1. Fetch real alumni from Supabase on mount
+  // Fetch alumni from Supabase directly, fall back to mock data
+  const MOCK_ALUMNI = [
+    { id: 'alm-priya-sharma',    name: 'Priya Sharma',    email: 'priya.sharma@alumni.edu',    department: 'Computer Science',          company: 'Google',    batch_year: 2018, profile_data: { title: 'Senior Software Engineer', skills: ['React', 'Node.js', 'System Design'], bio: 'Passionate about mentoring students in frontend and system design interviews.' } },
+    { id: 'alm-rahul-verma',     name: 'Rahul Verma',     email: 'rahul.verma@alumni.edu',     department: 'Electrical Engineering',    company: 'Microsoft', batch_year: 2016, profile_data: { title: 'Principal Engineer',        skills: ['C++', 'Distributed Systems', 'Cloud'],  bio: 'Helping students crack top-tier tech interviews with 8+ years of industry experience.' } },
+    { id: 'alm-sarah-chen',      name: 'Sarah Chen',      email: 'sarah.chen@alumni.edu',      department: 'Computer Science',          company: 'Google',    batch_year: 2017, profile_data: { title: 'Senior PM',               skills: ['Strategy', 'Growth', 'AI/ML'],           bio: 'Expert in scaling AI consumer products from 0 to 1.' } },
+    { id: 'alm-jasmine-patel',   name: 'Jasmine Patel',   email: 'jasmine.patel@alumni.edu',   department: 'Computer Science',          company: 'Meta',      batch_year: 2019, profile_data: { title: 'Data Scientist',          skills: ['Python', 'Big Data', 'Algorithms'],      bio: 'Specializing in large scale recommendation engines.' } },
+    { id: 'alm-aisha-okonkwo',   name: 'Aisha Okonkwo',   email: 'aisha.okonkwo@alumni.edu',   department: 'Computer Science',          company: 'DeepMind', batch_year: 2020, profile_data: { title: 'ML Engineer',             skills: ['AI Research', 'PyTorch', 'NLP'],         bio: 'Working on large language model alignment.' } },
+    { id: 'alm-carlos-mendez',   name: 'Carlos Mendez',   email: 'carlos.mendez@alumni.edu',   department: 'Information Technology',    company: 'Netflix',   batch_year: 2015, profile_data: { title: 'Staff Engineer',          skills: ['Distributed Systems', 'Java', 'Scale'],  bio: 'Built streaming infrastructure serving 200M+ users.' } },
+  ];
+
   useEffect(() => {
-    let active = true;
-    const loadAlumni = async () => {
-      try {
-        const realAlumni = await getAllAlumni();
-
-        if (!active || !Array.isArray(realAlumni)) return;
-
-        const mappedList = realAlumni.map(a => {
-          const p = a.profile_data || {};
-          const yrs = a.batch_year ? new Date().getFullYear() - a.batch_year : null;
-          return {
-            id:         a.id,
-            name:       a.name,
-            role:       p.title || (a.company ? `Alumni at ${a.company}` : `Alumni • ${a.department || 'General'}`),
-            score:      Math.min(99, 70 + ((p.skills?.length || 0) * 3) + (yrs || 0)),
-            scoreColor: yrs >= 8 ? '#ffb95f' : '#4edea3',
-            tags:       (p.skills || []).slice(0, 5),
-            bio:        p.bio || `Experienced alumni from ${a.department || 'the community'} ready to help students.`,
-            company:    a.company || '',
-            isReal:     true,
-          };
-        });
-
-        if (active && mappedList.length > 0) setAlumniList(mappedList);
-      } catch (e) {
-        console.error('Failed to load real alumni:', e);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    loadAlumni();
-    return () => { active = false; };
+    import('../lib/db').then(({ getAllAlumni }) => {
+      getAllAlumni().then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAllAlumni(data.map(toDisplayAlumni));
+        } else {
+          setAllAlumni(MOCK_ALUMNI.map(toDisplayAlumni));
+        }
+        setLoading(false);
+      }).catch(() => {
+        setAllAlumni(MOCK_ALUMNI.map(toDisplayAlumni));
+        setLoading(false);
+      });
+    });
   }, []);
 
   const toggleFilter = (f) => {
