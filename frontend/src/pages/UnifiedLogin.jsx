@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 
 // ── Hardcoded credential store (simulates what would be emailed after TNP approval) ──

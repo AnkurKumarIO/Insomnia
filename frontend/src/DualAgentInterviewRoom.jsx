@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useContext, useCallback } from 'rea
 import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
-import { AuthContext } from './App';
+import { AuthContext } from './context/AuthContext';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };

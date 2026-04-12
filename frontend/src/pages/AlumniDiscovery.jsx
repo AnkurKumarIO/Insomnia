@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import { sendRequest, getRequestsByStudent } from '../interviewRequests';
 
 const ALL_ALUMNI = [

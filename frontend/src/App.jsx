@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext } from 'react';
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import './index.css';
 import LandingPage from './pages/LandingPage';
@@ -14,37 +14,7 @@ import AlumniDashboard from './pages/AlumniDashboard';
 import TNPDashboard from './pages/TNPDashboard';
 import InterviewRoom from './pages/InterviewRoom';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
-
-// Auth Context
-export const AuthContext = createContext(null);
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('alumniconnect_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('alumniconnect_token'));
-
-  const login = (userData, authToken) => {
-    setUser(userData);
-    setToken(authToken);
-    localStorage.setItem('alumniconnect_user', JSON.stringify(userData));
-    localStorage.setItem('alumniconnect_token', authToken);
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('alumniconnect_user');
-    localStorage.removeItem('alumniconnect_token');
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+import { AuthProvider, AuthContext } from './context/AuthContext';
 
 // Smart dashboard redirect based on role
 function DashboardRouter() {

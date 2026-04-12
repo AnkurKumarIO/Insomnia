@@ -10,16 +10,19 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Routes
-app.use('/auth',          require('./routes/auth'));
-app.use('/ai',            require('./routes/aiRoutes'));
-app.use('/requests',      require('./routes/requests'));
-app.use('/notifications', require('./routes/notifications'));
-app.use('/users',         require('./routes/users'));
-app.use('/alumni',        require('./routes/alumni'));
-app.use('/register',      require('./routes/register'));
-app.use('/stats',         require('./routes/stats'));
-app.use('/chat',          require('./routes/chat'));
+// Router for API
+const apiRouter = express.Router();
+apiRouter.use('/auth',          require('./routes/auth'));
+apiRouter.use('/ai',            require('./routes/aiRoutes'));
+apiRouter.use('/requests',      require('./routes/requests'));
+apiRouter.use('/notifications', require('./routes/notifications'));
+apiRouter.use('/users',         require('./routes/users'));
+apiRouter.use('/alumni',        require('./routes/alumni'));
+apiRouter.use('/register',      require('./routes/register'));
+apiRouter.use('/stats',         require('./routes/stats'));
+apiRouter.use('/chat',          require('./routes/chat'));
+
+app.use('/api', apiRouter);
 
 // HTTP Server + Socket.io
 const server = http.createServer(app);

@@ -1,6 +1,6 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import AnalyticsTab from './TNPAnalytics';

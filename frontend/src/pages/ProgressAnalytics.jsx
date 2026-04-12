@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import { api } from '../api';
 
 const INSIGHTS = [

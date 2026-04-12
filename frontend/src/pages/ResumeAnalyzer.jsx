@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import { api } from '../api';
 
 export default function ResumeAnalyzer() {

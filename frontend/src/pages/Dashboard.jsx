@@ -1,6 +1,6 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';

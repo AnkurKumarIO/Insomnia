@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-import { AuthContext } from '../App';
+import { AuthContext } from '../context/AuthContext';
 
 export default function StudentRegistration() {
   const navigate = useNavigate();

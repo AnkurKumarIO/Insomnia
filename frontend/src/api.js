@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api';
+const ROOT_BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── Mock data (used when backend is unreachable) ───────────────────────────
 
@@ -348,4 +349,4 @@ export const api = {
   ),
 };
 
-export const SOCKET_URL = API_BASE;
+export const SOCKET_URL = ROOT_BASE;
