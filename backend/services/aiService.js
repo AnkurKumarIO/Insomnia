@@ -64,6 +64,11 @@ strengths (array of 2 genuine strengths).`,
 };
 
 // ─── Agent 2: Socratic Whisperer ─────────────────────────────────────────────
+/**
+ * Agent 2: The Socratic Whisperer (Live Alumni AI)
+ * Context-aware hint engine — analyses transcript and returns targeted coaching.
+ * @param {string} transcriptChunk 
+ */
 const generateSocraticHint = async (transcriptChunk) => {
   if (USE_AI) {
     try {
@@ -73,28 +78,123 @@ Return JSON with keys: hint (one sharp follow-up question or coaching tip, max 2
 category (one of: frontend|backend|database|system-design|debugging|soft-skills|ai-ml|general).`,
         `The candidate just said: "${transcriptChunk}"`
       );
-    } catch (e) { console.error('Agent 2 error:', e.message); }
+    } catch (e) {
+      console.error('Agent 2 error:', e.message);
+    }
   }
-  const text = transcriptChunk.toLowerCase();
-  const HINTS = {
-    frontend:        'Ask how they handled state management at scale — Redux vs Zustand vs Context?',
-    backend:         'Ask about middleware design: "How did you handle auth and rate limiting?"',
-    database:        'Ask about indexing: "How did you decide which columns to index?"',
-    'system-design': 'Ask about trade-offs: "Why this architecture over a monolith?"',
-    debugging:       'Probe: "What tools did you use to isolate the issue?"',
-    'soft-skills':   'Ask: "Tell me about a time you disagreed with a teammate on a technical decision."',
-    'ai-ml':         'Ask: "How did you measure model performance in production?"',
-    general:         'Ask about their biggest technical challenge in the last 6 months.',
-  };
-  let category = 'general';
-  if (text.includes('react') || text.includes('frontend') || text.includes('ui')) category = 'frontend';
-  else if (text.includes('node') || text.includes('backend') || text.includes('api')) category = 'backend';
-  else if (text.includes('database') || text.includes('sql') || text.includes('mongo')) category = 'database';
-  else if (text.includes('system') || text.includes('architect') || text.includes('scale')) category = 'system-design';
-  else if (text.includes('bug') || text.includes('debug') || text.includes('error')) category = 'debugging';
-  else if (text.includes('team') || text.includes('lead') || text.includes('collaborat')) category = 'soft-skills';
-  else if (text.includes('ai') || text.includes('ml') || text.includes('model') || text.includes('llm')) category = 'ai-ml';
-  return { hint: HINTS[category], category };
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const text = transcriptChunk.toLowerCase();
+
+      // Topic → hint map (ordered by specificity)
+      const rules = [
+        // Frontend
+        { keys: ['react', 'jsx', 'component', 'hook', 'useeffect', 'usestate'],
+          hints: [
+            "Ask how they handle state management at scale — Redux vs Zustand vs Context?",
+            "Probe their understanding of React's reconciliation algorithm and virtual DOM diffing.",
+            "Ask about their experience with React Server Components or concurrent features.",
+          ], category: 'frontend'
+        },
+        { keys: ['css', 'tailwind', 'styled', 'animation', 'responsive'],
+          hints: [
+            "Ask how they approach design systems and component reusability across teams.",
+            "Probe their understanding of CSS specificity, cascade, and performance implications.",
+          ], category: 'frontend'
+        },
+        // Backend
+        { keys: ['node', 'express', 'api', 'rest', 'graphql', 'endpoint'],
+          hints: [
+            "Ask how they handle API versioning and backward compatibility in production.",
+            "Probe their approach to rate limiting, authentication middleware, and error handling.",
+            "Ask about their experience designing idempotent APIs.",
+          ], category: 'backend'
+        },
+        { keys: ['database', 'sql', 'postgres', 'mysql', 'query', 'index', 'schema'],
+          hints: [
+            "Ask about their experience with query optimization — EXPLAIN plans, index strategies.",
+            "Probe their understanding of ACID properties and when to use NoSQL vs relational.",
+            "Ask how they handle database migrations in a zero-downtime deployment.",
+          ], category: 'database'
+        },
+        { keys: ['redis', 'cache', 'caching', 'memcache'],
+          hints: [
+            "Ask how they decide what to cache and how they handle cache invalidation.",
+            "Probe their understanding of cache stampede and how to prevent it.",
+          ], category: 'database'
+        },
+        // System design
+        { keys: ['scale', 'scalab', 'microservice', 'distributed', 'load balanc', 'kubernetes', 'docker'],
+          hints: [
+            "Ask how they'd design a system to handle 10x traffic overnight — what breaks first?",
+            "Probe their understanding of CAP theorem and how it influenced their design decisions.",
+            "Ask about their experience with service discovery and inter-service communication.",
+          ], category: 'system-design'
+        },
+        { keys: ['kafka', 'queue', 'message', 'event', 'pubsub', 'rabbitmq'],
+          hints: [
+            "Ask how they handle message ordering guarantees and exactly-once delivery.",
+            "Probe their experience with dead-letter queues and retry strategies.",
+          ], category: 'system-design'
+        },
+        // AI/ML
+        { keys: ['machine learning', 'ml', 'model', 'llm', 'gpt', 'ai', 'neural', 'training'],
+          hints: [
+            "Ask how they evaluate model performance beyond accuracy — precision, recall, F1?",
+            "Probe their understanding of model drift and how they monitor production ML systems.",
+            "Ask about their experience with prompt engineering and LLM token efficiency.",
+          ], category: 'ai-ml'
+        },
+        // Soft skills / leadership
+        { keys: ['team', 'lead', 'manage', 'conflict', 'disagree', 'mentor'],
+          hints: [
+            "Ask for a specific example where they had to influence without authority.",
+            "Probe how they give constructive feedback to peers — ask for a real scenario.",
+            "Ask how they prioritize when everything is urgent and stakeholders disagree.",
+          ], category: 'soft-skills'
+        },
+        { keys: ['fail', 'mistake', 'wrong', 'bug', 'error', 'incident', 'outage'],
+          hints: [
+            "Probe deeper — ask what they'd do differently and what systemic change they made.",
+            "Ask how they communicated the incident to stakeholders and what the post-mortem looked like.",
+          ], category: 'soft-skills'
+        },
+        { keys: ['project', 'built', 'shipped', 'launched', 'delivered'],
+          hints: [
+            "Ask about the biggest technical challenge they faced and how they unblocked it.",
+            "Probe the impact — ask for specific metrics: users, revenue, latency improvement.",
+            "Ask what they'd redesign if they started the project today.",
+          ], category: 'general'
+        },
+        // Security
+        { keys: ['security', 'auth', 'oauth', 'jwt', 'xss', 'csrf', 'injection'],
+          hints: [
+            "Ask how they stay current with security vulnerabilities in their stack.",
+            "Probe their understanding of the OWASP Top 10 and which they've encountered.",
+          ], category: 'general'
+        },
+      ];
+
+      // Find matching rule
+      for (const rule of rules) {
+        if (rule.keys.some(k => text.includes(k))) {
+          const hint = rule.hints[Math.floor(Math.random() * rule.hints.length)];
+          return resolve({ hint, category: rule.category });
+        }
+      }
+
+      // Generic fallbacks
+      const fallbacks = [
+        "Ask them to walk you through the most complex system they've ever built end-to-end.",
+        "Probe their decision-making process — ask 'why this approach over alternatives?'",
+        "Ask about a time they had to learn something completely new under time pressure.",
+        "Ask what they're currently learning and why they chose that topic.",
+        "Probe their understanding of trade-offs — ask 'what would you sacrifice for speed?'",
+      ];
+      resolve({ hint: fallbacks[Math.floor(Math.random() * fallbacks.length)], category: 'general' });
+    }, 600);
+  });
 };
 
 // ─── Agent 3: Post-Interview Analytics ───────────────────────────────────────

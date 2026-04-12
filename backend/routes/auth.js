@@ -116,27 +116,58 @@ router.post('/tnp/login', async (req, res) => {
   }
 });
 
-// POST /auth/alumni/login (simple email-based for demo)
-router.post('/alumni/login', async (req, res) => {
+// POST /auth/student/register
+router.post('/student/register', async (req, res) => {
   try {
-    const { name, email, department } = req.body;
-
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Name and email are required.' });
+    const { name, email, department, username, password } = req.body;
+    if (!username || !password || !name || !email) {
+      return res.status(400).json({ error: 'All fields are required.' });
     }
 
-    let user = await prisma.user.findUnique({ where: { email } });
+    let existingUser = await prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] }
+    });
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          role: 'ALUMNI',
-          name,
-          email,
-          department: department || 'General',
-          verification_status: 'VERIFIED'
-        }
-      });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email or username already exists.' });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        role: 'STUDENT',
+        name,
+        email,
+        department,
+        username,
+        password, // In production, we'd hash this
+        verification_status: 'PENDING'
+      }
+    });
+
+    const token = jwt.sign(
+      { userId: user.id, role: user.role, name: user.name },
+      process.env.JWT_SECRET || 'hackathon_secret',
+      { expiresIn: '24h' }
+    );
+
+    return res.json({ message: 'Registration successful', token, user: { id: user.id, name: user.name, role: user.role } });
+  } catch (error) {
+    console.error('Student Register Error:', error);
+    res.status(500).json({ error: 'Internal Server Error.' });
+  }
+});
+
+// POST /auth/student/login
+router.post('/student/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user || user.password !== password || user.role !== 'STUDENT') {
+      return res.status(401).json({ error: 'Invalid credentials or wrong role.' });
     }
 
     const token = jwt.sign(
@@ -145,10 +176,97 @@ router.post('/alumni/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    return res.json({ message: 'Alumni login successful', token, user: { id: user.id, name: user.name, role: user.role } });
+    return res.json({ message: 'Login successful', token, user: { id: user.id, name: user.name, role: user.role } });
+  } catch (error) {
+    console.error('Student Login Error:', error);
+    res.status(500).json({ error: 'Internal Server Error.' });
+  }
+});
+
+// POST /auth/alumni/register
+router.post('/alumni/register', async (req, res) => {
+  try {
+    const { name, email, department, username, password } = req.body;
+    if (!username || !password || !name || !email) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    let existingUser = await prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email or username already exists.' });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        role: 'ALUMNI',
+        name,
+        email,
+        department: department || 'General',
+        username,
+        password, // Should be hashed in production
+        verification_status: 'VERIFIED'
+      }
+    });
+
+    const token = jwt.sign(
+      { userId: user.id, role: user.role, name: user.name },
+      process.env.JWT_SECRET || 'hackathon_secret',
+      { expiresIn: '24h' }
+    );
+
+    return res.json({ message: 'Alumni registration successful', token, user: { id: user.id, name: user.name, role: user.role } });
+  } catch (error) {
+    console.error('Alumni Register Error:', error);
+    res.status(500).json({ error: 'Internal Server Error.' });
+  }
+});
+
+// POST /auth/alumni/login
+router.post('/alumni/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user || user.password !== password || user.role !== 'ALUMNI') {
+      return res.status(401).json({ error: 'Invalid credentials or wrong role.' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, role: user.role, name: user.name },
+      process.env.JWT_SECRET || 'hackathon_secret',
+      { expiresIn: '24h' }
+    );
+
+    return res.json({ message: 'Login successful', token, user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
     console.error('Alumni Login Error:', error);
     res.status(500).json({ error: 'Internal Server Error.' });
+  }
+});
+
+// GET /auth/alumni - Fetch all registered alumni
+router.get('/alumni', async (req, res) => {
+  try {
+    const alumni = await prisma.user.findMany({
+      where: { role: 'ALUMNI' },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        department: true,
+        email: true,
+      }
+    });
+    res.json(alumni);
+  } catch (error) {
+    console.error('Fetch Alumni Error:', error);
+    res.status(500).json({ error: 'Failed to fetch alumni.' });
   }
 });
 

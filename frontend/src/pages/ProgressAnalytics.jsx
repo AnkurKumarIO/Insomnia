@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 
-const INTERVIEWS = [
-  { id: 5, label: 'Mock Interview #05', score: 88, expanded: true,  checklist: [{ done: true, text: 'Improve eye contact' },{ done: false, text: 'Structure STAR responses better' },{ done: false, text: "Reduce filler words ('um','like')" },{ done: false, text: 'Clarify technical project details' }] },
-  { id: 4, label: 'Mock Interview #04', score: 76, expanded: false, checklist: [] },
-  { id: 3, label: 'Mock Interview #03', score: 70, expanded: false, checklist: [] },
+const INITIAL_INTERVIEWS = [
+  { id: 5, label: 'Mock Interview #05', score: 88, checklist: [{ done: true, text: 'Improve eye contact' },{ done: false, text: 'Structure STAR responses better' },{ done: false, text: "Reduce filler words ('um','like')" },{ done: false, text: 'Clarify technical project details' }] },
+  { id: 4, label: 'Mock Interview #04', score: 76, checklist: [] },
+  { id: 3, label: 'Mock Interview #03', score: 70, checklist: [] },
 ];
 
 const INSIGHTS = [
@@ -19,6 +19,16 @@ const pathD = `M ${POINTS.map(p => p.join(' ')).join(' L ')}`;
 
 export default function ProgressAnalytics() {
   const [expanded, setExpanded] = useState(5);
+  const [interviews, setInterviews] = useState(INITIAL_INTERVIEWS);
+  const [reportModal, setReportModal] = useState(null);
+
+  const toggleCheckItem = (interviewId, itemIdx) => {
+    setInterviews(prev => prev.map(iv =>
+      iv.id === interviewId
+        ? { ...iv, checklist: iv.checklist.map((c, i) => i === itemIdx ? { ...c, done: !c.done } : c) }
+        : iv
+    ));
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -84,7 +94,7 @@ export default function ProgressAnalytics() {
         <div style={{ background: '#222a3d', borderRadius: 12, padding: '1.5rem', border: '1px solid rgba(70,69,85,0.1)' }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.5rem' }}>Past Interviews</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {INTERVIEWS.map(iv => (
+            {interviews.map(iv => (
               <div key={iv.id} style={{ background: expanded === iv.id ? '#171f33' : '#131b2e', borderRadius: 12, overflow: 'hidden', border: expanded === iv.id ? '1px solid rgba(195,192,255,0.2)' : '1px solid transparent' }}>
                 <button onClick={() => setExpanded(expanded === iv.id ? null : iv.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'none', border: 'none', cursor: 'pointer', color: '#dae2fd' }}>
                   <div>
@@ -97,14 +107,14 @@ export default function ProgressAnalytics() {
                   <div style={{ padding: '0 1rem 1rem' }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 12 }}>Feedback Checklist</div>
                     {iv.checklist.map((c, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: 4, background: c.done ? 'rgba(78,222,163,0.2)' : 'transparent', border: c.done ? 'none' : '1px solid rgba(70,69,85,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                      <div key={i} onClick={() => toggleCheckItem(iv.id, i)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
+                        <div style={{ width: 20, height: 20, borderRadius: 4, background: c.done ? 'rgba(78,222,163,0.2)' : 'transparent', border: c.done ? 'none' : '1px solid rgba(70,69,85,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.2s' }}>
                           {c.done && <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#4edea3', fontVariationSettings: "'FILL' 1" }}>check_circle</span>}
                         </div>
-                        <span style={{ fontSize: '0.8rem', color: c.done ? '#dae2fd' : '#c7c4d8' }}>{c.text}</span>
+                        <span style={{ fontSize: '0.8rem', color: c.done ? '#dae2fd' : '#c7c4d8', textDecoration: c.done ? 'line-through' : 'none', opacity: c.done ? 0.7 : 1 }}>{c.text}</span>
                       </div>
                     ))}
-                    <button style={{ width: '100%', marginTop: 8, padding: '0.5rem', background: '#2d3449', color: '#c3c0ff', border: 'none', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                    <button onClick={() => setReportModal(iv)} style={{ width: '100%', marginTop: 8, padding: '0.5rem', background: '#2d3449', color: '#c3c0ff', border: 'none', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                       View Detailed Report
                     </button>
                   </div>
@@ -133,6 +143,48 @@ export default function ProgressAnalytics() {
           ))}
         </div>
       </div>
+
+      {/* Detailed Report Modal */}
+      {reportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 560, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Detailed Report</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1.25rem', color: '#dae2fd' }}>{reportModal.label}</h3>
+              </div>
+              <button onClick={() => setReportModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ background: '#131b2e', borderRadius: 12, padding: '1.5rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8' }}>Overall Score</span>
+                <span style={{ fontSize: '2rem', fontWeight: 900, color: '#c3c0ff' }}>{reportModal.score}</span>
+              </div>
+              <div style={{ height: 8, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${reportModal.score}%`, background: 'linear-gradient(90deg,#4f46e5,#c3c0ff)', borderRadius: 999 }} />
+              </div>
+            </div>
+            {reportModal.checklist.length > 0 && (
+              <div style={{ background: '#131b2e', borderRadius: 12, padding: '1.5rem', marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: '1rem' }}>Action Items</div>
+                {reportModal.checklist.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: c.done ? '#4edea3' : '#464555', fontVariationSettings: "'FILL' 1" }}>{c.done ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    <span style={{ fontSize: '0.875rem', color: c.done ? '#4edea3' : '#c7c4d8', textDecoration: c.done ? 'line-through' : 'none', opacity: c.done ? 0.7 : 1 }}>{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.15),rgba(11,19,38,0.8))', border: '1px solid rgba(79,70,229,0.3)', borderRadius: 12, padding: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>AI Recommendation</div>
+              <p style={{ fontSize: '0.8rem', color: '#dae2fd', lineHeight: 1.6 }}>Focus on structuring your answers using the STAR method. Practice with timed responses to improve clarity and reduce filler words.</p>
+            </div>
+            <button onClick={() => setReportModal(null)} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Close Report</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

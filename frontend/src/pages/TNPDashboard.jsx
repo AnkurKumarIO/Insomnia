@@ -111,7 +111,7 @@ export default function TNPDashboard() {
           })}
         </nav>
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
             Generate Report
           </button>
           <a href="#" onClick={e => { e.preventDefault(); logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
@@ -196,8 +196,10 @@ export default function TNPDashboard() {
                   <a href="#" style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</a>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {QUEUE.map((q, i) => (
-                    <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${q.color}` }}>
+                  {QUEUE.map((q, i) => {
+                    const st = queueStatus[q.name];
+                    return (
+                    <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
@@ -208,12 +210,17 @@ export default function TNPDashboard() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ background: '#2d3449', color: '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{q.status}</span>
-                        <button style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                        <button style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                        <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
+                        </span>
+                        {!st && <>
+                          <button onClick={() => handleApprove(q.name)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                          <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                        </>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -264,7 +271,7 @@ export default function TNPDashboard() {
                     </div>
                   ))}
                 </div>
-                <button style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                <button onClick={() => setActiveTab('queue')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                   View Full History
                 </button>
               </div>

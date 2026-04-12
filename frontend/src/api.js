@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── Mock data (used when backend is unreachable) ───────────────────────────
 
@@ -128,13 +128,40 @@ export const api = {
     () => MOCK_API.tnpLogin(username, password)
   ),
 
-  alumniLogin: (name, email, department) => callOrMock(
+  studentRegister: (data) => callOrMock(
+    () => fetch(`${API_BASE}/auth/student/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+    async () => { await mockDelay(); return { token: MOCK_TOKEN, user: { ...data, id: 'stu-new', role: 'STUDENT' } }; }
+  ),
+
+  studentLogin: (username, password) => callOrMock(
+    () => fetch(`${API_BASE}/auth/student/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(); return { token: MOCK_TOKEN, user: MOCK_USERS.students[0] }; }
+  ),
+
+  alumniRegister: (data) => callOrMock(
+    () => fetch(`${API_BASE}/auth/alumni/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+    async () => { await mockDelay(); return { token: MOCK_TOKEN, user: { ...data, id: 'alm-new', role: 'ALUMNI' } }; }
+  ),
+
+  alumniLogin: (username, password) => callOrMock(
     () => fetch(`${API_BASE}/auth/alumni/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, department }),
+      body: JSON.stringify({ username, password }),
     }).then(r => r.json()),
-    () => MOCK_API.alumniLogin(name, email, department)
+    async () => { await mockDelay(); return { token: MOCK_TOKEN, user: MOCK_USERS.alumni[0] }; }
   ),
 
   resumeAnalyze: (file) => callOrMock(
@@ -201,6 +228,11 @@ export const api = {
       body: JSON.stringify({ claim }),
     }).then(r => r.json()),
     async () => ({ claim, result: { verified: true, confidence: 95, note: 'Claim verified (mock)' } })
+  ),
+
+  fetchAlumni: () => callOrMock(
+    () => fetch(`${API_BASE}/auth/alumni`).then(r => r.json()),
+    async () => { await mockDelay(); return MOCK_USERS.alumni; }
   ),
 };
 

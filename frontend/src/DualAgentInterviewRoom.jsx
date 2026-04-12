@@ -46,8 +46,10 @@ export default function DualAgentInterviewRoom() {
   const myId = user?.name || user?.role || 'User';
 
   // ── Connection ──────────────────────────────────────────────────────────
+  // ── Connection ──────────────────────────────────────────────────────────
   const [isConnected, setIsConnected]   = useState(false);
-  const [peerConnected, setPeerConnected] = useState(false);
+  const [socketPeerPresent, setSocketPeerPresent] = useState(false); // Someone else in the socket room
+  const [videoConnected, setVideoConnected] = useState(false);     // Real WebRTC track received
   const [peerName, setPeerName]         = useState('Peer');
 
   // ── Controls ────────────────────────────────────────────────────────────
@@ -98,64 +100,127 @@ export default function DualAgentInterviewRoom() {
   const metricsRef     = useRef(null);
   const suggestionRef  = useRef(null);
   const makingOffer    = useRef(false);
+  const ignoreOffer    = useRef(false);
   const chatEndRef     = useRef(null);
+
+  // ── WebRTC PC Initialization ──────────────────────────────────────────
+  const initPC = useCallback(() => {
+    if (pcRef.current) return pcRef.current;
+    console.log('[WebRTC] Initializing PeerConnection');
+    const pc = new RTCPeerConnection(ICE);
+    pcRef.current = pc;
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) socketRef.current?.emit('ice-candidate', roomId, e.candidate);
+    };
+
+    pc.ontrack = (e) => {
+      console.log('[WebRTC] Remote track received');
+      if (remoteVideoRef.current && e.streams[0]) {
+        remoteVideoRef.current.srcObject = e.streams[0];
+        setVideoConnected(true);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state:', pc.connectionState);
+      if (pc.connectionState === 'connected') setVideoConnected(true);
+      if (['disconnected','failed','closed'].includes(pc.connectionState)) setVideoConnected(false);
+    };
+
+    pc.onnegotiationneeded = async () => {
+      try {
+        console.log('[WebRTC] Negotiation needed');
+        makingOffer.current = true;
+        await pc.setLocalDescription(await pc.createOffer());
+        socketRef.current?.emit('offer', roomId, pc.localDescription);
+      } catch (err) {
+        console.error('[WebRTC] Negotiation error:', err);
+      } finally {
+        makingOffer.current = false;
+      }
+    };
+
+    return pc;
+  }, [roomId]);
 
   // ── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
+    console.log('[Room] Entering room:', roomId);
     const socket = io(`${SOCKET_URL}/interview`);
     socketRef.current = socket;
 
+    // 1. Initialize PC immediately so signaling can start
+    const pc = initPC();
+
+    // 2. Start Camera
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then(stream => {
+        console.log('[Media] Camera/Mic access granted');
         streamRef.current = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        initPC(stream);
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
       })
-      .catch(() => initPC(null));
+      .catch(err => console.error('[Media] Camera access denied:', err));
 
+    // 3. Socket Events
     socket.on('connect', () => {
       setIsConnected(true);
       socket.emit('join-room', roomId, myId);
     });
-    socket.on('disconnect', () => setIsConnected(false));
 
     socket.on('user-connected', (uid) => {
+      console.log('[Socket] Peer joined:', uid);
       setPeerName(uid);
-      setPeerConnected(true);
+      setSocketPeerPresent(true);
     });
+
     socket.on('user-disconnected', () => {
-      setPeerConnected(false);
+      console.log('[Socket] Peer left');
+      setSocketPeerPresent(false);
+      setVideoConnected(false);
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     });
 
-    // WebRTC signaling
+    // 4. Signaling
     socket.on('offer', async (offer) => {
+      console.log('[WebRTC] Received offer');
       const pc = pcRef.current; if (!pc) return;
+      
+      const offerCollision = makingOffer.current || pc.signalingState !== 'stable';
+      ignoreOffer.current = offerCollision && !makingOffer.current; // Simple polite peer logic part 1
+      if (ignoreOffer.current) return;
+
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const ans = await pc.createAnswer();
-        await pc.setLocalDescription(ans);
-        socket.emit('answer', roomId, ans);
-      } catch (e) { console.error(e); }
+        await pc.setLocalDescription(await pc.createAnswer());
+        socket.emit('answer', roomId, pc.localDescription);
+      } catch (err) {
+        console.error('[WebRTC] Offer handling error:', err);
+      }
     });
+
     socket.on('answer', async (ans) => {
-      const pc = pcRef.current;
-      if (!pc || pc.signalingState === 'stable') return;
-      try { await pc.setRemoteDescription(new RTCSessionDescription(ans)); } catch (e) { console.error(e); }
+      console.log('[WebRTC] Received answer');
+      const pc = pcRef.current; if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(ans));
+      } catch (err) {
+        console.error('[WebRTC] Answer handling error:', err);
+      }
     });
+
     socket.on('ice-candidate', async (c) => {
       try { await pcRef.current?.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
     });
 
-    // Agent 2: AI hints — now includes category
+    // Agents feed ... existing logic
     socket.on('whisperer_feed', (data) => {
-      // data can be { hint, category, ts } or legacy string
       const hint = typeof data === 'string' ? data : data.hint;
       const category = typeof data === 'object' ? data.category : 'general';
       setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
     });
 
-    // Agent 6: Speech coaching tip (private to this user)
     socket.on('speech_coaching', (result) => {
       setCoachingTip(result.coaching_tip || '');
       if (result.confidence) setConfT(result.confidence);
@@ -163,7 +228,6 @@ export default function DualAgentInterviewRoom() {
       if (result.energy)     setEnergyT(result.energy);
     });
 
-    // Agent 7: Fact-check result (broadcast to all in room)
     socket.on('fact_check_result', ({ claim, result }) => {
       setFactChecks(p => [
         { claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note },
@@ -177,34 +241,27 @@ export default function DualAgentInterviewRoom() {
       }, ...p]);
     });
 
-    // Live metrics sync
     socket.on('coach_metrics_update', (m) => {
       if (m.confidence !== undefined) setConfT(m.confidence);
       if (m.clarity    !== undefined) setClarT(m.clarity);
       if (m.energy     !== undefined) setEnergyT(m.energy);
     });
 
-    // Chat messages from peer
     socket.on('chat_message', (msg) => {
       setChatMessages(p => [...p, msg]);
     });
 
-    // Hand raise notification
     socket.on('hand_raised', (uid) => {
       setHints(p => [{ text: `✋ ${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]);
     });
 
     // Timers
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-
-    // Vary metrics every 3s + broadcast via Agent 6 speech socket
     metricsRef.current = setInterval(() => {
       const wpm = Math.floor(Math.random() * 80 + 100);
       const fillers = Math.floor(Math.random() * 5);
       socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
     }, 3000);
-
-    // Rotate AI suggestion every 12s
     suggestionRef.current = setInterval(() => {
       setSuggestionIdx(i => {
         const next = (i + 1) % WHISPERER_POOL.length;
@@ -214,50 +271,17 @@ export default function DualAgentInterviewRoom() {
     }, 12000);
 
     return () => {
+      console.log('[Room] Cleaning up');
       socket.disconnect();
       pcRef.current?.close();
+      pcRef.current = null;
       streamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       clearInterval(timerRef.current);
       clearInterval(metricsRef.current);
       clearInterval(suggestionRef.current);
     };
-  }, [roomId]);
-
-  // Auto-scroll chat
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
-
-  // ── Peer connection ──────────────────────────────────────────────────────
-  function initPC(stream) {
-    const pc = new RTCPeerConnection(ICE);
-    pcRef.current = pc;
-    if (stream) stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-    pc.ontrack = (e) => {
-      if (remoteVideoRef.current && e.streams[0]) {
-        remoteVideoRef.current.srcObject = e.streams[0];
-        setPeerConnected(true);
-      }
-    };
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socketRef.current?.emit('ice-candidate', roomId, e.candidate);
-    };
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') setPeerConnected(true);
-      if (['disconnected','failed','closed'].includes(pc.connectionState)) setPeerConnected(false);
-    };
-    // First peer in room creates offer when second joins
-    socketRef.current?.on('user-connected', async () => {
-      if (makingOffer.current) return;
-      makingOffer.current = true;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socketRef.current.emit('offer', roomId, offer);
-      } catch (e) { console.error(e); }
-      makingOffer.current = false;
-    });
-  }
+  }, [roomId, initPC, myId]);
 
   // ── Screen share ─────────────────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
@@ -438,7 +462,7 @@ export default function DualAgentInterviewRoom() {
           <div style={{ display:'flex', alignItems:'center', gap:7, background:'#222a3d', padding:'0.25rem 0.65rem', borderRadius:999, border:'1px solid rgba(70,69,85,0.3)' }}>
             <div style={{ width:7, height:7, borderRadius:'50%', background: isConnected ? '#4edea3' : '#ffb4ab', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
             <span style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: isConnected ? '#4edea3' : '#ffb4ab' }}>
-              {isConnected ? (peerConnected ? 'LIVE · PEER CONNECTED' : 'LIVE · WAITING FOR PEER') : 'CONNECTING...'}
+              {isConnected ? (videoConnected ? 'LIVE' : (socketPeerPresent ? 'PEER DETECTED · CONNECTING...' : 'WAITING FOR PEER')) : 'CONNECTING...'}
             </span>
           </div>
           <span style={{ fontSize:'0.72rem', color:'#c7c4d8' }}>Room: <strong style={{ color:'#c3c0ff' }}>{roomId}</strong></span>
@@ -469,7 +493,7 @@ export default function DualAgentInterviewRoom() {
                   <span className="material-symbols-outlined" style={{ fontSize:48, color:'#464555' }}>videocam_off</span>
                 </div>
               )}
-              {/* Live metrics overlay */}
+              {/* Live metrics overlay ... existing */}
               <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)' }}>
                 {[{l:'Confidence',v:confidence,c:'#4edea3'},{l:'Clarity',v:clarity,c:'#c3c0ff'},{l:'Energy',v:energy,c:'#ffb95f'}].map(m=>(
                   <div key={m.l} style={{ marginBottom:7 }}>
@@ -492,23 +516,23 @@ export default function DualAgentInterviewRoom() {
             </div>
 
             {/* Remote */}
-            <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:`1px solid ${peerConnected ? 'rgba(78,222,163,0.35)' : 'rgba(70,69,85,0.2)'}`, transition:'border-color 0.5s' }}>
-              <video ref={remoteVideoRef} autoPlay playsInline style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
-              {!peerConnected && (
+            <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:`1px solid ${videoConnected ? 'rgba(78,222,163,0.35)' : 'rgba(70,69,85,0.2)'}`, transition:'border-color 0.5s' }}>
+              <video ref={remoteVideoRef} autoPlay playsInline style={{ width:'100%', height:'100%', objectFit:'cover', display: videoConnected ? 'block' : 'none' }} />
+              {!videoConnected && (
                 <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'rgba(11,19,38,0.9)', padding:'1rem' }}>
-                  <div style={{ width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.25rem', fontWeight:700, color:'#1d00a5', marginBottom:10 }}>?</div>
-                  <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#c7c4d8', marginBottom:6 }}>Waiting for peer...</div>
-                  <div style={{ fontSize:'0.68rem', color:'#c7c4d8', opacity:0.55, textAlign:'center', maxWidth:200, lineHeight:1.5 }}>Open this URL in another tab and log in as a different user</div>
-                  <div style={{ marginTop:10, padding:'0.35rem 0.7rem', background:'#222a3d', borderRadius:7, fontSize:'0.65rem', color:'#c3c0ff', fontFamily:'monospace', wordBreak:'break-all', maxWidth:240, textAlign:'center' }}>{window.location.href}</div>
+                  <div style={{ width:56, height:56, borderRadius:'50%', background: socketPeerPresent ? 'linear-gradient(135deg,#00a572,#4edea3)' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.25rem', fontWeight:700, color: socketPeerPresent ? '#003d29' : '#1d00a5', marginBottom:10 }}>{socketPeerPresent ? peerName[0]?.toUpperCase() : '?'}</div>
+                  <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#c7c4d8', marginBottom:6 }}>{socketPeerPresent ? 'Connecting to video...' : 'Waiting for peer...'}</div>
+                  <div style={{ fontSize:'0.68rem', color:'#c7c4d8', opacity:0.55, textAlign:'center', maxWidth:200, lineHeight:1.5 }}>{socketPeerPresent ? 'Wait a moment for the WebRTC handshake to complete.' : 'Open this URL in another tab and log in as a different user'}</div>
+                  {!socketPeerPresent && <div style={{ marginTop:10, padding:'0.35rem 0.7rem', background:'#222a3d', borderRadius:7, fontSize:'0.65rem', color:'#c3c0ff', fontFamily:'monospace', wordBreak:'break-all', maxWidth:240, textAlign:'center' }}>{window.location.href}</div>}
                 </div>
               )}
               <div style={{ position:'absolute', top:10, left:10, display:'flex', alignItems:'center', gap:5, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', padding:'0.2rem 0.55rem', borderRadius:999 }}>
                 <div style={{ display:'flex', alignItems:'flex-end', gap:1, height:10 }}>
-                  {[5,9,11,7].map((h,i)=><div key={i} style={{ width:2, height:h, background: peerConnected && i<3 ? '#4edea3' : 'rgba(70,69,85,0.5)', borderRadius:1, transition:'background 0.5s' }} />)}
+                  {[5,9,11,7].map((h,i)=><div key={i} style={{ width:2, height:h, background: videoConnected && i<3 ? '#4edea3' : 'rgba(70,69,85,0.5)', borderRadius:1, transition:'background 0.5s' }} />)}
                 </div>
-                <span style={{ fontSize:'0.58rem', fontWeight:700, color:'#c7c4d8' }}>{peerConnected ? 'HD · Live' : 'No signal'}</span>
+                <span style={{ fontSize:'0.58rem', fontWeight:700, color:'#c7c4d8' }}>{videoConnected ? 'HD · Live' : 'No signal'}</span>
               </div>
-              {peerConnected && <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>{peerName}</div>}
+              {socketPeerPresent && <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>{peerName}</div>}
             </div>
           </div>
         </div>
@@ -724,10 +748,10 @@ export default function DualAgentInterviewRoom() {
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <div style={{ display:'flex' }}>
             {[myId[0]||'Y', peerName[0]||'?', 'AI'].map((l,i)=>(
-              <div key={i} style={{ width:32, height:32, borderRadius:'50%', background: i===2 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : i===1&&peerConnected ? 'linear-gradient(135deg,#00a572,#4edea3)' : '#222a3d', border:'2px solid #0b1326', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:700, color: i===2 ? '#1d00a5' : '#c3c0ff', marginLeft: i>0 ? -7 : 0, opacity: i===1&&!peerConnected ? 0.35 : 1, transition:'all 0.3s' }}>{l.toUpperCase()}</div>
+              <div key={i} style={{ width:32, height:32, borderRadius:'50%', background: i===2 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : i===1&&videoConnected ? 'linear-gradient(135deg,#00a572,#4edea3)' : (i===1&&socketPeerPresent ? '#222a3d' : '#222a3d'), border:'2px solid #0b1326', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:700, color: i===2 ? '#1d00a5' : '#c3c0ff', marginLeft: i>0 ? -7 : 0, opacity: i===1&&!socketPeerPresent ? 0.35 : 1, transition:'all 0.3s' }}>{l.toUpperCase()}</div>
             ))}
           </div>
-          <span style={{ fontSize:'0.7rem', color:'#c7c4d8' }}>{peerConnected ? '3 connected' : '1 connected'}</span>
+          <span style={{ fontSize:'0.7rem', color:'#c7c4d8' }}>{videoConnected ? '3 active' : (socketPeerPresent ? 'Connecting...' : 'Peer offline')}</span>
         </div>
       </div>
 
