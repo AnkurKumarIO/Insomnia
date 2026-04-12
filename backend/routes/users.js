@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // PATCH /users/:id/profile — save full profile data
 router.patch('/:id/profile', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id;
     const {
       bio, linkedin, github, portfolio,
       department, skills, cgpa, college, year,
       resumeName, projects, targetRoles,
       preferredCompanies, openTo, gradMonth, gradYear,
-      name, email, profileComplete,
+      name, email,
     } = req.body;
 
-    const profile_data = {
+    const profileDataObj = {
       bio, linkedin, github, portfolio,
       skills, cgpa, college, year,
       resumeName, projects, targetRoles,
@@ -23,20 +24,22 @@ router.patch('/:id/profile', async (req, res) => {
       profileCompletedAt: new Date().toISOString(),
     };
 
-    const updates = { profile_data };
+    const updates = { profile_data: JSON.stringify(profileDataObj) };
     if (department) updates.department = department;
     if (name)       updates.name = name;
     if (email)      updates.email = email;
 
-    const { data, error } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    const user = await prisma.user.update({
+      where: { id },
+      data: updates
+    });
 
-    if (error) throw error;
-    res.json({ message: 'Profile saved', user: data });
+    const result = {
+      ...user,
+      profile_data: JSON.parse(user.profile_data || '{}')
+    };
+
+    res.json({ message: 'Profile saved', user: result });
   } catch (err) {
     console.error('Profile update error:', err);
     res.status(500).json({ error: err.message });
@@ -46,15 +49,21 @@ router.patch('/:id/profile', async (req, res) => {
 // GET /users/:id
 router.get('/:id', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const id = req.params.id;
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
 
-    if (error) throw error;
-    res.json(data);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const result = {
+      ...user,
+      profile_data: JSON.parse(user.profile_data || '{}')
+    };
+
+    res.json(result);
   } catch (err) {
+    console.error('Fetch user error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -62,16 +71,22 @@ router.get('/:id', async (req, res) => {
 // GET /users/by-email/:email
 router.get('/by-email/:email', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', decodeURIComponent(req.params.email))
-      .single();
+    const email = decodeURIComponent(req.params.email);
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
 
-    if (error) throw error;
-    res.json(data);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const result = {
+      ...user,
+      profile_data: JSON.parse(user.profile_data || '{}')
+    };
+
+    res.json(result);
   } catch (err) {
-    res.status(404).json({ error: 'User not found' });
+    console.error('Fetch user by email error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

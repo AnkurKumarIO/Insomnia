@@ -49,9 +49,9 @@ function StudentDetailModal({ request, onClose, onAccept }) {
             {/* Student basic info */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '1rem' }}>
-                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700, color: '#1d00a5', flexShrink: 0 }}>{request.studentName[0]}</div>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700, color: '#1d00a5', flexShrink: 0 }}>{request?.studentName ? request.studentName[0] : '?'}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{p.name || request.studentName}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{p?.name || request?.studentName || 'Student'}</div>
                   {p.college && <div style={{ fontSize: '0.78rem', color: '#c7c4d8', marginTop: 2 }}>{p.college}</div>}
                   {(p.department || p.year) && (
                     <div style={{ fontSize: '0.72rem', color: '#c3c0ff', marginTop: 2 }}>
@@ -472,7 +472,7 @@ export default function AlumniDashboard() {
   });
 
   if (!user) return <Navigate to="/" replace />;
-  const firstName = user.name ? user.name.split(' ')[0] : 'Alumni';
+  const firstName = (user?.name || user?.role || 'Alumni').split(' ')[0];
 
   // Load requests for this alumni from Supabase directly
   useEffect(() => {
@@ -689,7 +689,7 @@ export default function AlumniDashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {matchedRequests.map(r => (
                 <div key={r.id} style={{ background: '#131b2e', borderRadius: 14, padding: '1rem 1.25rem', border: '1px solid rgba(70,69,85,0.15)', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r?.studentName ? r.studentName[0] : '?'}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>{highlight(r.studentName, q)}</div>
                     <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{highlight(r.topic, q)}</div>

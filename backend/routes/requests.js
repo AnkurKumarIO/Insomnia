@@ -1,35 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // GET /requests?alumniId=&studentId=
 router.get('/', async (req, res) => {
   try {
     const { alumniId, studentId } = req.query;
-    let query = supabase
-      .from('interview_requests')
-      .select(`
-        *,
-        student:users!interview_requests_student_id_fkey(id, name, email, profile_data),
-        alumni:users!interview_requests_alumni_id_fkey(id, name, email)
-      `)
-      .order('created_at', { ascending: false });
+    const where = {};
+    if (alumniId)  where.alumni_id = alumniId;
+    if (studentId) where.student_id = studentId;
 
-    if (alumniId)  query = query.eq('alumni_id', alumniId);
-    if (studentId) query = query.eq('student_id', studentId);
+    const data = await prisma.interviewRequest.findMany({
+      where,
+      include: {
+        student: {
+          select: { id: true, name: true, email: true, profile_data: true }
+        },
+        alumni: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    const { data, error } = await query;
-    if (error) throw error;
-
-    // Flatten names into top-level fields for easy frontend use
+    // Flatten names and parse profile_data for easy frontend use
     const result = (data || []).map(r => ({
       ...r,
+      id:           r.request_id, // Alias for frontend compat
       student_name: r.student?.name || '',
-      alumni_name:  r.alumni?.name  || '',
+      alumni_name:  r.alumni?.name   || '',
+      student_profile_snapshot: r.student_profile_snapshot ? JSON.parse(r.student_profile_snapshot) : (r.student?.profile_data ? JSON.parse(r.student.profile_data) : null),
     }));
 
     res.json(result);
   } catch (err) {
+    console.error('Fetch requests error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -40,22 +46,20 @@ router.post('/', async (req, res) => {
     const { studentId, alumniId, topic, message, studentProfileSnapshot } = req.body;
     if (!studentId || !alumniId) return res.status(400).json({ error: 'studentId and alumniId are required.' });
 
-    const { data, error } = await supabase
-      .from('interview_requests')
-      .insert({
+    const request = await prisma.interviewRequest.create({
+      data: {
         student_id: studentId,
         alumni_id: alumniId,
         topic: topic || 'Mock Interview',
         message: message || '',
-        student_profile_snapshot: studentProfileSnapshot || null,
+        student_profile_snapshot: studentProfileSnapshot ? JSON.stringify(studentProfileSnapshot) : null,
         status: 'PENDING',
-      })
-      .select()
-      .single();
+      }
+    });
 
-    if (error) throw error;
-    res.json(data);
+    res.json({ ...request, id: request.request_id });
   } catch (err) {
+    console.error('Create request error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -68,18 +72,15 @@ router.patch('/:id', async (req, res) => {
 
     const updates = { status };
     if (scheduledTime) {
-      updates.scheduled_time = scheduledTime;
+      updates.scheduled_time = new Date(scheduledTime);
       updates.room_id = `room-${id.slice(-8)}-${Date.now()}`;
     }
 
-    const { data: request, error } = await supabase
-      .from('interview_requests')
-      .update(updates)
-      .eq('request_id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const request = await prisma.interviewRequest.update({
+      where: { request_id: id },
+      data: updates,
+      include: { student: true }
+    });
 
     // Push notification to student
     let notifPayload = null;
@@ -113,11 +114,14 @@ router.patch('/:id', async (req, res) => {
     }
 
     if (notifPayload) {
-      await supabase.from('notifications').insert(notifPayload);
+      await prisma.notification.create({
+        data: notifPayload
+      });
     }
 
-    res.json(request);
+    res.json({ ...request, id: request.request_id });
   } catch (err) {
+    console.error('Update request error:', err);
     res.status(500).json({ error: err.message });
   }
 });

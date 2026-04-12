@@ -55,7 +55,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`\n🚀 AlumniConnect Backend running on http://localhost:${PORT}`);
   console.log(`📡 Socket.io ready on ws://localhost:${PORT}/interview`);

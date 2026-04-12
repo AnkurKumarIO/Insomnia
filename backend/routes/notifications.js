@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../supabase');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // GET /notifications?userId=
 router.get('/', async (req, res) => {
@@ -8,15 +9,14 @@ router.get('/', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: 'userId is required.' });
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const data = await prisma.notification.findMany({
+      where: { user_id: userId },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    if (error) throw error;
     res.json(data);
   } catch (err) {
+    console.error('Fetch notifications error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -27,15 +27,14 @@ router.patch('/read', async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId is required.' });
 
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', userId)
-      .eq('read', false);
+    await prisma.notification.updateMany({
+      where: { user_id: userId, read: false },
+      data: { read: true }
+    });
 
-    if (error) throw error;
     res.json({ success: true });
   } catch (err) {
+    console.error('Mark read error:', err);
     res.status(500).json({ error: err.message });
   }
 });

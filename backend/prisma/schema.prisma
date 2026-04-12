@@ -22,9 +22,45 @@ model User {
   booked_slots        ScheduleSlot[]    @relation("StudentBookings")
   student_interviews  InterviewRecord[] @relation("StudentInterviews")
   alumni_interviews   InterviewRecord[] @relation("AlumniInterviews")
+  
+  sent_requests       InterviewRequest[] @relation("StudentRequests")
+  received_requests   InterviewRequest[] @relation("AlumniRequests")
+  notifications       Notification[]
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+model InterviewRequest {
+  request_id               String   @id @default(uuid())
+  student_id               String
+  alumni_id                String
+  topic                    String
+  message                  String?
+  status                   String   @default("PENDING")
+  scheduled_time           DateTime?
+  room_id                  String?
+  student_profile_snapshot String?
+
+  student                  User     @relation("StudentRequests", fields: [student_id], references: [id])
+  alumni                   User     @relation("AlumniRequests", fields: [alumni_id], references: [id])
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  user_id     String
+  type        String
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  request_id  String?
+
+  user        User     @relation(fields: [user_id], references: [id])
+
+  createdAt   DateTime @default(now())
 }
 
 model ScheduleSlot {
