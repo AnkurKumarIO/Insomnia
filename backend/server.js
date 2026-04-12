@@ -1,8 +1,8 @@
 const express = require('express');
-const http = require('http');
+const http    = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
-const dotenv = require('dotenv');
+const cors    = require('cors');
+const dotenv  = require('dotenv');
 
 dotenv.config();
 
@@ -10,57 +10,65 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Router for API
-const apiRouter = express.Router();
-apiRouter.use('/auth',          require('./routes/auth'));
-apiRouter.use('/ai',            require('./routes/aiRoutes'));
-apiRouter.use('/requests',      require('./routes/requests'));
-apiRouter.use('/notifications', require('./routes/notifications'));
-apiRouter.use('/users',         require('./routes/users'));
-apiRouter.use('/alumni',        require('./routes/alumni'));
-apiRouter.use('/register',      require('./routes/register'));
-apiRouter.use('/stats',         require('./routes/stats'));
-apiRouter.use('/chat',          require('./routes/chat'));
+// ── Routes (mounted at root, no /api prefix) ──────────────────────────────────
+app.use('/auth',          require('./routes/auth'));
+app.use('/ai',            require('./routes/aiRoutes'));
+app.use('/requests',      require('./routes/requests'));
+app.use('/notifications', require('./routes/notifications'));
+app.use('/users',         require('./routes/users'));
+app.use('/alumni',        require('./routes/alumni'));
+app.use('/register',      require('./routes/register'));
+app.use('/stats',         require('./routes/stats'));
+app.use('/chat',          require('./routes/chat'));
 
-app.use('/api', apiRouter);
-
-// HTTP Server + Socket.io
+// ── Socket.io ─────────────────────────────────────────────────────────────────
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
 });
-
 require('./socket/interviewRoom')(io);
 
-// Health check
+// ── Health & info ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'AlumNEX Backend is running' });
+  res.json({ status: 'ok', message: 'AlumNEX Backend is running' });
 });
 
-app.get('/api', (req, res) => {
+app.get('/', (req, res) => {
   res.json({
     name: 'AlumNEX AI API',
     version: '2.0.0',
     database: 'Supabase (PostgreSQL)',
-    endpoints: {
-      health:              'GET  /health',
-      studentVerify:       'POST /auth/student/verify',
-      tnpLogin:            'POST /auth/tnp/login',
-      alumniLogin:         'POST /auth/alumni/login',
-      resumeAnalyze:       'POST /ai/resume-analyze',
-      interviewAnalytics:  'POST /ai/interview-analytics',
-      getRequests:         'GET  /requests?alumniId=&studentId=',
-      createRequest:       'POST /requests',
-      updateRequest:       'PATCH /requests/:id',
-      getNotifications:    'GET  /notifications?userId=',
-      markNotifsRead:      'PATCH /notifications/read',
-    },
+    routes: [
+      'GET  /health',
+      'GET  /alumni',
+      'POST /auth/student/verify',
+      'POST /auth/tnp/login',
+      'POST /auth/alumni/login',
+      'POST /ai/resume-analyze',
+      'POST /ai/interview-analytics',
+      'POST /ai/profile-strength',
+      'GET  /requests?alumniId=&studentId=',
+      'POST /requests',
+      'PATCH /requests/:id',
+      'GET  /notifications?userId=',
+      'PATCH /notifications/read',
+      'GET  /users/:id',
+      'GET  /users/by-email/:email',
+      'PATCH /users/:id/profile',
+      'GET  /stats/platform',
+      'GET  /stats/interviews?userId=',
+      'GET  /stats/pending-users',
+      'PATCH /stats/verify/:id',
+      'POST /chat/interview',
+      'POST /chat/questions',
+    ],
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`\n🚀 AlumNEX Backend running on http://localhost:${PORT}`);
   console.log(`📡 Socket.io ready on ws://localhost:${PORT}/interview`);
-  console.log(`🗄️  Database: Supabase (PostgreSQL)\n`);
+  console.log(`🗄️  Database: Supabase (PostgreSQL)`);
+  console.log(`🤖 Groq AI: ${process.env.GROQ_API_KEY ? '✅ connected' : '❌ missing key'}\n`);
 });
