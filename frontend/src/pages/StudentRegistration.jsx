@@ -56,8 +56,6 @@ export default function StudentRegistration() {
     const e = {};
     if (!form.name.trim()) e.name = 'Required';
     if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = 'Valid email required';
-    if (!form.username.trim()) e.username = 'Required';
-    if (!form.password.trim() || form.password.length < 6) e.password = 'Min 6 chars';
     if (!form.college.trim()) e.college = 'Required';
     if (!form.year) e.year = 'Required';
     if (!form.department) e.department = 'Required';
