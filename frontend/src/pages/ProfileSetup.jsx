@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import { updateUserProfile } from '../lib/db';
 
 const STEPS = ['Personal Info', 'Skills & Academics', 'Resume & Projects', 'Career Goals', 'Review'];
 const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
@@ -204,11 +205,39 @@ export default function ProfileSetup() {
     </div>,
   ];
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
-    const fullProfile = { ...pending, ...profile, photoPreview };
+    const fullProfile = { ...pending, ...profile, photoPreview, profileComplete: true };
     localStorage.setItem('alumniconnect_profile', JSON.stringify(fullProfile));
-    const userData = { id: `stu-${Date.now()}`, name: pending.name || 'Student', role: 'STUDENT', department: profile.department || pending.department, profileComplete: true };
+
+    const userId = pending.id;
+    const profilePayload = {
+      ...profile,
+      name:            pending.name,
+      college:         pending.college || profile.college,
+      year:            pending.year    || profile.year,
+      profileComplete: true,
+      profileCompletedAt: new Date().toISOString(),
+    };
+
+    // Save to Supabase directly
+    if (userId) {
+      await updateUserProfile(userId, profilePayload).catch(err =>
+        console.warn('Profile save failed:', err)
+      );
+    }
+
+    const userData = {
+      id:              userId || `stu-${Date.now()}`,
+      name:            pending.name || 'Student',
+      role:            'STUDENT',
+      department:      profile.department || pending.department,
+      profileComplete: true,
+    };
+
+    // Update pending profile to mark as complete
+    localStorage.setItem('alumniconnect_pending_profile', JSON.stringify({ ...pending, profileComplete: true }));
+
     login(userData, `token-${Date.now()}`);
     navigate('/dashboard');
   };

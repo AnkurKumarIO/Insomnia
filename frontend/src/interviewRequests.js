@@ -1,91 +1,336 @@
-// Shared in-memory + localStorage store for interview requests
-// Both student and alumni dashboards read/write this same store.
-// In a real app this would be a backend API + websocket push.
+// Interview requests — backed by Supabase directly from frontend
+// Falls back to localStorage when Supabase is unreachable
+
+import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
 
 const STORAGE_KEY = 'alumniconnect_interview_requests';
+const NOTIF_KEY   = 'alumniconnect_student_notifications';
 
-function load() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
+// ── localStorage helpers (fallback) ──────────────────────────────────────────
+function loadLocal() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
-
-function save(requests) {
+function saveLocal(requests) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
 }
-
-export function getRequests() {
-  return load();
+function pushLocalNotif({ studentName, type, title, message, requestId }) {
+  try {
+    const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+    all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, read: false, createdAt: new Date().toISOString() });
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+  } catch {}
 }
 
-// Student sends a request to an alumni
-export function sendRequest({ studentName, studentId, alumniName, alumniRole, topic, message }) {
-  const requests = load();
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export function getStudentNotifications(studentName) {
+  try {
+    const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+    return all.filter(n => n.studentName === studentName);
+  } catch { return []; }
+}
+
+export function markStudentNotifsRead(studentName) {
+  try {
+    const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+    const updated = all.map(n => n.studentName === studentName ? { ...n, read: true } : n);
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+  } catch {}
+}
+
+// ── Send a request (student → alumni) ────────────────────────────────────────
+
+export async function sendRequest({ studentName, studentId, alumniName, alumniRole, topic, message, studentProfile, alumniId }) {
+  // Get the real student UUID from auth context
+  let realStudentId = studentId;
+  try {
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    if (authUser.id && !authUser.id.startsWith('stu-') && !authUser.id.startsWith('alm-')) {
+      realStudentId = authUser.id;
+    }
+  } catch {}
+
+  const hasRealIds = realStudentId && alumniId &&
+    !String(realStudentId).startsWith('stu-') && !String(alumniId).startsWith('alm-');
+
+  if (hasRealIds) {
+    try {
+      const result = await dbCreateRequest({
+        studentId: realStudentId,
+        alumniId,
+        topic:    topic   || 'Mock Interview',
+        message:  message || '',
+        studentProfileSnapshot: studentProfile || null,
+      });
+
+      if (result?.request_id) {
+        const local = loadLocal();
+        local.push({
+          id:            result.request_id,
+          studentName,
+          studentId:     realStudentId,
+          alumniName,
+          alumniRole,
+          topic:         result.topic,
+          message:       result.message || '',
+          status:        'pending',
+          scheduledTime: null,
+          roomId:        null,
+          createdAt:     result.created_at || new Date().toISOString(),
+          studentProfile,
+        });
+        saveLocal(local);
+        return result;
+      }
+    } catch (e) {
+      console.warn('sendRequest: Supabase failed, falling back to localStorage', e.message);
+    }
+  } else {
+    console.warn('sendRequest: missing real UUIDs — studentId:', realStudentId, 'alumniId:', alumniId);
+  }
+
+  // Fallback — localStorage only
+  const local = loadLocal();
   const req = {
-    id: `req-${Date.now()}`,
+    id:            `req-${Date.now()}`,
     studentName,
-    studentId,
+    studentId:     realStudentId || studentId,
     alumniName,
     alumniRole,
-    topic: topic || 'Mock Interview',
-    message: message || '',
-    status: 'pending',       // pending | accepted | declined
-    scheduledTime: null,     // ISO string set when alumni accepts
-    roomId: null,            // set when alumni accepts
-    createdAt: new Date().toISOString(),
+    topic:         topic   || 'Mock Interview',
+    message:       message || '',
+    status:        'pending',
+    scheduledTime: null,
+    roomId:        null,
+    createdAt:     new Date().toISOString(),
+    studentProfile: studentProfile || null,
   };
-  requests.push(req);
-  save(requests);
+  local.push(req);
+  saveLocal(local);
   return req;
 }
 
-// Alumni accepts a request and sets a scheduled time
-export function acceptRequest(requestId, scheduledTime) {
-  const requests = load();
+// Normalize DB status (PENDING/ACCEPTED/SLOT_BOOKED/DECLINED) → local (pending/accepted/slot_booked/declined)
+function normalizeStatus(status) {
+  if (!status) return 'pending';
+  return status.toLowerCase().replace('slot_booked', 'slot_booked');
+}
+
+// ── Get all requests (for alumni dashboard) ───────────────────────────────────
+
+export async function getRequestsFromDB(alumniId) {
+  try {
+    if (alumniId) {
+      const data = await api.getRequests({ alumniId });
+      if (Array.isArray(data)) return data;
+    }
+  } catch {}
+  return loadLocal();
+}
+
+// ── Sync local requests from DB for a student ─────────────────────────────────
+
+export async function syncStudentRequests(studentId) {
+  try {
+    if (studentId) {
+      const data = await api.getRequests({ studentId });
+      if (Array.isArray(data)) {
+        // Merge DB records into localStorage
+        const local = loadLocal();
+        data.forEach(dbReq => {
+          const idx = local.findIndex(r => r.id === dbReq.request_id);
+          const mapped = {
+            id:            dbReq.request_id,
+            studentName:   dbReq.student_name || '',
+            studentId:     dbReq.student_id,
+            alumniName:    dbReq.alumni_name  || '',
+            alumniRole:    '',
+            topic:         dbReq.topic,
+            message:       dbReq.message,
+            status:        dbReq.status?.toLowerCase().replace('_booked', '_booked') || 'pending',
+            scheduledTime: dbReq.scheduled_time || null,
+            roomId:        dbReq.room_id || null,
+            createdAt:     dbReq.created_at,
+            studentProfile: dbReq.student_profile_snapshot || null,
+          };
+          if (idx === -1) local.push(mapped);
+          else local[idx] = { ...local[idx], ...mapped };
+        });
+        saveLocal(local);
+      }
+    }
+  } catch {}
+}
+
+// ── localStorage-based reads (used by BookButton, etc.) ──────────────────────
+
+export function getRequests() { return loadLocal(); }
+
+export function getRequestsForAlumni(alumniName) {
+  return loadLocal().filter(r => r.alumniName === alumniName && r.status === 'pending');
+}
+
+export function getRequestsByStudent(studentName) {
+  return loadLocal().filter(r => r.studentName === studentName);
+}
+
+// ── Accept (alumni) ───────────────────────────────────────────────────────────
+
+export async function acceptRequestOnly(requestId) {
+  try {
+    await dbUpdateRequest(requestId, { status: 'ACCEPTED' });
+  } catch (e) { console.warn('acceptRequestOnly DB error:', e.message); }
+
+  const requests = loadLocal();
   const idx = requests.findIndex(r => r.id === requestId);
   if (idx === -1) return null;
-  const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
-  requests[idx] = { ...requests[idx], status: 'accepted', scheduledTime, roomId };
-  save(requests);
+  requests[idx] = { ...requests[idx], status: 'accepted' };
+  saveLocal(requests);
+
+  // Push notification to student in Supabase
+  try {
+    const req = requests[idx];
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    if (req.studentId && !String(req.studentId).startsWith('stu-')) {
+      await createNotification({
+        userId:    req.studentId,
+        type:      'ACCEPTED',
+        title:     'Interview Request Accepted! 🎉',
+        message:   'Your interview request has been accepted. The alumni will book a slot shortly.',
+        requestId,
+      });
+    }
+  } catch {}
+
+  pushLocalNotif({
+    studentName: requests[idx].studentName,
+    type:        'accepted',
+    title:       'Interview Request Accepted! 🎉',
+    message:     'Your interview request has been accepted. The alumni will book a slot shortly.',
+    requestId,
+  });
   return requests[idx];
 }
 
-// Alumni declines a request
-export function declineRequest(requestId) {
-  const requests = load();
+// ── Book slot (alumni) ────────────────────────────────────────────────────────
+
+export async function bookSlot(requestId, scheduledTime) {
+  const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
+  try {
+    await dbUpdateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime, roomId });
+  } catch (e) { console.warn('bookSlot DB error:', e.message); }
+
+  const requests = loadLocal();
+  const idx = requests.findIndex(r => r.id === requestId);
+  if (idx === -1) return null;
+  requests[idx] = { ...requests[idx], status: 'slot_booked', scheduledTime, roomId };
+  saveLocal(requests);
+
+  const formatted = new Date(scheduledTime).toLocaleString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  try {
+    const req = requests[idx];
+    if (req.studentId && !String(req.studentId).startsWith('stu-')) {
+      await createNotification({
+        userId:    req.studentId,
+        type:      'SLOT_BOOKED',
+        title:     'Interview Slot Confirmed! 📅',
+        message:   `Your interview is scheduled for ${formatted}.`,
+        requestId,
+      });
+    }
+  } catch {}
+
+  pushLocalNotif({
+    studentName: requests[idx].studentName,
+    type:        'slot_booked',
+    title:       'Interview Slot Confirmed! 📅',
+    message:     `Your interview is scheduled for ${formatted}.`,
+    requestId,
+  });
+  return requests[idx];
+}
+
+// ── Reschedule (alumni) ───────────────────────────────────────────────────────
+
+export async function rescheduleSlot(requestId, newScheduledTime) {
+  try {
+    await dbUpdateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime: newScheduledTime });
+  } catch (e) { console.warn('rescheduleSlot DB error:', e.message); }
+
+  const requests = loadLocal();
+  const idx = requests.findIndex(r => r.id === requestId);
+  if (idx === -1) return null;
+  requests[idx] = { ...requests[idx], scheduledTime: newScheduledTime };
+  saveLocal(requests);
+
+  const formatted = new Date(newScheduledTime).toLocaleString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  pushLocalNotif({
+    studentName: requests[idx].studentName,
+    type:        'slot_booked',
+    title:       'Interview Rescheduled 🔄',
+    message:     `Your interview has been rescheduled to ${formatted}.`,
+    requestId,
+  });
+  return requests[idx];
+}
+
+// ── Decline (alumni) ──────────────────────────────────────────────────────────
+
+export async function declineRequest(requestId) {
+  try {
+    await dbUpdateRequest(requestId, { status: 'DECLINED' });
+  } catch (e) { console.warn('declineRequest DB error:', e.message); }
+
+  const requests = loadLocal();
   const idx = requests.findIndex(r => r.id === requestId);
   if (idx === -1) return;
+  const studentName = requests[idx].studentName;
   requests[idx] = { ...requests[idx], status: 'declined' };
-  save(requests);
+  saveLocal(requests);
+
+  try {
+    const req = requests[idx];
+    if (req.studentId && !String(req.studentId).startsWith('stu-')) {
+      await createNotification({
+        userId:    req.studentId,
+        type:      'DECLINED',
+        title:     'Interview Request Update',
+        message:   'Your request was not accepted this time. Try another mentor.',
+        requestId,
+      });
+    }
+  } catch {}
+
+  pushLocalNotif({
+    studentName,
+    type:    'declined',
+    title:   'Interview Request Update',
+    message: 'Your request was not accepted this time. Try another mentor.',
+    requestId,
+  });
 }
 
-// Get requests for a specific alumni (by name)
-export function getRequestsForAlumni(alumniName) {
-  return load().filter(r => r.alumniName === alumniName && r.status === 'pending');
+// ── Legacy compat ─────────────────────────────────────────────────────────────
+
+export function acceptRequest(requestId, scheduledTime) {
+  return bookSlot(requestId, scheduledTime);
 }
 
-// Get requests sent by a specific student (by name or id)
-export function getRequestsByStudent(studentName) {
-  return load().filter(r => r.studentName === studentName);
-}
-
-// Check if scheduled time has arrived (within 15 min window)
 export function isJoinable(scheduledTime) {
   if (!scheduledTime) return false;
   const scheduled = new Date(scheduledTime).getTime();
   const now = Date.now();
-  // Allow joining 5 min before and up to 2 hours after
   return now >= scheduled - 5 * 60 * 1000 && now <= scheduled + 2 * 60 * 60 * 1000;
 }
 
-// Format scheduled time nicely
 export function formatScheduledTime(isoString) {
   if (!isoString) return '';
-  const d = new Date(isoString);
-  return d.toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+  return new Date(isoString).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }

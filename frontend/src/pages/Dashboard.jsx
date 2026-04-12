@@ -5,17 +5,108 @@ import AlumniDiscovery from './AlumniDiscovery';
 import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
+import AlumNexLogo from '../AlumNexLogo';
+import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import { api } from '../api';
 
-const SKILLS = [
-  { label: 'Data Architecture', pct: 92, color: '#c3c0ff' },
-  { label: 'Product Strategy',  pct: 78, color: '#4edea3' },
-  { label: 'Interface Design',  pct: 64, color: '#ffb95f' },
+// ── Inline BookModal for Recommended Mentor ───────────────────────────────────
+const TOPICS = [
+  'Mock Interview – General', 'Mock Interview – System Design',
+  'Mock Interview – Frontend', 'Mock Interview – Backend',
+  'Career Guidance', 'Resume Review',
 ];
-const PIPELINE = [
-  { icon: 'rocket_launch', label: 'Applied',    count: 12, color: '#c3c0ff' },
-  { icon: 'forum',         label: 'Interviews', count: 4,  color: '#4edea3' },
-  { icon: 'verified',      label: 'Offers',     count: 1,  color: '#ffb95f' },
-];
+
+function MentorBookModal({ mentor, studentName, onClose, onSent }) {
+  const [topic, setTopic] = useState(TOPICS[0]);
+  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
+
+  if (!mentor) return null;
+
+  const handleSend = () => {
+    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    sendRequest({
+      studentName,
+      studentId: studentName,
+      alumniName: mentor.name,
+      alumniId:   mentor.id,
+      alumniRole: `${mentor.title} • ${mentor.company}`,
+      topic,
+      message,
+      studentProfile: {
+        name: profile.name || studentName,
+        college: profile.college || '',
+        department: profile.department || '',
+        year: profile.year || '',
+        cgpa: profile.cgpa || '',
+        linkedin: profile.linkedin || '',
+        github: profile.github || '',
+        resumeName: profile.resumeName || '',
+        skills: profile.skills || [],
+        bio: profile.bio || '',
+      },
+    });
+    setSent(true);
+    setTimeout(() => { onSent(); onClose(); }, 1800);
+  };
+
+  const inp = { width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+        {sent ? (
+          <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+            <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Sent!</h3>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
+              Your request has been sent to <strong style={{ color: '#dae2fd' }}>{mentor.name}</strong>.<br />
+              You'll see the scheduled time once they accept.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Book Mock Interview</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{mentor.name}</h3>
+                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} • {mentor.company}</p>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {mentor.tags?.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.25rem' }}>
+                {mentor.tags.map(t => <span key={t} style={{ padding: '0.2rem 0.6rem', background: '#222a3d', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, color: '#c7c4d8' }}>{t}</span>)}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Session Type</label>
+                <select value={topic} onChange={e => setTopic(e.target.value)} style={inp}>
+                  {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Message <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+                <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={`Hi ${mentor.name?.split(' ')[0]}, I'd love to practice ${topic.toLowerCase()} with you...`} rows={3} style={{ ...inp, resize: 'none' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: '1.5rem' }}>
+              <button onClick={onClose} style={{ flex: 1, padding: '0.75rem', background: '#222a3d', color: '#c7c4d8', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSend} style={{ flex: 2, padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span> Send Request
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const NAV_ITEMS = [
   { icon: 'dashboard',   label: 'Dashboard',          tab: 'home' },
   { icon: 'group',       label: 'Directory',           tab: 'directory' },
@@ -30,6 +121,14 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [search, setSearch] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [studentNotifs, setStudentNotifs] = useState([]);
+  const [showMentorBook, setShowMentorBook] = useState(false);
+  const [mentorBookSent, setMentorBookSent] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [recommendedMentor, setRecommendedMentor] = useState(null);
+  const [profileData, setProfileData] = useState({});
+  const [aiProfileStrength, setAiProfileStrength] = useState(null);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -53,23 +152,151 @@ export default function Dashboard() {
 
   if (!user) return <Navigate to="/" replace />;
   const firstName = user.name ? user.name.split(' ')[0] : user.role;
-  const CIRC = 2 * Math.PI * 70;
-  const offset = CIRC * (1 - 0.8);
 
-  // Load saved profile for the dropdown
-  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+  // Poll student notifications every 3s
+  useEffect(() => {
+    const load = () => setStudentNotifs(getStudentNotifications(user.name));
+    load();
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
+  }, [user.name]);
+
+  // Fetch recommended mentor + profile data
+  useEffect(() => {
+    api.getAlumni().then(alumni => {
+      if (Array.isArray(alumni) && alumni.length > 0) {
+        const a = alumni[0];
+        const p = a.profile_data || {};
+        setRecommendedMentor({
+          id:      a.id,
+          name:    a.name,
+          company: a.company || '',
+          title:   p.title || (a.company ? `Alumni at ${a.company}` : 'Alumni'),
+          tags:    (p.skills || []).slice(0, 3),
+        });
+      }
+    }).catch(() => {});
+
+    if (user?.id) {
+      api.getUser(user.id).then(u => {
+        const pd = u?.profile_data || JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        setProfileData(pd);
+        // Ask Gemini to evaluate profile strength
+        if (Object.keys(pd).length > 0) {
+          api.profileStrength(pd).then(r => { if (r && !r.error) setAiProfileStrength(r); }).catch(() => {});
+        }
+      }).catch(() => {
+        const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        setProfileData(saved);
+      });
+    } else {
+      const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+      setProfileData(saved);
+    }
+  }, [user?.id]);
+
+  const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
+
+  // Profile completion — use Gemini result if available, else calculate locally
+  const profileCompletion = aiProfileStrength?.score ?? (() => {
+    const checks = [
+      !!profileData.bio, !!profileData.linkedin, !!profileData.github,
+      !!profileData.department, (profileData.skills?.length > 0),
+      !!profileData.cgpa, !!profileData.resumeName,
+      (profileData.projects?.some(p => p.title)),
+      (profileData.targetRoles?.length > 0),
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  })();
+  const completionLabel = aiProfileStrength?.label ?? (profileCompletion >= 80 ? 'Expert' : profileCompletion >= 50 ? 'Growing' : 'Starter');
+  const skills = aiProfileStrength?.top_skills?.length > 0
+    ? aiProfileStrength.top_skills
+    : (profileData.skills || []).slice(0, 3);
+
+  const SKILL_COLORS = ['#c3c0ff', '#4edea3', '#ffb95f'];
+  const myRequests     = getRequestsByStudent(user?.name || '');
+  const pendingCount   = myRequests.filter(r => r.status === 'pending').length;
+  const interviewCount = myRequests.filter(r => r.status === 'slot_booked' || r.status === 'accepted').length;
+  const CIRC   = 2 * Math.PI * 70;
+  const offset = CIRC * (1 - profileCompletion / 100);
+  const savedProfile = profileData;
 
   const renderContent = () => {
     if (activeTab === 'directory') return <AlumniDiscovery searchQuery={search} />;
     if (activeTab === 'analytics') return <ProgressAnalytics />;
     if (activeTab === 'premium') return <PremiumPage />;
-    if (activeTab === 'messages') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>chat_bubble</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Messages coming soon</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Real-time chat with alumni mentors</p>
-      </div>
-    );
+    if (activeTab === 'messages') {
+      const allNotifs = studentNotifs;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 4 }}>Messages & Notifications</h2>
+              <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Updates from your interview requests and scheduled sessions</p>
+            </div>
+            {allNotifs.some(n => !n.read) && (
+              <button onClick={() => markStudentNotifsRead(user.name)} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          {allNotifs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16, border: '1px solid rgba(70,69,85,0.15)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 56, opacity: 0.25, display: 'block', marginBottom: 16 }}>notifications_none</span>
+              <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 6 }}>No messages yet</p>
+              <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>Notifications from alumni will appear here once you send interview requests</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {allNotifs.map(n => {
+                const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                const canJoin = n.type === 'slot_booked' && req?.roomId && req?.scheduledTime &&
+                  Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
+                const iconMap = { slot_booked: 'event_available', accepted: 'check_circle', declined: 'cancel', default: 'notifications' };
+                const colorMap = { slot_booked: '#4edea3', accepted: '#c3c0ff', declined: '#ffb4ab', default: '#c7c4d8' };
+                const bgMap = { slot_booked: 'rgba(78,222,163,0.1)', accepted: 'rgba(195,192,255,0.1)', declined: 'rgba(255,180,171,0.1)', default: 'rgba(70,69,85,0.1)' };
+                const type = n.type || 'default';
+                return (
+                  <div key={n.id} style={{ background: !n.read ? '#171f33' : '#131b2e', borderRadius: 14, padding: '1.25rem', border: `1px solid ${!n.read ? 'rgba(195,192,255,0.12)' : 'rgba(70,69,85,0.12)'}`, display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: bgMap[type] || bgMap.default, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: colorMap[type] || colorMap.default, fontVariationSettings: "'FILL' 1" }}>
+                        {iconMap[type] || iconMap.default}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: !n.read ? '#dae2fd' : '#c7c4d8' }}>{n.title}</span>
+                        {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0 }} />}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6, marginBottom: 6 }}>{n.message}</p>
+                      <div style={{ fontSize: '0.65rem', color: 'rgba(199,196,216,0.4)', fontWeight: 600 }}>
+                        {new Date(n.createdAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {/* Join Now button */}
+                      {n.type === 'slot_booked' && req && (
+                        <div style={{ marginTop: 10 }}>
+                          {canJoin ? (
+                            <a href={`/interview/${req.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                            </a>
+                          ) : req.scheduledTime ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
+                              {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
     if (activeTab === 'settings') return <SettingsPage />;
     // home
     return (
@@ -96,8 +323,8 @@ export default function Dashboard() {
                   <circle cx="80" cy="80" r="70" fill="transparent" stroke="#c3c0ff" strokeWidth="10" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={offset} />
                 </svg>
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '1.75rem', fontWeight: 900 }}>80%</span>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3' }}>Expert</span>
+                  <span style={{ fontSize: '1.75rem', fontWeight: 900 }}>{profileCompletion}%</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3' }}>{completionLabel}</span>
                 </div>
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.75rem', textAlign: 'center', color: '#c7c4d8', lineHeight: 1.6, maxWidth: 180 }}>
@@ -112,22 +339,29 @@ export default function Dashboard() {
               <div style={label}>Top Proficiencies</div>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#c7c4d8' }}>more_horiz</span>
             </div>
-            {SKILLS.map(({ label: l, pct, color }) => (
-              <div key={l} style={{ marginBottom: '1.5rem' }}>
+            {skills.length > 0 ? skills.map((skill, idx) => (
+              <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
-                  <span style={{ fontWeight: 500 }}>{l}</span><span style={{ color: '#c7c4d8' }}>{pct}%</span>
+                  <span style={{ fontWeight: 500 }}>{skill}</span>
+                  <span style={{ color: '#c7c4d8' }}>—</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999 }} />
+                  <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
                 </div>
               </div>
-            ))}
+            )) : (
+              <p style={{ fontSize: '0.8rem', color: '#c7c4d8', opacity: 0.6 }}>Add skills in your profile to see them here.</p>
+            )}
           </div>
 
           {/* Pipeline */}
           <div style={glass}>
             <div style={{ ...label, marginBottom: '1.5rem' }}>Pipeline</div>
-            {PIPELINE.map(({ icon, label: l, count, color }) => (
+            {[
+              { icon: 'send',       label: 'Requests Sent', count: myRequests.length,  color: '#c3c0ff' },
+              { icon: 'forum',      label: 'Interviews',    count: interviewCount,      color: '#4edea3' },
+              { icon: 'hourglass_empty', label: 'Pending', count: pendingCount,         color: '#ffb95f' },
+            ].map(({ icon, label: l, count, color }) => (
               <div key={l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: '#222a3d', borderRadius: 10, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -141,8 +375,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
-          {/* Resume CTA */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+          {/* Resume CTA — full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -173,24 +407,21 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Mentor */}
-          <div style={{ ...glass, borderLeft: '2px solid #c3c0ff' }}>
-            <div style={{ ...label, marginBottom: '1.5rem' }}>Recommended Mentor</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1rem' }}>
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#4edea3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700, color: 'white', border: '2px solid #c3c0ff' }}>PS</div>
+          {/* Recommended Mentor CTA — clean button, no profile preview */}
+          <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 24, fontVariationSettings: "'FILL' 1" }}>psychology</span>
+              </div>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: 2 }}>Priya Sharma</div>
-                <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>Senior Engineer at Google</div>
+                <div style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd', marginBottom: 3 }}>Recommended Mentor</div>
+                <div style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>Get matched with a top alumni mentor for your mock interview</div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
-                {['React','System Design','Big Tech'].map(t => (
-                  <span key={t} style={{ padding: '0.2rem 0.6rem', background: 'rgba(78,222,163,0.1)', color: '#4edea3', fontSize: '0.65rem', borderRadius: 999, fontWeight: 500 }}>{t}</span>
-                ))}
-              </div>
-              <button onClick={() => setActiveTab('directory')} style={{ width: '100%', padding: '0.6rem', background: '#222a3d', color: '#dae2fd', fontSize: '0.75rem', fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'center', display: 'block' }}>
-                Book Mock Interview
-              </button>
             </div>
+            <button onClick={() => setShowMentorBook(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.65rem 1.5rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person_search</span>
+              View Mentor
+            </button>
           </div>
         </div>
       </>
@@ -199,10 +430,29 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
+      {showMentorBook && (
+        <MentorBookModal
+          mentor={recommendedMentor}
+          studentName={user?.name || 'Student'}
+          onClose={() => setShowMentorBook(false)}
+          onSent={() => setMentorBookSent(true)}
+        />
+      )}
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={() => { logout(); navigate('/login'); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1rem', zIndex: 50 }}>
         <div style={{ padding: '1.5rem 1rem 1rem' }}>
-          <div style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#c3c0ff' }}>AlumniConnect</div>
-          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#c7c4d8', marginTop: 2 }}>Intelligence Suite</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlumNexLogo size={28} />
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+              <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginTop: 1 }}>Intelligence Suite</div>
+            </div>
+          </div>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {NAV_ITEMS.map(({ icon, label: l, tab }) => {
@@ -218,13 +468,13 @@ export default function Dashboard() {
           <div style={{ background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
             <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#1d00a5', fontWeight: 700, marginBottom: 4 }}>Elite Access</div>
             <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1d00a5', marginBottom: 12, lineHeight: 1.4 }}>Unlock AI Mentorship</div>
-            <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.4rem', background: '#060e20', color: '#c3c0ff', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Upgrade to Pro</button>
+            <button onClick={() => setActiveTab('premium')} style={{ width: '100%', padding: '0.4rem', background: '#060e20', color: '#c3c0ff', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Upgrade to Pro</button>
           </div>
           <div style={{ borderTop: '1px solid rgba(70,69,85,0.3)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <a href="mailto:support@alumniconnect.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
+            <a href="mailto:support@alumnex.ai" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', textDecoration: 'none' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>help</span> Support
             </a>
-            <button onClick={() => { logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+            <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#c7c4d8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
             </button>
           </div>
@@ -238,9 +488,16 @@ export default function Dashboard() {
               { label: 'Network',     tab: 'directory' },
               { label: 'Insights',    tab: 'analytics' },
               { label: 'Mentorship',  tab: 'premium'   },
-              { label: 'Events',      tab: 'messages'  },
+              { label: 'Messages',    tab: 'messages'  },
             ].map((t) => (
-              <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t.label}</button>
+              <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4, position: 'relative', display: 'flex', alignItems: 'center', gap: 5 }}>
+                {t.label}
+                {t.tab === 'messages' && studentNotifs.filter(n => !n.read).length > 0 && (
+                  <span style={{ background: '#ff4444', color: 'white', borderRadius: 999, fontSize: '0.55rem', fontWeight: 700, padding: '0.1rem 0.35rem', minWidth: 16, textAlign: 'center' }}>
+                    {studentNotifs.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -251,6 +508,66 @@ export default function Dashboard() {
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search alumni..." style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 220, outline: 'none' }} />
               </div>
             )}
+
+            {/* Student notification bell */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => { setShowNotifs(v => !v); setShowProfile(false); if (!showNotifs) markStudentNotifsRead(user.name); }} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: showNotifs ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifs ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
+                {unreadNotifCount > 0 && (
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
+                )}
+              </button>
+              {showNotifs && (
+                <>
+                  <div onClick={() => setShowNotifs(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, width: 340, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Notifications</span>
+                      <span style={{ fontSize: '0.65rem', color: '#c7c4d8' }}>{studentNotifs.length} total</span>
+                    </div>
+                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                      {studentNotifs.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
+                          <p style={{ fontSize: '0.875rem' }}>No notifications yet</p>
+                        </div>
+                      ) : studentNotifs.map((n, i) => (
+                        <div key={n.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: !n.read ? 'rgba(195,192,255,0.04)' : 'transparent' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'slot_booked' ? 'rgba(78,222,163,0.12)' : n.type === 'accepted' ? 'rgba(195,192,255,0.12)' : 'rgba(255,180,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'slot_booked' ? '#4edea3' : n.type === 'accepted' ? '#c3c0ff' : '#ffb4ab', fontVariationSettings: "'FILL' 1" }}>
+                              {n.type === 'slot_booked' ? 'event_available' : n.type === 'accepted' ? 'check_circle' : 'cancel'}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: 3, color: !n.read ? '#dae2fd' : '#c7c4d8' }}>{n.title}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.5 }}>{n.message}</div>
+                            <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
+                              {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            {/* Join Now button for slot_booked notifications */}
+                            {n.type === 'slot_booked' && (() => {
+                              const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                              if (!req?.roomId) return null;
+                              const canJoin = req.scheduledTime && Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
+                              return canJoin ? (
+                                <a href={`/interview/${req.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
+                                </a>
+                              ) : (
+                                <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600 }}>
+                                  🕐 {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0, marginTop: 6 }} />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Profile avatar button */}
             <div style={{ position: 'relative' }}>
@@ -299,7 +616,7 @@ export default function Dashboard() {
                     <button onClick={() => { setShowProfile(false); setActiveTab('settings'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Edit Profile
                     </button>
-                    <button onClick={() => { setShowProfile(false); logout(); navigate('/'); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+                    <button onClick={() => setShowLogoutConfirm(true)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', borderRadius: 8, color: '#ffb4ab', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                       Sign Out
                     </button>
                   </div>
@@ -315,7 +632,7 @@ export default function Dashboard() {
         </section>
 
         <footer style={{ marginTop: 'auto', padding: '3rem 2rem', borderTop: '1px solid rgba(70,69,85,0.2)', background: '#0b1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumniConnect AI. The Digital Curator.</p>
+          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNex. The Intelligence Platform.</p>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             {['Privacy','Terms','API','Contact'].map(l => <a key={l} href="#" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', textDecoration: 'none' }}>{l}</a>)}
           </div>

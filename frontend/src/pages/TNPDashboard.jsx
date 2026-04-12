@@ -1,6 +1,11 @@
-import React, { useContext, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import React, { useContext, useState, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import AlumNexLogo from '../AlumNexLogo';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import AnalyticsTab from './TNPAnalytics';
+import SystemSettingsTab from './TNPSettings';
+import ComplianceTab from './TNPCompliance';
 
 const QUEUE = [
   { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
@@ -26,78 +31,256 @@ export default function TNPDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [queueStatus, setQueueStatus] = useState({});
+  const [credModal, setCredModal] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [tnpNotifs, setTnpNotifs] = useState([]);
+  const [seenNotifIds, setSeenNotifIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tnp_seen_notifs') || '[]'); } catch { return []; }
+  });
 
-  if (!user) return <Navigate to="/" replace />;
+  // Poll for new approval requests every 3s
+  useEffect(() => {
+    const buildNotifs = () => {
+      const notifs = [];
+      // Pending student registrations (awaiting TNP approval)
+      try {
+        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+        if (pending.username && pending.name) {
+          notifs.push({
+            id: `pending-${pending.username}`,
+            type: 'student_register',
+            title: 'New Student Registration',
+            desc: `${pending.name} (${pending.department || 'Student'}) is awaiting verification`,
+            time: pending.createdAt || new Date().toISOString(),
+            icon: 'school',
+            color: '#c3c0ff',
+          });
+        }
+      } catch {}
+      // Pending alumni applications (awaiting TNP approval)
+      try {
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        pendingAlumni.forEach(acc => {
+          notifs.push({
+            id: `pending-alumni-${acc.id || acc.email}`,
+            type: 'alumni_register',
+            title: 'Alumni Approval Request',
+            desc: `${acc.name} (${acc.department || 'Alumni'}) applied for mentor verification`,
+            time: acc.createdAt || new Date().toISOString(),
+            icon: 'psychology',
+            color: '#4edea3',
+          });
+        });
+      } catch {}
+      // Hardcoded demo notifications (always present for demo)
+      const DEMO = [
+        { id: 'demo-1', type: 'student_register', title: 'New Student Registration', desc: 'Arjun Malhotra (CS, 2024) submitted documents for verification', time: new Date(Date.now() - 5 * 60000).toISOString(), icon: 'school', color: '#c3c0ff' },
+        { id: 'demo-2', type: 'alumni_register', title: 'Alumni Approval Request', desc: 'Sarah Jenkins (Senior Dev, Google) applied for mentor verification', time: new Date(Date.now() - 62 * 60000).toISOString(), icon: 'psychology', color: '#4edea3' },
+        { id: 'demo-3', type: 'alumni_register', title: 'Alumni Approval Request', desc: 'Dr. Elena Rodriguez (PhD AI Ethics) submitted academic credentials', time: new Date(Date.now() - 3 * 3600000).toISOString(), icon: 'psychology', color: '#4edea3' },
+      ];
+      // Merge demo + dynamic, deduplicate by id
+      const all = [...DEMO, ...notifs.filter(n => !DEMO.find(d => d.id === n.id))];
+      setTnpNotifs(all);
+    };
+    buildNotifs();
+    const interval = setInterval(buildNotifs, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const handleApprove = (name) => setQueueStatus(s => ({ ...s, [name]: 'approved' }));
-  const handleReview  = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
+  const unreadCount = tnpNotifs.filter(n => !seenNotifIds.includes(n.id)).length;
+
+  const openNotifPanel = () => {
+    setShowNotifPanel(v => !v);
+    setShowProfile(false);
+    // Mark all as seen
+    const ids = tnpNotifs.map(n => n.id);
+    setSeenNotifIds(ids);
+    localStorage.setItem('tnp_seen_notifs', JSON.stringify(ids));
+  };
+
+  const timeAgo = (iso) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  // Settings state
+  const [commSettings, setCommSettings] = useState({ emailNotifs: true, smsAlerts: false, weeklyReport: true, instantApproval: false, mentorMatchAlert: true });
+  const [roles, setRoles] = useState([
+    { id: 1, name: 'TNP Coordinator', permissions: ['approve', 'reports', 'settings', 'logs'], active: true },
+    { id: 2, name: 'Placement Officer', permissions: ['approve', 'reports'], active: true },
+    { id: 3, name: 'Alumni Verifier', permissions: ['approve'], active: false },
+    { id: 4, name: 'Analytics Viewer', permissions: ['reports'], active: true },
+  ]);
+  // Logs filter state
+  const [logRole, setLogRole] = useState('');
+  const [logAction, setLogAction] = useState('');
+  const [logDate, setLogDate] = useState('');
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  function genPassword() {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
+    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+  function genUsername(name) {
+    const parts = name.trim().toLowerCase().split(/\s+/);
+    const base = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
+    return base.replace(/[^a-z.]/g, '') + Math.floor(Math.random() * 90 + 10);
+  }
+
+  const handleApprove = (q) => {
+    const username = genUsername(q.name);
+    const password = genPassword();
+    const email = `${username}@alumniconnect.edu`;
+    const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
+
+    // Save to approved accounts store
+    const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+    existing.push({ username, password, role, name: q.name, email, department: q.sub });
+    localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
+
+    setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
+    setCredModal({ name: q.name, username, password, email, role });
+  };
+
+  const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
 
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
     { icon: 'rule',            label: 'Verification Queue', tab: 'queue' },
     { icon: 'analytics',       label: 'Analytics',          tab: 'analytics' },
+    { icon: 'policy',          label: 'Compliance & Log',   tab: 'compliance' },
     { icon: 'settings_suggest',label: 'System Settings',    tab: 'settings' },
   ];
 
   const renderContent = () => {
-    if (activeTab === 'queue') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
-        {QUEUE.map((q, i) => {
-          const st = queueStatus[q.name];
-          return (
-            <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{q.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
-                </div>
+    if (activeTab === 'queue') {
+      const q = queueSearch.toLowerCase().trim();
+      const filteredQueue = q
+        ? QUEUE.filter(item =>
+            item.name.toLowerCase().includes(q) ||
+            item.sub.toLowerCase().includes(q) ||
+            item.status.toLowerCase().includes(q)
+          )
+        : QUEUE;
+
+      const highlight = (text) => {
+        if (!q) return text;
+        const str = String(text);
+        const idx = str.toLowerCase().indexOf(q);
+        if (idx === -1) return str;
+        return (
+          <>
+            {str.slice(0, idx)}
+            <mark style={{ background: 'rgba(195,192,255,0.35)', color: '#dae2fd', borderRadius: 3, padding: '0 2px' }}>{str.slice(idx, idx + q.length)}</mark>
+            {str.slice(idx + q.length)}
+          </>
+        );
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Verification Queue</h2>
+            {q && (
+              <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>
+                <span style={{ color: '#c3c0ff', fontWeight: 700 }}>{filteredQueue.length}</span> of {QUEUE.length} results for "<span style={{ color: '#c3c0ff' }}>{queueSearch}</span>"
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
-                </span>
-                {!st && <>
-                  <button onClick={() => handleApprove(q.name)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                  <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
-                </>}
-              </div>
+            )}
+          </div>
+          {filteredQueue.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#c7c4d8', background: '#131b2e', borderRadius: 16, border: '1px solid rgba(70,69,85,0.15)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, opacity: 0.3, display: 'block', marginBottom: 10 }}>search_off</span>
+              <p style={{ fontWeight: 600 }}>No results for "{queueSearch}"</p>
             </div>
-          );
-        })}
-      </div>
-    );
-    if (activeTab === 'analytics') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>analytics</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Advanced Analytics</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Placement trends, cohort analysis, and predictive insights</p>
-      </div>
-    );
-    if (activeTab === 'settings') return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: '#c7c4d8' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>settings_suggest</span>
-        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>System Settings</p>
-        <p style={{ fontSize: '0.875rem', opacity: 0.6, marginTop: 8 }}>Configure platform rules, roles, and integrations</p>
-      </div>
-    );
+          ) : filteredQueue.map((item, i) => {
+            const st = queueStatus[item.name];
+            return (
+              <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : item.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ color: item.color, fontSize: 22 }}>{item.icon}</span>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{highlight(item.name)}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{highlight(item.sub)}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : highlight(item.status)}
+                  </span>
+                  {!st && <>
+                    <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                    <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                  </>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    if (activeTab === 'analytics') return <AnalyticsTab />;
+    if (activeTab === 'compliance') return <ComplianceTab logRole={logRole} setLogRole={setLogRole} logAction={logAction} setLogAction={setLogAction} logDate={logDate} setLogDate={setLogDate} />;
+    if (activeTab === 'settings') return <SystemSettingsTab commSettings={commSettings} setCommSettings={setCommSettings} roles={roles} setRoles={setRoles} />;
     return null; // home rendered below
   };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
+
+      {credModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(78,222,163,0.25)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
+              <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#4edea3', marginBottom: 6 }}>Account Approved!</h3>
+              <p style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>
+                Credentials for <strong style={{ color: '#dae2fd' }}>{credModal.name}</strong> have been generated.<br />
+                <span style={{ color: '#ffb95f' }}>In production, these would be emailed to {credModal.email}</span>
+              </p>
+            </div>
+            {[['Username', credModal.username], ['Password', credModal.password], ['Email', credModal.email], ['Role', credModal.role]].map(([label, val]) => (
+              <div key={label} style={{ background: '#131b2e', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(70,69,85,0.2)' }}>
+                <div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: '#c3c0ff' }}>{val}</div>
+                </div>
+                <button onClick={() => navigator.clipboard.writeText(val)} style={{ background: 'rgba(195,192,255,0.1)', border: 'none', borderRadius: 6, padding: '0.3rem 0.6rem', color: '#c3c0ff', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}>Copy</button>
+              </div>
+            ))}
+            <div style={{ background: 'rgba(255,185,95,0.08)', border: '1px solid rgba(255,185,95,0.2)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.75rem', color: '#ffb95f', lineHeight: 1.6 }}>📧 Simulated email sent to {credModal.email}. User can now log in at <strong>/login</strong></p>
+            </div>
+            <button onClick={() => setCredModal(null)} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={() => { logout(); navigate('/login'); }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
       {/* Sidebar */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 20, fontVariationSettings: "'FILL' 1" }}>hub</span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+          <AlumNexLogo size={32} />
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#c3c0ff', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>Indigo Nexus</div>
-            <div style={{ fontSize: '0.6rem', color: '#c7c4d8', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>Master Control</div>
+            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff', letterSpacing: '-0.02em' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+            <div style={{ fontSize: '0.55rem', color: '#c7c4d8', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>Master Control</div>
           </div>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -114,7 +297,7 @@ export default function TNPDashboard() {
           <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
             Generate Report
           </button>
-          <a href="#" onClick={e => { e.preventDefault(); logout(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
+          <a href="#" onClick={e => { e.preventDefault(); setShowLogoutConfirm(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
           </a>
         </div>
@@ -124,23 +307,147 @@ export default function TNPDashboard() {
       <main style={{ marginLeft: 256, flex: 1 }}>
         <header style={{ position: 'fixed', top: 0, left: 256, right: 0, height: 64, zIndex: 40, background: 'rgba(11,19,38,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <div style={{ position: 'relative' }}>
-              <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
-              <input placeholder="Search students, alumni, or companies..." style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 320, outline: 'none' }} />
-            </div>
+            {/* Search — only shown on home/queue tabs, searches verification queue */}
+            {(activeTab === 'home' || activeTab === 'queue') && (
+              <div style={{ position: 'relative' }}>
+                <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
+                <input
+                  value={queueSearch}
+                  onChange={e => setQueueSearch(e.target.value)}
+                  placeholder="Search verification queue..."
+                  style={{ background: '#060e20', border: 'none', borderRadius: 999, padding: '0.4rem 1rem 0.4rem 2.2rem', color: '#dae2fd', fontSize: '0.75rem', width: 280, outline: 'none' }}
+                />
+                {queueSearch && (
+                  <button onClick={() => setQueueSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 0, display: 'flex' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                  </button>
+                )}
+              </div>
+            )}
             <nav style={{ display: 'flex', gap: '1.5rem' }}>
-              {['Overview','Compliance','Logs'].map((t,i) => (
-                <a key={t} href="#" style={{ fontSize: '0.875rem', fontWeight: i===0?600:400, color: i===0?'#c3c0ff':'#c7c4d8', textDecoration: 'none' }}>{t}</a>
+              {[
+                { label: 'Overview',         tab: 'home' },
+                { label: 'Compliance & Log', tab: 'compliance' },
+              ].map((t) => (
+                <button key={t.label} onClick={() => setActiveTab(t.tab)} style={{ fontSize: '0.875rem', fontWeight: activeTab === t.tab ? 600 : 400, color: activeTab === t.tab ? '#c3c0ff' : '#c7c4d8', background: 'none', border: 'none', cursor: 'pointer', borderBottom: activeTab === t.tab ? '2px solid #4f46e5' : '2px solid transparent', paddingBottom: 4 }}>{t.label}</button>
               ))}
             </nav>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>notifications</span>
-            <span className="material-symbols-outlined" style={{ color: '#c7c4d8', cursor: 'pointer' }}>settings</span>
+            {/* Notification Bell */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={openNotifPanel} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: showNotifPanel ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifPanel ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
+                {unreadCount > 0 && (
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
+                )}
+              </button>
+
+              {showNotifPanel && (
+                <>
+                  <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, width: 360, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Approval Requests</span>
+                        {unreadCount > 0 && (
+                          <span style={{ background: '#ff4444', color: 'white', borderRadius: 999, fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.4rem' }}>{unreadCount} new</span>
+                        )}
+                      </div>
+                      <button onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }} style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>View Queue</button>
+                    </div>
+                    <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                      {tnpNotifs.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
+                          <p style={{ fontSize: '0.875rem' }}>No pending approvals</p>
+                        </div>
+                      ) : tnpNotifs.map((n) => {
+                        const isNew = !seenNotifIds.includes(n.id);
+                        return (
+                          <div key={n.id} onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }}
+                            style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: isNew ? 'rgba(195,192,255,0.04)' : 'transparent', cursor: 'pointer', transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,192,255,0.07)'}
+                            onMouseLeave={e => e.currentTarget.style.background = isNew ? 'rgba(195,192,255,0.04)' : 'transparent'}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: `${n.color}15`, border: `1px solid ${n.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 19, color: n.color, fontVariationSettings: "'FILL' 1" }}>{n.icon}</span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: isNew ? '#dae2fd' : '#c7c4d8' }}>{n.title}</span>
+                                {isNew && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', flexShrink: 0 }} />}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.4, marginBottom: 4 }}>{n.desc}</div>
+                              <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', fontWeight: 600 }}>{timeAgo(n.time)}</div>
+                            </div>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#c7c4d8', flexShrink: 0, marginTop: 4 }}>chevron_right</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid rgba(70,69,85,0.15)', textAlign: 'center' }}>
+                      <button onClick={() => { setShowNotifPanel(false); setActiveTab('queue'); }} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        Go to Verification Queue →
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dae2fd' }}>Coordinator Profile</div>
-              <div style={{ fontSize: '0.6rem', color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senior Lead</div>
+
+            {/* Profile button */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setShowProfile(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dae2fd' }}>TNP Coordinator</div>
+                  <div style={{ fontSize: '0.6rem', color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senior Lead</div>
+                </div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#1d00a5', fontSize: '0.85rem', border: showProfile ? '2px solid #c3c0ff' : '2px solid transparent', transition: 'border 0.2s' }}>T</div>
+              </button>
+
+              {showProfile && (
+                <>
+                  <div onClick={() => setShowProfile(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 48, right: 0, width: 260, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                    {/* Profile header */}
+                    <div style={{ padding: '1.25rem', background: 'linear-gradient(135deg,rgba(79,70,229,0.2),rgba(11,19,38,0.8))', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem', color: '#1d00a5' }}>T</div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#dae2fd' }}>TNP Coordinator</div>
+                          <div style={{ fontSize: '0.65rem', color: '#c3c0ff', marginTop: 2 }}>Senior Lead</div>
+                          <div style={{ fontSize: '0.62rem', color: '#c7c4d8', marginTop: 1 }}>tnp@alumnex.edu</div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Menu items */}
+                    <div style={{ padding: '0.5rem' }}>
+                      {[
+                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); } },
+                        { icon: 'settings', label: 'Account Settings', sub: 'Configure your preferences', action: () => { setShowProfile(false); setActiveTab('settings'); } },
+                      ].map(item => (
+                        <button key={item.label} onClick={item.action} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, textAlign: 'left', transition: 'background 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,192,255,0.06)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(195,192,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#c3c0ff' }}>{item.icon}</span>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#dae2fd' }}>{item.label}</div>
+                            <div style={{ fontSize: '0.65rem', color: '#c7c4d8', marginTop: 1 }}>{item.sub}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ padding: '0.5rem', borderTop: '1px solid rgba(70,69,85,0.15)' }}>
+                      <button onClick={() => { setShowProfile(false); setShowLogoutConfirm(true); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, color: '#ffb4ab', fontSize: '0.8rem', fontWeight: 600 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>logout</span> Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -151,7 +458,7 @@ export default function TNPDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <h2 style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 8 }}>Command Center</h2>
-              <p style={{ color: '#c7c4d8', maxWidth: 500, fontSize: '0.875rem' }}>Overseeing the growth and integration of AlumniConnect AI across all active placement departments.</p>
+              <p style={{ color: '#c7c4d8', maxWidth: 500, fontSize: '0.875rem' }}>Overseeing the growth and integration of AlumNex across all active placement departments.</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#171f33', border: '1px solid rgba(70,69,85,0.2)', padding: '0.5rem 1rem', borderRadius: 12 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4edea3' }} />
@@ -193,34 +500,45 @@ export default function TNPDashboard() {
                   <h3 style={{ fontWeight: 700, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ color: '#c3c0ff' }}>rule</span> Verification Queue
                   </h3>
-                  <a href="#" style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</a>
+                  <button onClick={() => setActiveTab('queue')} style={{ fontSize: '0.65rem', fontWeight: 700, color: '#c3c0ff', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.1em' }}>View All</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {QUEUE.map((q, i) => {
-                    const st = queueStatus[q.name];
-                    return (
-                    <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : q.color}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span className="material-symbols-outlined" style={{ color: q.color, fontSize: 22 }}>{q.icon}</span>
+                  {(() => {
+                    const sq = queueSearch.toLowerCase().trim();
+                    const filtered = sq ? QUEUE.filter(item => item.name.toLowerCase().includes(sq) || item.sub.toLowerCase().includes(sq) || item.status.toLowerCase().includes(sq)) : QUEUE;
+                    const hl = (text) => {
+                      if (!sq) return text;
+                      const str = String(text);
+                      const idx = str.toLowerCase().indexOf(sq);
+                      if (idx === -1) return str;
+                      return <>{str.slice(0, idx)}<mark style={{ background: 'rgba(195,192,255,0.35)', color: '#dae2fd', borderRadius: 3, padding: '0 2px' }}>{str.slice(idx, idx + sq.length)}</mark>{str.slice(idx + sq.length)}</>;
+                    };
+                    return filtered.map((item, i) => {
+                      const st = queueStatus[item.name];
+                      return (
+                        <div key={i} style={{ background: '#131b2e', borderRadius: 16, padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `4px solid ${st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : item.color}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#222a3d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span className="material-symbols-outlined" style={{ color: item.color, fontSize: 22 }}>{item.icon}</span>
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700 }}>{hl(item.name)}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{hl(item.sub)}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : hl(item.status)}
+                            </span>
+                            {!st && <>
+                              <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
+                              <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                            </>}
+                          </div>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{q.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{q.sub}</div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : q.status}
-                        </span>
-                        {!st && <>
-                          <button onClick={() => handleApprove(q.name)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                          <button onClick={() => handleReview(q.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
-                        </>}
-                      </div>
-                    </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
@@ -300,10 +618,6 @@ export default function TNPDashboard() {
         </section>
       </main>
 
-      {/* FAB */}
-      <button style={{ position: 'fixed', bottom: 32, right: 32, width: 56, height: 56, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(79,70,229,0.4)', zIndex: 50, border: 'none', cursor: 'pointer' }}>
-        <span className="material-symbols-outlined" style={{ color: '#1d00a5', fontSize: 24, fontVariationSettings: "'FILL' 1" }}>add</span>
-      </button>
     </div>
   );
 }

@@ -2,6 +2,9 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── Mock data (used when backend is unreachable) ───────────────────────────
 
+const MOCK_TOKEN = 'mock-jwt-token-for-local-dev';
+const mockDelay = (ms = 600) => new Promise(r => setTimeout(r, ms));
+
 const MOCK_USERS = {
   students: [
     { id: 'stu-001', name: 'Alice Johnson', role: 'STUDENT', department: 'Computer Science' },
@@ -14,17 +17,12 @@ const MOCK_USERS = {
   tnp: { id: 'tnp-001', name: 'TNP Coordinator', role: 'TNP' },
 };
 
-const MOCK_TOKEN = 'mock-jwt-token-for-local-dev';
-
-const mockDelay = (ms = 600) => new Promise(r => setTimeout(r, ms));
-
 const MOCK_API = {
   health: async () => ({ status: 'ok (mock)', message: 'Running in offline/mock mode' }),
 
-  studentVerify: async (_file) => {
+  studentVerify: async () => {
     await mockDelay();
-    const user = MOCK_USERS.students[0]; // Always verifies as Alice Johnson
-    return { token: MOCK_TOKEN, user };
+    return { token: MOCK_TOKEN, user: MOCK_USERS.students[0] };
   },
 
   tnpLogin: async (username, password) => {
@@ -35,14 +33,13 @@ const MOCK_API = {
     return { error: 'Invalid credentials. Use admin / tnp_secure_123' };
   },
 
-  alumniLogin: async (name, email, _department) => {
+  alumniLogin: async (name, email, department) => {
     await mockDelay();
     if (!name || !email) return { error: 'Name and email are required.' };
-    const user = { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: _department || 'General' };
-    return { token: MOCK_TOKEN, user };
+    return { token: MOCK_TOKEN, user: { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: department || 'General' } };
   },
 
-  resumeAnalyze: async (_file) => {
+  resumeAnalyze: async () => {
     await mockDelay(1200);
     return {
       message: 'Resume analyzed (mock)',
@@ -57,7 +54,7 @@ const MOCK_API = {
     };
   },
 
-  interviewAnalytics: async (_data) => {
+  interviewAnalytics: async () => {
     await mockDelay(1500);
     return {
       message: 'Analytics generated (mock)',
@@ -74,11 +71,36 @@ const MOCK_API = {
       },
     };
   },
+
+  getRequests: async () => {
+    await mockDelay(400);
+    return [];
+  },
+
+  createRequest: async (payload) => {
+    await mockDelay(400);
+    return { request_id: `mock-${Date.now()}`, ...payload, status: 'PENDING' };
+  },
+
+  updateRequest: async (id, updates) => {
+    await mockDelay(400);
+    return { request_id: id, ...updates };
+  },
+
+  getNotifications: async () => {
+    await mockDelay(300);
+    return [];
+  },
+
+  markNotifsRead: async () => {
+    await mockDelay(200);
+    return { success: true };
+  },
 };
 
-// ─── Try real backend, fall back to mock ────────────────────────────────────
+// ─── Backend availability check ─────────────────────────────────────────────
 
-let _backendAvailable = null; // null = unknown, true/false after first check
+let _backendAvailable = null;
 
 async function isBackendUp() {
   if (_backendAvailable !== null) return _backendAvailable;
@@ -93,11 +115,7 @@ async function isBackendUp() {
 
 async function callOrMock(realFn, mockFn) {
   if (await isBackendUp()) {
-    try {
-      return await realFn();
-    } catch {
-      return await mockFn();
-    }
+    try { return await realFn(); } catch { return await mockFn(); }
   }
   return await mockFn();
 }
@@ -164,10 +182,11 @@ export const api = {
     async () => { await mockDelay(); return { token: MOCK_TOKEN, user: MOCK_USERS.alumni[0] }; }
   ),
 
-  resumeAnalyze: (file) => callOrMock(
+  resumeAnalyze: (file, userId) => callOrMock(
     () => {
       const fd = new FormData();
       fd.append('resume', file);
+      if (userId) fd.append('userId', userId);
       return fetch(`${API_BASE}/ai/resume-analyze`, { method: 'POST', body: fd }).then(r => r.json());
     },
     () => MOCK_API.resumeAnalyze(file)
@@ -210,6 +229,15 @@ export const api = {
     })
   ),
 
+  profileStrength: (profileData) => callOrMock(
+    () => fetch(`${API_BASE}/ai/profile-strength`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileData }),
+    }).then(r => r.json()),
+    async () => { await mockDelay(600); return { score: 60, label: 'Growing', missing: ['Add GitHub link', 'Upload resume'], top_skills: [] }; }
+  ),
+
   // Agent 6: Speech Analysis
   analyzeSpeech: (metrics) => callOrMock(
     () => fetch(`${API_BASE}/ai/analyze-speech`, {
@@ -233,6 +261,90 @@ export const api = {
   fetchAlumni: () => callOrMock(
     () => fetch(`${API_BASE}/auth/alumni`).then(r => r.json()),
     async () => { await mockDelay(); return MOCK_USERS.alumni; }
+  ),
+
+  getRequests: (params = {}) => callOrMock(
+    () => {
+      const qs = new URLSearchParams(params).toString();
+      return fetch(`${API_BASE}/requests?${qs}`).then(r => r.json());
+    },
+    () => MOCK_API.getRequests(params)
+  ),
+
+  createRequest: (payload) => callOrMock(
+    () => fetch(`${API_BASE}/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json()),
+    () => MOCK_API.createRequest(payload)
+  ),
+
+  updateRequest: (id, updates) => callOrMock(
+    () => fetch(`${API_BASE}/requests/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }).then(r => r.json()),
+    () => MOCK_API.updateRequest(id, updates)
+  ),
+
+  getNotifications: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/notifications?userId=${userId}`).then(r => r.json()),
+    () => MOCK_API.getNotifications(userId)
+  ),
+
+  markNotifsRead: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/notifications/read`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }).then(r => r.json()),
+    () => MOCK_API.markNotifsRead(userId)
+  ),
+
+  saveProfile: (userId, profileData) => callOrMock(
+    () => fetch(`${API_BASE}/users/${userId}/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profileData),
+    }).then(r => r.json()),
+    async () => { await mockDelay(400); return { message: 'Profile saved (mock)' }; }
+  ),
+
+  getUser: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/users/${userId}`).then(r => r.json()),
+    async () => { await mockDelay(300); return null; }
+  ),
+
+  getUserByEmail: (email) => callOrMock(
+    () => fetch(`${API_BASE}/users/by-email/${encodeURIComponent(email)}`).then(r => r.json()),
+    async () => { await mockDelay(300); return null; }
+  ),
+
+  getPlatformStats: () => callOrMock(
+    () => fetch(`${API_BASE}/stats/platform`).then(r => r.json()),
+    async () => { await mockDelay(400); return { verified_students: 5, active_mentors: 6, mock_interviews: 0, scheduled_today: 0 }; }
+  ),
+
+  getInterviewQuestions: (topic) => callOrMock(
+    () => fetch(`${API_BASE}/chat/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(600);
+      return { questions: [
+        { q: "Tell me about yourself and your background.", cat: "Intro" },
+        { q: "Describe a challenging technical problem you solved recently.", cat: "Behavioral" },
+        { q: "How would you design a scalable notification system?", cat: "System Design" },
+        { q: "What's the difference between SQL and NoSQL databases?", cat: "Technical" },
+        { q: "How do you handle conflicts within your team?", cat: "Behavioral" },
+        { q: "Explain the concept of microservices and their trade-offs.", cat: "System Design" },
+        { q: "Where do you see yourself in 5 years?", cat: "Career" },
+      ]};
+    }
   ),
 };
 
