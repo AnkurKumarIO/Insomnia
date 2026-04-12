@@ -19,7 +19,8 @@ app.use('/users',         require('./routes/users'));
 app.use('/alumni',        require('./routes/alumni'));
 app.use('/register',      require('./routes/register'));
 app.use('/stats',         require('./routes/stats'));
-app.use('/chat',          require('./routes/chat'));
+app.use('/chat',             require('./routes/chat'));
+app.use('/interview-records', require('./routes/interviewRecords'));
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -58,6 +59,7 @@ app.get('/', (req, res) => {
       'GET  /stats/platform',
       'GET  /stats/interviews?userId=',
       'GET  /stats/pending-users',
+      'PATCH /interview-records/:id',
       'PATCH /stats/verify/:id',
       'POST /chat/interview',
       'POST /chat/questions',

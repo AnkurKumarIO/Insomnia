@@ -80,6 +80,17 @@ router.post('/summarize-profile', async (req, res) => {
   }
 });
 
+// Alias used by api.profileStrength() on the frontend
+router.post('/profile-strength', async (req, res) => {
+  try {
+    const { profileData } = req.body;
+    const summary = await summarizeStudentProfile(profileData || {});
+    res.json({ message: 'Profile strength evaluated', summary });
+  } catch (e) {
+    res.status(500).json({ error: 'Profile strength evaluation failed.' });
+  }
+});
+
 // ── Agent 6: Live Speech Coach (called per audio chunk) ───────────────────────
 router.post('/analyze-speech', async (req, res) => {
   try {

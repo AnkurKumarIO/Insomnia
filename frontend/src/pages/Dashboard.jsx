@@ -9,12 +9,12 @@ import AlumNexLogo from '../AlumNexLogo';
 import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import { api } from '../api';
-import { getAllAlumni, getUserById } from '../lib/db';
+import { getAllAlumni, getUserById, getSlotBookedRequestsForStudent } from '../lib/db';
 
 // â”€â”€ Inline BookModal for Recommended Mentor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOPICS = [
-  'Mock Interview â€“ General', 'Mock Interview â€“ System Design',
-  'Mock Interview â€“ Frontend', 'Mock Interview â€“ Backend',
+  'Mock Interview "“ General', 'Mock Interview "“ System Design',
+  'Mock Interview "“ Frontend', 'Mock Interview "“ Backend',
   'Career Guidance', 'Resume Review',
 ];
 
@@ -131,6 +131,7 @@ export default function Dashboard() {
   const [recommendedMentor, setRecommendedMentor] = useState(null);
   const [profileData, setProfileData] = useState({});
   const [aiProfileStrength, setAiProfileStrength] = useState(null);
+  const [bookedRequests, setBookedRequests] = useState([]);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -184,6 +185,35 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user.name]);
 
+  // Fetch booked interview requests from Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    getSlotBookedRequestsForStudent(user.id).then(rows => {
+      if (rows && rows.length > 0) {
+        setBookedRequests(rows);
+      } else {
+        // Fallback: localStorage
+        const fallback = getRequestsByStudent(user.name).filter(r => r.status === 'slot_booked');
+        setBookedRequests(fallback.map(r => ({
+          request_id: r.id,
+          room_id: r.roomId || null,
+          scheduled_time: r.scheduledTime || null,
+          alumniName: r.alumniName || r.alumniRole || 'Alumni',
+          topic: r.topic || '',
+        })));
+      }
+    }).catch(() => {
+      const fallback = getRequestsByStudent(user.name).filter(r => r.status === 'slot_booked');
+      setBookedRequests(fallback.map(r => ({
+        request_id: r.id,
+        room_id: r.roomId || null,
+        scheduled_time: r.scheduledTime || null,
+        alumniName: r.alumniName || r.alumniRole || 'Alumni',
+        topic: r.topic || '',
+      })));
+    });
+  }, [user?.id, user?.name]);
+
   // Fetch recommended mentor + profile data
   useEffect(() => {
     getAllAlumni().then(alumni => {
@@ -219,7 +249,7 @@ export default function Dashboard() {
 
   const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
 
-  // Profile completion â€” use Gemini result if available, else calculate locally
+  // Profile completion "” use Gemini result if available, else calculate locally
   const profileCompletion = aiProfileStrength?.score ?? (() => {
     const checks = [
       !!profileData.bio, !!profileData.linkedin, !!profileData.github,
@@ -371,7 +401,7 @@ export default function Dashboard() {
               <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
                   <span style={{ fontWeight: 500 }}>{skill}</span>
-                  <span style={{ color: '#c7c4d8' }}>â€”</span>
+                  <span style={{ color: '#c7c4d8' }}>"”</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
@@ -404,7 +434,36 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-          {/* Resume CTA â€” full width */}
+                    {/* Scheduled Interviews — from Supabase SLOT_BOOKED requests */}
+          {bookedRequests.length > 0 && (
+            <div style={{ background: '#131b2e', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(78,222,163,0.15)' }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: '1rem' }}>Scheduled Interviews</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {bookedRequests.map(req => (
+                  <div key={req.request_id} style={{ background: '#171f33', borderRadius: 12, padding: '1rem 1.25rem', border: '1px solid rgba(78,222,163,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#dae2fd', marginBottom: 3 }}>{req.alumniName || 'Alumni'}</div>
+                      {req.scheduled_time && (
+                        <div style={{ fontSize: '0.72rem', color: '#c7c4d8', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#4edea3' }}>schedule</span>
+                          {new Date(req.scheduled_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                    {req.room_id ? (
+                      <Link to={`/interview/${req.room_id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>videocam</span>
+                        Join Interview
+                      </Link>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ffb95f', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, padding: '0.4rem 0.875rem', flexShrink: 0 }}>Room not ready yet</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Resume CTA "” full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -435,7 +494,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recommended Mentor CTA â€” clean button, no profile preview */}
+          {/* Recommended Mentor CTA "” clean button, no profile preview */}
           <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -530,7 +589,7 @@ export default function Dashboard() {
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {/* Search â€” only visible in Directory tab */}
+            {/* Search "” only visible in Directory tab */}
             {activeTab === 'directory' && (
               <div style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
@@ -632,9 +691,9 @@ export default function Dashboard() {
                   {/* Profile details */}
                   <div style={{ padding: '1rem' }}>
                     {[
-                      { icon: 'school', label: 'Year', val: savedProfile.year || 'â€”' },
-                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || 'â€”' },
-                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : 'â€”' },
+                      { icon: 'school', label: 'Year', val: savedProfile.year || '"”' },
+                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || '"”' },
+                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : '"”' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c3c0ff' }}>{item.icon}</span>

@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import { api } from '../api';
-import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
+import { getAllAlumni, getRequestsForAlumni, getSlotBookedRequestsForAlumni, updateRequest } from '../lib/db';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -256,7 +256,7 @@ function BookSlotModal({ request, onClose, onBooked }) {
               {selectedDate && (
                 <>
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>
-                    Select Time â€” {formattedSelected}
+                    Select Time "” {formattedSelected}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
                     {TIME_SLOTS.map(t => (
@@ -364,7 +364,7 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
               </div>
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time â€” {formattedSelected}</div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time "” {formattedSelected}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
                     {TIME_SLOTS.map(t => <button key={t} onClick={() => setSelectedTime(t)} style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, background: selectedTime === t ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: selectedTime === t ? '#1d00a5' : '#c7c4d8' }}>{t}</button>)}
                   </div>
@@ -454,6 +454,7 @@ export default function AlumniDashboard() {
   const [acceptedToast, setAcceptedToast] = useState(null); // { name }
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [alumniBookedRequests, setAlumniBookedRequests] = useState([]);
 
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
@@ -529,6 +530,14 @@ export default function AlumniDashboard() {
     return () => clearInterval(interval);
   }, [user.name, user.id]);
 
+  // Fetch SLOT_BOOKED requests for alumni from Supabase (for Join Now links)
+  useEffect(() => {
+    if (!user?.id) return;
+    getSlotBookedRequestsForAlumni(user.id).then(rows => {
+      if (rows && rows.length > 0) setAlumniBookedRequests(rows);
+    }).catch(() => {});
+  }, [user?.id]);
+
   // Build notifications list: new requests + meetings in 24h
   const allScheduled = [...SCHEDULE, ...extraSlots];
   const now = Date.now();
@@ -539,7 +548,7 @@ export default function AlumniDashboard() {
   });
   const notifications = [
     ...liveRequests.map(r => ({ id: r.id, type: 'request', title: 'New Interview Request', desc: `${r.studentName} wants to book a ${r.topic}`, time: r.createdAt })),
-    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} â€” ${s.when}`, time: s.scheduledTime })),
+    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} "” ${s.when}`, time: s.scheduledTime })),
   ];
   const unreadCount = notifications.filter(n => !seenNotifIds.includes(n.id)).length;
 
@@ -583,11 +592,17 @@ export default function AlumniDashboard() {
     }
   };
 
-  const handleSlotBooked = (requestId, scheduledTime) => {
-    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId: `room-${requestId.slice(-8)}-${Date.now()}` } : r));
+  const handleSlotBooked = async (requestId, scheduledTime) => {
+    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId } : r));
+    // Persist roomId to Supabase
+    try {
+      await updateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime, roomId });
+    } catch (e) {
+      console.warn('handleSlotBooked: failed to persist roomId', e.message);
+    }
     const formatted = formatScheduledTime(scheduledTime);
     const req = liveRequests.find(r => r.id === requestId);
-    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
     setExtraSlots(s => [...s, {
       when: formatted,
       title: `Mock Interview: ${req?.studentName || 'Student'}`,
@@ -656,7 +671,7 @@ export default function AlumniDashboard() {
   const renderSearchResults = (q) => {
     const ql = q.toLowerCase();
 
-    // Search requests â€” include all statuses for this alumni
+    // Search requests "” include all statuses for this alumni
     const allRequests = (() => {
       try {
         return getRequests().filter(r => r.alumniName === user.name);
@@ -797,7 +812,7 @@ export default function AlumniDashboard() {
       const bookedRequests = liveRequests.filter(r => r.status === 'slot_booked' && r.scheduledTime);
       const allSlots = [...SCHEDULE, ...extraSlots];
 
-      // Check if a day/hour cell has a booking â€” using ISO scheduledTime for accuracy
+      // Check if a day/hour cell has a booking "” using ISO scheduledTime for accuracy
       const isBooked = (dayIdx, hour) => {
         // Check bookedRequests by ISO date
         const cellDate = weekDays[dayIdx];
@@ -912,7 +927,7 @@ export default function AlumniDashboard() {
                     const isToday = dayIdx === todayIdx;
                     return (
                       <div key={dayIdx}
-                        title={slotInfo ? `${slotInfo.title} â€” ${slotInfo.sub}` : 'Available'}
+                        title={slotInfo ? `${slotInfo.title} "” ${slotInfo.sub}` : 'Available'}
                         style={{ padding: '0.3rem', borderLeft: '1px solid rgba(70,69,85,0.1)', background: booked ? 'rgba(255,107,107,0.08)' : isToday ? 'rgba(78,222,163,0.03)' : 'transparent', cursor: booked ? 'default' : 'pointer', minHeight: 36, position: 'relative', transition: 'background 0.15s' }}
                         onMouseEnter={e => { if (!booked) e.currentTarget.style.background = 'rgba(195,192,255,0.06)'; }}
                         onMouseLeave={e => { if (!booked) e.currentTarget.style.background = isToday ? 'rgba(78,222,163,0.03)' : 'transparent'; }}>
@@ -1092,7 +1107,7 @@ export default function AlumniDashboard() {
             <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#c7c4d8', marginBottom: 16 }}>Average Rating</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
               <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>4.9</span>
-              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>â˜…â˜…â˜…â˜…â˜…</span>
+              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>★★★★★</span>
             </div>
           </div>
         </div>
@@ -1190,6 +1205,24 @@ export default function AlumniDashboard() {
                 <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>Upcoming Sessions</span>
               </div>
               <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Supabase-sourced booked sessions */}
+                {alumniBookedRequests.map((r, i) => (
+                  <div key={`sb-${i}`} style={{ position: 'relative', paddingLeft: 24, borderLeft: '2px solid #c3c0ff' }}>
+                    <div style={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', background: '#c3c0ff' }} />
+                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+                      {r.scheduled_time ? new Date(r.scheduled_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Scheduled'}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>Mock Interview: {r.studentName || 'Student'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{r.topic || 'Mock Interview'}</div>
+                    {r.room_id ? (
+                      <Link to={`/interview/${r.room_id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
+                      </Link>
+                    ) : (
+                      <span style={{ display: 'inline-block', marginTop: 6, fontSize: '0.65rem', color: '#ffb95f', fontWeight: 600 }}>Room not ready yet</span>
+                    )}
+                  </div>
+                ))}
                 {SCHEDULE.map((s, i) => (
                   <div key={i} style={{ position: 'relative', paddingLeft: 24, borderLeft: `2px solid ${s.active ? '#c3c0ff' : 'rgba(70,69,85,0.3)'}` }}>
                     <div style={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', background: s.active ? '#c3c0ff' : '#464555' }} />
@@ -1289,7 +1322,7 @@ export default function AlumniDashboard() {
             );
           })}
         </nav>
-        {/* Only Sign Out at bottom â€” no "New Mentorship" button */}
+        {/* Only Sign Out at bottom "” no "New Mentorship" button */}
         <div style={{ marginTop: 'auto' }}>
           <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
@@ -1306,7 +1339,7 @@ export default function AlumniDashboard() {
             <input
               value={globalSearch}
               onChange={e => setGlobalSearch(e.target.value)}
-              placeholder="Search anything â€” names, sessions, topics..."
+              placeholder="Search anything "” names, sessions, topics..."
               style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }}
             />
             {globalSearch && (
@@ -1399,10 +1432,10 @@ export default function AlumniDashboard() {
                         </div>
                         <div style={{ padding: '0.75rem 1rem' }}>
                           {[
-                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || 'â€”' },
-                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || 'â€”' },
-                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || 'â€”' },
-                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || 'â€”' },
+                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || '"”' },
+                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || '"”' },
+                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || '"”' },
+                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || '"”' },
                           ].map(item => (
                             <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.45rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#c3c0ff' }}>{item.icon}</span>

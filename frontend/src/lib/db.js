@@ -219,3 +219,83 @@ export async function verifyUser(id, status) {
     .single();
   return data;
 }
+
+// ── Interview Records ─────────────────────────────────────────────────────────
+
+// Task 3.1 — upsert a completed interview record (Student end-session)
+export async function upsertInterviewRecord({ student_id, alumni_id, request_id, transcript, student_score, ai_action_items, status }) {
+  const { data, error } = await supabase
+    .from('interview_records')
+    .upsert({
+      student_id,
+      alumni_id,
+      request_id,
+      transcript:      transcript      || '',
+      student_score:   student_score   || 0,
+      ai_action_items: ai_action_items || null,
+      status:          status          || 'COMPLETED',
+    }, { onConflict: 'request_id' })
+    .select()
+    .single();
+  return { data, error };
+}
+
+// Task 3.2 — update an existing interview record (Alumni rating save)
+export async function updateInterviewRecord(interviewId, updates) {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  try {
+    const res = await fetch(`${API_URL}/interview-records/${interviewId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { data: null, error: { message: err.error || `HTTP ${res.status}` } };
+    }
+    const data = await res.json();
+    return { data, error: null };
+  } catch (e) {
+    // Fallback: direct Supabase update if backend unreachable
+    const { data, error } = await supabase
+      .from('interview_records')
+      .update(updates)
+      .eq('interview_id', interviewId)
+      .select()
+      .single();
+    return { data, error };
+  }
+}
+
+// ── Room-ID Query Helpers ─────────────────────────────────────────────────────
+
+// Task 4.1 — get SLOT_BOOKED requests for a student (includes room_id)
+export async function getSlotBookedRequestsForStudent(studentId) {
+  const { data, error } = await supabase
+    .from('interview_requests')
+    .select('request_id, room_id, scheduled_time, alumni_id, topic, alumni:users!interview_requests_alumni_id_fkey(name, company, profile_data)')
+    .eq('student_id', studentId)
+    .eq('status', 'SLOT_BOOKED')
+    .order('scheduled_time', { ascending: true });
+  if (error) { console.warn('getSlotBookedRequestsForStudent:', error.message); return []; }
+  return (data || []).map(r => ({
+    ...r,
+    alumniName:    r.alumni?.name    || '',
+    alumniCompany: r.alumni?.company || '',
+  }));
+}
+
+// Task 4.2 — get SLOT_BOOKED requests for an alumni (includes room_id)
+export async function getSlotBookedRequestsForAlumni(alumniId) {
+  const { data, error } = await supabase
+    .from('interview_requests')
+    .select('request_id, room_id, scheduled_time, student_id, topic, student:users!interview_requests_student_id_fkey(name, profile_data)')
+    .eq('alumni_id', alumniId)
+    .eq('status', 'SLOT_BOOKED')
+    .order('scheduled_time', { ascending: true });
+  if (error) { console.warn('getSlotBookedRequestsForAlumni:', error.message); return []; }
+  return (data || []).map(r => ({
+    ...r,
+    studentName: r.student?.name || '',
+  }));
+}

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './context/AuthContext';
+import { upsertInterviewRecord } from './lib/db';
+import { supabase } from './lib/supabaseClient';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
@@ -39,11 +41,87 @@ function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Feature: alumnex-interview-room
+function RatingReviewForm({ roomId, requestId, alumniId, studentId, onSubmitted }) {
+  const [ratings, setRatings] = useState({ technical_skills: 0, communication: 0, problem_solving: 0, cultural_fit: 0 });
+  const [review, setReview] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const DIMENSIONS = [
+    { key: 'technical_skills', label: 'Technical Skills' },
+    { key: 'communication', label: 'Communication' },
+    { key: 'problem_solving', label: 'Problem Solving' },
+    { key: 'cultural_fit', label: 'Cultural Fit' },
+  ];
+
+  const avgRating = Object.values(ratings).filter(v => v > 0).reduce((a, b, _, arr) => a + b / arr.length, 0);
+
+  const handleSubmit = async () => {
+    setSaving(true); setError(null);
+    try {
+      const { updateInterviewRecord } = await import('./lib/db');
+      const { error: err } = await updateInterviewRecord(requestId || roomId, {
+        alumni_feedback: JSON.stringify({ ratings, review }),
+        student_score: Math.round(avgRating * 20), // convert 1-5 to 0-100
+        status: 'COMPLETED',
+      });
+      if (err) throw new Error(err.message);
+      onSubmitted();
+    } catch (e) {
+      setError(e.message || 'Failed to save. Please retry.');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+      <div style={{ maxWidth: 560, width: '100%', background: '#171f33', borderRadius: 20, padding: '2.5rem', border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⭐</div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Rate the Session</h2>
+          <p style={{ color: '#c7c4d8', marginTop: 8, fontSize: '0.875rem' }}>Your feedback helps the student improve</p>
+        </div>
+        {DIMENSIONS.map(({ key, label }) => (
+          <div key={key} style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>{label}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <button key={star} onClick={() => setRatings(r => ({ ...r, [key]: star }))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 28, color: ratings[key] >= star ? '#ffb95f' : 'rgba(70,69,85,0.5)', transition: 'color 0.15s' }}>
+                  {ratings[key] >= star ? '★' : '☆'}
+                </button>
+              ))}
+              {ratings[key] > 0 && <span style={{ fontSize: '0.75rem', color: '#ffb95f', alignSelf: 'center', marginLeft: 4 }}>{ratings[key]}/5</span>}
+            </div>
+          </div>
+        ))}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Written Feedback <span style={{ fontWeight: 400, textTransform: 'none', opacity: 0.5 }}>(optional)</span></div>
+          <textarea value={review} onChange={e => setReview(e.target.value)} placeholder="Share specific observations about the candidate's performance..." rows={4}
+            style={{ width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.75rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+        </div>
+        {error && <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#ffb4ab' }}>{error}</div>}
+        <button onClick={handleSubmit} disabled={saving || Object.values(ratings).every(v => v === 0)}
+          style={{ width: '100%', padding: '0.875rem', background: saving || Object.values(ratings).every(v => v === 0) ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: saving || Object.values(ratings).every(v => v === 0) ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {saving ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Saving...</> : 'Submit Feedback & Finish'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DualAgentInterviewRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+
+  // Auth guard
+  if (!user) { navigate('/login'); return null; }
+
   const myId = user?.name || user?.role || 'User';
+  const isAlumni = user?.role === 'ALUMNI';
+  const isStudent = !isAlumni;
 
   // ── Connection ──────────────────────────────────────────────────────────
   // ── Connection ──────────────────────────────────────────────────────────
@@ -88,6 +166,13 @@ export default function DualAgentInterviewRoom() {
   const [ended, setEnded]       = useState(false);
   const [analytics, setAnalytics] = useState(null);
 
+  // ── Role-based / face detection state ───────────────────────────────────
+  const [faceDetected, setFaceDetected] = useState(true);
+  const [showRating, setShowRating] = useState(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [resolvedRequestId, setResolvedRequestId] = useState(null);
+  const [resolvedStudentId, setResolvedStudentId] = useState(null);
+
   // ── Refs ────────────────────────────────────────────────────────────────
   const localVideoRef  = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -102,6 +187,7 @@ export default function DualAgentInterviewRoom() {
   const makingOffer    = useRef(false);
   const ignoreOffer    = useRef(false);
   const chatEndRef     = useRef(null);
+  const faceCanvasRef  = useRef(null);
 
   // ── WebRTC PC Initialization ──────────────────────────────────────────
   const initPC = useCallback(() => {
@@ -167,6 +253,14 @@ export default function DualAgentInterviewRoom() {
     socket.on('connect', () => {
       setIsConnected(true);
       socket.emit('join-room', roomId, myId);
+      // Resolve request_id and student_id from Supabase for this room
+      supabase.from('interview_requests').select('request_id, student_id, alumni_id').eq('room_id', roomId).single()
+        .then(({ data }) => {
+          if (data) {
+            setResolvedRequestId(data.request_id);
+            setResolvedStudentId(data.student_id);
+          }
+        }).catch(() => {});
     });
 
     socket.on('user-connected', (uid) => {
@@ -327,6 +421,31 @@ export default function DualAgentInterviewRoom() {
     setSharing(false);
   }, []);
 
+  // ── Face Detection ────────────────────────────────────────────────────────
+  const detectFace = useCallback(() => {
+    if (!camOn || !localVideoRef.current || !faceCanvasRef.current) return;
+    const video = localVideoRef.current;
+    const canvas = faceCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    canvas.width = 64;
+    canvas.height = 48;
+    ctx.drawImage(video, 0, 0, 64, 48);
+    const imageData = ctx.getImageData(0, 0, 64, 48);
+    const data = imageData.data;
+    const luminances = [];
+    for (let i = 0; i < data.length; i += 4) {
+      luminances.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    }
+    const mean = luminances.reduce((a, b) => a + b, 0) / luminances.length;
+    const variance = luminances.reduce((a, b) => a + (b - mean) ** 2, 0) / luminances.length;
+    setFaceDetected(variance > 200);
+  }, [camOn]);
+
+  useEffect(() => {
+    const id = setInterval(detectFace, 3000);
+    return () => clearInterval(id);
+  }, [detectFace]);
+
   // ── Controls ─────────────────────────────────────────────────────────────
   const toggleMic = () => {
     streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
@@ -383,6 +502,14 @@ export default function DualAgentInterviewRoom() {
     clearInterval(timerRef.current);
     clearInterval(metricsRef.current);
     clearInterval(suggestionRef.current);
+
+    if (isAlumni) {
+      // Alumni path: skip Agent 3, just show RatingReviewForm
+      setEnded(true);
+      return;
+    }
+
+    // Student path
     setEnded(true);
     try {
       const data = await api.interviewAnalytics({
@@ -414,10 +541,36 @@ export default function DualAgentInterviewRoom() {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50))); // keep last 50
       } catch (saveErr) { console.warn('Could not save interview report:', saveErr); }
 
+      // ── Upsert to Supabase interview_records ──────────────────────────
+      try {
+        const score = Math.round((confidence + clarity + energy) / 3);
+        const transcript = hints.filter(h => h.type === 'ai').map(h => h.text).join(' ');
+        // Resolve alumni_id from Supabase if not already resolved
+        let alumniId = null;
+        if (resolvedRequestId) {
+          const { data: reqData } = await supabase.from('interview_requests').select('alumni_id').eq('request_id', resolvedRequestId).single();
+          alumniId = reqData?.alumni_id || null;
+        }
+        await upsertInterviewRecord({
+          student_id: user.id,
+          alumni_id: alumniId,
+          request_id: resolvedRequestId,
+          transcript,
+          student_score: score,
+          ai_action_items: data.analytics?.actionable_insights || [],
+          status: 'COMPLETED',
+        });
+      } catch (dbErr) { console.warn('Could not upsert interview record:', dbErr); }
+
     } catch (e) { console.error(e); }
   };
 
   const remaining = Math.max(0, 3600 - elapsed);
+
+  // ── Alumni post-session: Rating form ─────────────────────────────────────
+  if (isAlumni && ended) {
+    return <RatingReviewForm roomId={roomId} requestId={resolvedRequestId} alumniId={user.id} studentId={resolvedStudentId} onSubmitted={() => navigate('/dashboard')} />;
+  }
 
   // ── Analytics screen ──────────────────────────────────────────────────────
   if (ended && analytics) {
@@ -516,7 +669,8 @@ export default function DualAgentInterviewRoom() {
                   <span className="material-symbols-outlined" style={{ fontSize:48, color:'#464555' }}>videocam_off</span>
                 </div>
               )}
-              {/* Live metrics overlay ... existing */}
+              {/* Live metrics overlay — Student only */}
+              {isStudent && (
               <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)' }}>
                 {[{l:'Confidence',v:confidence,c:'#4edea3'},{l:'Clarity',v:clarity,c:'#c3c0ff'},{l:'Energy',v:energy,c:'#ffb95f'}].map(m=>(
                   <div key={m.l} style={{ marginBottom:7 }}>
@@ -533,9 +687,17 @@ export default function DualAgentInterviewRoom() {
                   <span style={{ fontSize:'0.58rem', color:'#c7c4d8' }}>AI coaching live</span>
                 </div>
               </div>
-              <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>
+              )}              <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>
                 {myId} {sharing ? '(Screen)' : '(You)'}
               </div>
+              {/* Hidden canvas for face detection */}
+              <canvas ref={faceCanvasRef} style={{ display:'none' }} />
+              {/* Face detection warning overlay */}
+              {!faceDetected && camOn && (
+                <div style={{ position:'absolute', bottom:40, left:0, right:0, background:'rgba(0,0,0,0.75)', padding:'0.5rem 0.75rem', textAlign:'center', fontSize:'0.72rem', fontWeight:700, color:'#ffb95f' }}>
+                  ⚠ Face not visible — please adjust your camera
+                </div>
+              )}
             </div>
 
             {/* Remote */}
@@ -576,8 +738,8 @@ export default function DualAgentInterviewRoom() {
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
               <div style={{ padding:'0.875rem', borderBottom:'1px solid rgba(70,69,85,0.15)', flexShrink:0, display:'flex', flexDirection:'column', gap:'0.65rem', overflowY:'auto', maxHeight:340 }}>
 
-                {/* Agent 6: Speech coaching tip */}
-                {coachingTip && (
+                {/* Agent 6: Speech coaching tip — Student only */}
+                {isStudent && coachingTip && (
                   <div style={{ background:'rgba(78,222,163,0.07)', border:'1px solid rgba(78,222,163,0.2)', borderRadius:9, padding:'0.6rem 0.8rem', display:'flex', alignItems:'flex-start', gap:7 }}>
                     <span className="material-symbols-outlined" style={{ color:'#4edea3', fontSize:13, marginTop:1, flexShrink:0 }}>tips_and_updates</span>
                     <div>
@@ -587,7 +749,8 @@ export default function DualAgentInterviewRoom() {
                   </div>
                 )}
 
-                {/* Agent 2: Socratic Whisperer */}
+                {/* Agent 2: Socratic Whisperer — Alumni only */}
+                {isAlumni && (
                 <div style={{ background:'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(11,19,38,0.85))', border:'1px solid rgba(79,70,229,0.35)', borderRadius:11, padding:'0.8rem' }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:5 }}>
@@ -604,6 +767,7 @@ export default function DualAgentInterviewRoom() {
                     <button onClick={nextSuggestion} style={{ background:'rgba(70,69,85,0.3)', color:'#c7c4d8', border:'none', borderRadius:6, padding:'0.25rem 0.65rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Skip</button>
                   </div>
                 </div>
+                )}
 
                 {/* Agent 7: Fact Checker */}
                 <div style={{ background:'rgba(42,23,0,0.45)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:9, padding:'0.7rem' }}>
@@ -617,6 +781,7 @@ export default function DualAgentInterviewRoom() {
                       <span style={{ fontSize:'0.62rem', fontWeight:700, color: f.status==='confirmed' ? '#4edea3' : '#ffb4ab', flexShrink:0 }}>{f.status==='confirmed'?'✓':'⚠'} {f.pct}</span>
                     </div>
                   ))}
+                  {isAlumni && (
                   <div style={{ display:'flex', gap:5, marginTop:6 }}>
                     <input value={factInput} onChange={e=>setFactInput(e.target.value)}
                       onKeyDown={e=>{ if(e.key==='Enter') triggerFactCheck(factInput); }}
@@ -624,6 +789,7 @@ export default function DualAgentInterviewRoom() {
                       style={{ flex:1, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:6, padding:'0.28rem 0.5rem', color:'#dae2fd', fontSize:'0.65rem', outline:'none' }} />
                     <button onClick={()=>triggerFactCheck(factInput)} style={{ background:'rgba(255,185,95,0.15)', color:'#ffb95f', border:'none', borderRadius:6, padding:'0.28rem 0.6rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Check</button>
                   </div>
+                  )}
                 </div>
 
                 {/* Agent 5: Peer Profile Summary */}
