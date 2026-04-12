@@ -92,8 +92,6 @@ export default function UnifiedLogin() {
     ALUMNI:  'Demo: priya.sharma / Alumni@2026  (also: sarah.chen, jasmine.patel, aisha.okonkwo)',
     TNP:     'Demo: admin / tnp_secure_123',
   };
-    TNP:     'Demo: admin / tnp_secure_123',
-  };
 
   const inp = {
     width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)',
