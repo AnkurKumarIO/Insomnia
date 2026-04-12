@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../api';
 
@@ -16,7 +16,21 @@ export default function ProgressAnalytics() {
   const [expanded, setExpanded]       = useState(null);
   const [reportModal, setReportModal] = useState(null);
 
-  useEffect(() => {
+  const HISTORY_KEY = 'alumnex_interview_history';
+
+  const loadInterviews = () => {
+    // 1. Load from localStorage (saved after each session)
+    try {
+      const local = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      const userHistory = local.filter(r => r.userId === user?.id || r.studentName === user?.name);
+      if (userHistory.length > 0) {
+        setInterviews(userHistory);
+        setLoading(false);
+        return;
+      }
+    } catch {}
+
+    // 2. Fallback: fetch from API
     if (!user?.id) { setLoading(false); return; }
     api.getInterviewRecords(user.id).then(data => {
       if (Array.isArray(data) && data.length > 0) {
@@ -29,12 +43,21 @@ export default function ProgressAnalytics() {
             ? r.ai_action_items.actionable_insights.map(t => ({ done: false, text: t }))
             : [],
           analytics: r.ai_action_items || null,
+          userId:    user.id,
         }));
-        setInterviews(mapped.reverse()); // newest first
+        setInterviews(mapped.reverse());
+        // Save to localStorage for offline access
+        try {
+          const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+          const merged = [...mapped, ...existing.filter(e => !mapped.find(m => m.id === e.id))];
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+        } catch {}
       }
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [user?.id]);
+  };
+
+  useEffect(() => { loadInterviews(); }, [user?.id, user?.name]);
 
   // Derived stats
   const scores      = interviews.filter(i => i.score > 0).map(i => i.score);
@@ -53,11 +76,16 @@ export default function ProgressAnalytics() {
     : null;
 
   const toggleCheckItem = (interviewId, itemIdx) => {
-    setInterviews(prev => prev.map(iv =>
-      iv.id === interviewId
-        ? { ...iv, checklist: iv.checklist.map((c, i) => i === itemIdx ? { ...c, done: !c.done } : c) }
-        : iv
-    ));
+    setInterviews(prev => {
+      const updated = prev.map(iv =>
+        iv.id === interviewId
+          ? { ...iv, checklist: iv.checklist.map((c, i) => i === itemIdx ? { ...c, done: !c.done } : c) }
+          : iv
+      );
+      // Persist checklist state
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   if (loading) return (
@@ -175,14 +203,23 @@ export default function ProgressAnalytics() {
         </div>
       </div>
 
-      {/* AI Insights */}
+      {/* AI Insights — from latest interview or static fallback */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.5rem' }}>
           <span className="material-symbols-outlined" style={{ color: '#c3c0ff', fontSize: 28 }}>auto_awesome</span>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>AI Curator Insights</h2>
+          {interviews[0]?.analytics && <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 999, padding: '0.2rem 0.6rem' }}>From latest interview</span>}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem' }}>
-          {INSIGHTS.map(ins => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: '1rem' }}>
+          {(interviews[0]?.analytics?.actionable_insights?.length > 0
+            ? interviews[0].analytics.actionable_insights.slice(0, 4).map((text, i) => ({
+                icon: ['record_voice_over','analytics','diversity_3','history'][i % 4],
+                color: ['#4edea3','#c3c0ff','#ffb95f','#ffb4ab'][i % 4],
+                title: `Action Item ${i + 1}`,
+                text,
+              }))
+            : INSIGHTS
+          ).map(ins => (
             <div key={ins.title} style={{ background: '#171f33', borderRadius: 12, padding: '1.5rem', borderLeft: '3px solid transparent', transition: 'all 0.3s' }}
               onMouseEnter={e => { e.currentTarget.style.borderLeft = `3px solid ${ins.color}`; e.currentTarget.style.transform = 'translateY(-4px)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderLeft = '3px solid transparent'; e.currentTarget.style.transform = 'none'; }}>
@@ -245,3 +282,4 @@ export default function ProgressAnalytics() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 const PLACEMENT_DATA = [
   { dept: 'CS', placed: 87, total: 95, avg_pkg: '12.4 LPA', top: 'Google, Microsoft' },
@@ -229,3 +229,4 @@ export default function AnalyticsTab() {
     </div>
   );
 }
+

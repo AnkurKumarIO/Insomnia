@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 const LOGS = [
   { id: 1, user: 'admin', role: 'TNP', action: 'Login', detail: 'Successful login from 192.168.1.10', timestamp: '2026-04-12 09:14:22', status: 'success' },
@@ -144,3 +144,4 @@ export default function ComplianceTab({ logRole, setLogRole, logAction, setLogAc
     </div>
   );
 }
+

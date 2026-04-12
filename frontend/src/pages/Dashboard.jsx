@@ -33,7 +33,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
       studentId: authUser.id || studentName,
       alumniName: mentor.name,
       alumniId:   mentor.id,
-      alumniRole: `${mentor.title} â€¢ ${mentor.company}`,
+      alumniRole: `${mentor.title} • ${mentor.company}`,
       topic,
       message,
       studentProfile: {
@@ -60,7 +60,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
       <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
         {sent ? (
           <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>âœ…</div>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Sent!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
               Your request has been sent to <strong style={{ color: '#dae2fd' }}>{mentor.name}</strong>.<br />
@@ -73,7 +73,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
               <div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Book Mock Interview</div>
                 <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{mentor.name}</h3>
-                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} â€¢ {mentor.company}</p>
+                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} • {mentor.company}</p>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
                 <span className="material-symbols-outlined">close</span>
@@ -591,7 +591,7 @@ export default function Dashboard() {
                                 </a>
                               ) : (
                                 <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600 }}>
-                                  ðŸ• {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  🕐 {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </div>
                               );
                             })()}
@@ -682,5 +682,6 @@ const glass = { background: 'rgba(23,31,51,0.7)', backdropFilter: 'blur(20px)', 
 const label = { fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', fontWeight: 700, marginBottom: '1rem' };
 const btnOutline = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', background: 'transparent', borderRadius: 8, cursor: 'pointer' };
 const btnPrimary = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer' };
+
 
 

@@ -41,7 +41,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
 
         {done ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>âœ…</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Accepted!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified. Click "Book Slot" to schedule the interview.</p>
           </div>
@@ -56,7 +56,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
                   {p.college && <div style={{ fontSize: '0.78rem', color: '#c7c4d8', marginTop: 2 }}>{p.college}</div>}
                   {(p.department || p.year) && (
                     <div style={{ fontSize: '0.72rem', color: '#c3c0ff', marginTop: 2 }}>
-                      {[p.department, p.year].filter(Boolean).join(' â€¢ ')}
+                      {[p.department, p.year].filter(Boolean).join(' • ')}
                     </div>
                   )}
                 </div>
@@ -429,9 +429,9 @@ function AddSlotModal({ onClose, onAdd }) {
 }
 
 const SCHEDULE = [
-  { when: 'Today â€¢ 2:00 PM',     title: 'Mock Interview: David Chen',  sub: 'Backend Infrastructure Focus', active: true },
-  { when: 'Tomorrow â€¢ 10:30 AM', title: 'Career Path Guidance',         sub: 'Group Session â€¢ 4 Students',   active: false },
-  { when: 'Fri â€¢ 4:00 PM',       title: 'Resume Deep Dive',             sub: 'One-on-One â€¢ Marcus Aurelius', active: false },
+  { when: 'Today • 2:00 PM',     title: 'Mock Interview: David Chen',  sub: 'Backend Infrastructure Focus', active: true },
+  { when: 'Tomorrow • 10:30 AM', title: 'Career Path Guidance',         sub: 'Group Session • 4 Students',   active: false },
+  { when: 'Fri • 4:00 PM',       title: 'Resume Deep Dive',             sub: 'One-on-One • Marcus Aurelius', active: false },
 ];
 const NAV_ITEMS = [
   { icon: 'dashboard',     label: 'Dashboard',  tab: 'home' },
@@ -559,7 +559,7 @@ export default function AlumniDashboard() {
   };
 
   const handleAddSlot = ({ date, time, duration }) => {
-    const label = `${date} â€¢ ${time}`;
+    const label = `${date} • ${time}`;
     setExtraSlots(s => [...s, { when: label, title: `Open Slot (${duration} min)`, sub: 'Available for booking', active: false }]);
   };
 
@@ -814,7 +814,7 @@ export default function AlumniDashboard() {
         // Fallback: check string-based slots
         return allSlots.some(s => {
           if (!s.when) return false;
-          const parts = s.when.split('â€¢');
+          const parts = s.when.split('•');
           if (parts.length < 2) return false;
           const timeStr = parts[1].trim().replace(' PM','').replace(' AM','');
           const slotHour = parseInt(timeStr.split(':')[0]);
@@ -844,7 +844,7 @@ export default function AlumniDashboard() {
 
         return allSlots.find(s => {
           if (!s.when) return false;
-          const parts = s.when.split('â€¢');
+          const parts = s.when.split('•');
           if (parts.length < 2) return false;
           const timeStr = parts[1].trim().replace(' PM','').replace(' AM','');
           const slotHour = parseInt(timeStr.split(':')[0]);
@@ -1005,7 +1005,7 @@ export default function AlumniDashboard() {
                   </span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
-                {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `â€¢ ${r.studentProfile.department}` : ''}</div>}
+                {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `• ${r.studentProfile.department}` : ''}</div>}
               </div>
 
               {/* Actions */}
@@ -1473,4 +1473,5 @@ export default function AlumniDashboard() {
 
 const glass = { background: 'rgba(23,31,51,0.7)', backdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', borderRadius: 16 };
 const btnOutline = { padding: '0.5rem 1.25rem', background: 'transparent', border: '1px solid rgba(195,192,255,0.2)', color: '#c3c0ff', borderRadius: 999, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' };
+
 

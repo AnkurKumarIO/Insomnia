@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+﻿import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
@@ -391,6 +391,29 @@ export default function DualAgentInterviewRoom() {
         fullTranscript: hints.filter(h => h.type === 'ai').map(h => h.text).join(' '),
       });
       setAnalytics(data.analytics);
+
+      // ── Save report to localStorage for ProgressAnalytics ──────────────
+      try {
+        const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
+        const HISTORY_KEY = 'alumnex_interview_history';
+        const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        const score = Math.round((confidence + clarity + energy) / 3);
+        const report = {
+          id: `iv-${roomId}-${Date.now()}`,
+          label: `Mock Interview #${String(existing.filter(r => r.userId === authUser.id || r.studentName === authUser.name).length + 1).padStart(2, '0')}`,
+          score,
+          date: new Date().toISOString(),
+          userId: authUser.id,
+          studentName: authUser.name,
+          roomId,
+          metrics: { confidence, clarity, energy },
+          analytics: data.analytics,
+          checklist: (data.analytics?.actionable_insights || []).map(t => ({ done: false, text: t })),
+        };
+        existing.unshift(report); // newest first
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50))); // keep last 50
+      } catch (saveErr) { console.warn('Could not save interview report:', saveErr); }
+
     } catch (e) { console.error(e); }
   };
 
@@ -762,3 +785,4 @@ export default function DualAgentInterviewRoom() {
     </div>
   );
 }
+
