@@ -3,17 +3,16 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import AlumNexLogo from '../AlumNexLogo';
 
-// ── Hardcoded credential store (simulates what would be emailed after TNP approval) ──
-// Format: { username, password, role, name, department, email }
+// ── Hardcoded credential store ──
 const CREDENTIAL_STORE = [
-  // TNP
-  { username: 'admin',          password: 'tnp_secure_123', role: 'TNP',     name: 'TNP Coordinator',  department: 'Administration' },
-  // Demo students (generated after registration + TNP approval)
-  { username: 'alice.johnson42', password: 'Xk7mP2qR9n',   role: 'STUDENT', name: 'Alice Johnson',    department: 'Computer Science' },
-  { username: 'bob.smith18',     password: 'Ry4nQ8wL3v',   role: 'STUDENT', name: 'Bob Smith',        department: 'Electrical Engineering' },
-  // Demo alumni
-  { username: 'priya.sharma',    password: 'Alumni@2026',   role: 'ALUMNI',  name: 'Priya Sharma',     department: 'Computer Science' },
-  { username: 'rahul.verma',     password: 'Alumni@2026',   role: 'ALUMNI',  name: 'Rahul Verma',      department: 'Electrical Engineering' },
+  { username: 'admin',           password: 'tnp_secure_123', role: 'TNP',     name: 'TNP Coordinator',  department: 'Administration',         id: 'tnp-admin' },
+  { username: 'alice.johnson42', password: 'Xk7mP2qR9n',    role: 'STUDENT', name: 'Alice Johnson',    department: 'Computer Science',       id: 'stu-alice-johnson' },
+  { username: 'bob.smith18',     password: 'Ry4nQ8wL3v',    role: 'STUDENT', name: 'Bob Smith',        department: 'Electrical Engineering', id: 'stu-bob-smith' },
+  { username: 'priya.sharma',    password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Priya Sharma',     department: 'Computer Science',       id: 'alm-priya-sharma' },
+  { username: 'rahul.verma',     password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Rahul Verma',      department: 'Electrical Engineering', id: 'alm-rahul-verma' },
+  { username: 'sarah.chen',      password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Sarah Chen',       department: 'Computer Science',       id: 'alm-sarah-chen' },
+  { username: 'jasmine.patel',   password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Jasmine Patel',    department: 'Computer Science',       id: 'alm-jasmine-patel' },
+  { username: 'aisha.okonkwo',   password: 'Alumni@2026',    role: 'ALUMNI',  name: 'Aisha Okonkwo',    department: 'Computer Science',       id: 'alm-aisha-okonkwo' },
 ];
 
 // Also check dynamically generated credentials from registration flow
@@ -70,7 +69,7 @@ export default function UnifiedLogin() {
         setLoading(false);
         return;
       }
-      const userData = { id: `${cred.role.toLowerCase()}-${Date.now()}`, name: cred.name, role: cred.role, department: cred.department };
+      const userData = { id: cred.id || `${cred.role.toLowerCase()}-${Date.now()}`, name: cred.name, role: cred.role, department: cred.department };
       login(userData, `token-${Date.now()}`);
 
       // If student and profile not set up yet, go to profile setup
@@ -90,7 +89,9 @@ export default function UnifiedLogin() {
 
   const DEMO_HINTS = {
     STUDENT: 'Demo: alice.johnson42 / Xk7mP2qR9n',
-    ALUMNI:  'Demo: priya.sharma / Alumni@2026',
+    ALUMNI:  'Demo: priya.sharma / Alumni@2026  (also: sarah.chen, jasmine.patel, aisha.okonkwo)',
+    TNP:     'Demo: admin / tnp_secure_123',
+  };
     TNP:     'Demo: admin / tnp_secure_123',
   };
 
@@ -169,6 +170,12 @@ export default function UnifiedLogin() {
               <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#c7c4d8', marginTop: '1.25rem' }}>
                 Don't have an account?{' '}
                 <a href="/auth/student/register" style={{ color: '#c3c0ff', textDecoration: 'none', fontWeight: 600 }}>Register here</a>
+              </p>
+            )}
+            {role === 'ALUMNI' && (
+              <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#c7c4d8', marginTop: '1.25rem' }}>
+                New alumni mentor?{' '}
+                <a href="/auth/alumni/register" style={{ color: '#4edea3', textDecoration: 'none', fontWeight: 600 }}>Create account</a>
               </p>
             )}
           </div>

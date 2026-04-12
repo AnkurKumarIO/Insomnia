@@ -477,23 +477,19 @@ export default function AlumniDashboard() {
   // Load requests for this alumni from Supabase directly
   useEffect(() => {
     const load = async () => {
+      let usedSupabase = false;
       try {
-        // Resolve real alumni UUID
         let alumniId = user.id;
         const isMockId = !alumniId || String(alumniId).startsWith('alm-') || String(alumniId).startsWith('stu-');
-
         if (isMockId) {
-          // Look up by name from alumni list
           const { getAllAlumni } = await import('../lib/db');
           const alumniList = await getAllAlumni();
           const match = alumniList.find(a => a.name === user.name);
           if (match) alumniId = match.id;
         }
-
-        if (alumniId && !String(alumniId).startsWith('alm-')) {
+        if (alumniId && !String(alumniId).startsWith('alm-') && !String(alumniId).startsWith('stu-')) {
           const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
           const data = await dbGetRequests(alumniId);
-
           const mapped = data.map(r => ({
             id:            r.request_id,
             studentName:   r.student_name || r.student?.name || '',
@@ -508,8 +504,6 @@ export default function AlumniDashboard() {
             createdAt:     r.created_at,
             studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
           }));
-
-          // Merge into localStorage
           const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
           mapped.forEach(dbReq => {
             const idx = local.findIndex(l => l.id === dbReq.id);
@@ -518,14 +512,16 @@ export default function AlumniDashboard() {
           });
           localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
           setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
-          return;
+          usedSupabase = true;
         }
       } catch (err) {
-        console.warn('AlumniDashboard: failed to load requests', err.message);
+        console.warn('AlumniDashboard: Supabase failed, using localStorage', err.message);
       }
-      // Fallback to localStorage
-      const all = getRequests();
-      setLiveRequests(all.filter(r => r.alumniName === user.name && ['pending','accepted','slot_booked'].includes(r.status)));
+      if (!usedSupabase) {
+        const all = getRequests();
+        const mine = all.filter(r => r.alumniName === user.name || r.alumniId === user.id);
+        setLiveRequests(mine.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
+      }
     };
     load();
     const interval = setInterval(load, 5000);

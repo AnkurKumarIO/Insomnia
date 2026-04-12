@@ -96,6 +96,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
     studentName,
     studentId:     realStudentId || studentId,
     alumniName,
+    alumniId:      alumniId || '',
     alumniRole,
     topic:         topic   || 'Mock Interview',
     message:       message || '',

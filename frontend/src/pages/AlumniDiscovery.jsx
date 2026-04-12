@@ -52,9 +52,10 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
 
   const handleSend = () => {
     const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
-      studentId: studentName,
+      studentId: authUser.id || studentName,
       alumniName: alumni.name,
       alumniId:   alumni.id,
       alumniRole: `${alumni.title} • ${alumni.company}`,
@@ -192,13 +193,29 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
   const [bookingAlumni, setBookingAlumni] = useState(null);
   const [refreshKey, setRefreshKey]     = useState(0);
 
-  // Fetch alumni from Supabase directly
+  // Fetch alumni from Supabase directly, fall back to mock data
+  const MOCK_ALUMNI = [
+    { id: 'alm-priya-sharma',    name: 'Priya Sharma',    email: 'priya.sharma@alumni.edu',    department: 'Computer Science',          company: 'Google',    batch_year: 2018, profile_data: { title: 'Senior Software Engineer', skills: ['React', 'Node.js', 'System Design'], bio: 'Passionate about mentoring students in frontend and system design interviews.' } },
+    { id: 'alm-rahul-verma',     name: 'Rahul Verma',     email: 'rahul.verma@alumni.edu',     department: 'Electrical Engineering',    company: 'Microsoft', batch_year: 2016, profile_data: { title: 'Principal Engineer',        skills: ['C++', 'Distributed Systems', 'Cloud'],  bio: 'Helping students crack top-tier tech interviews with 8+ years of industry experience.' } },
+    { id: 'alm-sarah-chen',      name: 'Sarah Chen',      email: 'sarah.chen@alumni.edu',      department: 'Computer Science',          company: 'Google',    batch_year: 2017, profile_data: { title: 'Senior PM',               skills: ['Strategy', 'Growth', 'AI/ML'],           bio: 'Expert in scaling AI consumer products from 0 to 1.' } },
+    { id: 'alm-jasmine-patel',   name: 'Jasmine Patel',   email: 'jasmine.patel@alumni.edu',   department: 'Computer Science',          company: 'Meta',      batch_year: 2019, profile_data: { title: 'Data Scientist',          skills: ['Python', 'Big Data', 'Algorithms'],      bio: 'Specializing in large scale recommendation engines.' } },
+    { id: 'alm-aisha-okonkwo',   name: 'Aisha Okonkwo',   email: 'aisha.okonkwo@alumni.edu',   department: 'Computer Science',          company: 'DeepMind', batch_year: 2020, profile_data: { title: 'ML Engineer',             skills: ['AI Research', 'PyTorch', 'NLP'],         bio: 'Working on large language model alignment.' } },
+    { id: 'alm-carlos-mendez',   name: 'Carlos Mendez',   email: 'carlos.mendez@alumni.edu',   department: 'Information Technology',    company: 'Netflix',   batch_year: 2015, profile_data: { title: 'Staff Engineer',          skills: ['Distributed Systems', 'Java', 'Scale'],  bio: 'Built streaming infrastructure serving 200M+ users.' } },
+  ];
+
   useEffect(() => {
     import('../lib/db').then(({ getAllAlumni }) => {
       getAllAlumni().then(data => {
-        if (Array.isArray(data)) setAllAlumni(data.map(toDisplayAlumni));
+        if (Array.isArray(data) && data.length > 0) {
+          setAllAlumni(data.map(toDisplayAlumni));
+        } else {
+          setAllAlumni(MOCK_ALUMNI.map(toDisplayAlumni));
+        }
         setLoading(false);
-      }).catch(() => setLoading(false));
+      }).catch(() => {
+        setAllAlumni(MOCK_ALUMNI.map(toDisplayAlumni));
+        setLoading(false);
+      });
     });
   }, []);
 

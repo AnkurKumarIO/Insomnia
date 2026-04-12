@@ -10,6 +10,7 @@ import UnifiedLogin from './pages/UnifiedLogin';
 import ProfileSetup from './pages/ProfileSetup';
 import TNPLogin from './pages/TNPLogin';
 import AlumniLogin from './pages/AlumniLogin';
+import AlumniRegistration from './pages/AlumniRegistration';
 import Dashboard from './pages/Dashboard';
 import AlumniDashboard from './pages/AlumniDashboard';
 import TNPDashboard from './pages/TNPDashboard';
@@ -99,6 +100,7 @@ function App() {
           <Route path="/profile-setup" element={<ProfileSetup />} />
           <Route path="/auth/tnp" element={<TNPLogin />} />
           <Route path="/auth/alumni" element={<AlumniLogin />} />
+          <Route path="/auth/alumni/register" element={<AlumniRegistration />} />
           <Route path="/dashboard" element={<DashboardRouter />} />
           <Route path="/interview/:roomId" element={<InterviewRoom />} />
           <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
