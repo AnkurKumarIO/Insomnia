@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { api } from '../api';
+import { updateUserProfile } from '../lib/db';
 
 const NOTIF_ITEMS = [
   { key: 'interview_requests', label: 'Interview Requests', desc: 'When a student sends you a booking request' },
@@ -64,9 +64,9 @@ export default function SettingsPage() {
     const updatedUser = { ...user, name: profile.name, department: profile.department };
     login(updatedUser, localStorage.getItem('alumniconnect_token'));
 
-    // Save to Supabase if we have a real user id
-    if (user?.id) {
-      await api.saveProfile(user.id, profile);
+    // Save to Supabase directly
+    if (user?.id && !user.id.startsWith('stu-') && !user.id.startsWith('alm-')) {
+      await updateUserProfile(user.id, profile).catch(err => console.warn('Profile save:', err.message));
     }
 
     flashSaved();
