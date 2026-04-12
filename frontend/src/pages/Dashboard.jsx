@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useRef } from 'react';
+﻿import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumniDiscovery from './AlumniDiscovery';
@@ -11,10 +11,10 @@ import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import { api } from '../api';
 import { getAllAlumni, getUserById } from '../lib/db';
 
-// ── Inline BookModal for Recommended Mentor ───────────────────────────────────
+// â”€â”€ Inline BookModal for Recommended Mentor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOPICS = [
-  'Mock Interview – General', 'Mock Interview – System Design',
-  'Mock Interview – Frontend', 'Mock Interview – Backend',
+  'Mock Interview â€“ General', 'Mock Interview â€“ System Design',
+  'Mock Interview â€“ Frontend', 'Mock Interview â€“ Backend',
   'Career Guidance', 'Resume Review',
 ];
 
@@ -33,7 +33,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
       studentId: authUser.id || studentName,
       alumniName: mentor.name,
       alumniId:   mentor.id,
-      alumniRole: `${mentor.title} • ${mentor.company}`,
+      alumniRole: `${mentor.title} â€¢ ${mentor.company}`,
       topic,
       message,
       studentProfile: {
@@ -60,7 +60,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
       <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
         {sent ? (
           <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>âœ…</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Sent!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>
               Your request has been sent to <strong style={{ color: '#dae2fd' }}>{mentor.name}</strong>.<br />
@@ -73,7 +73,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
               <div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Book Mock Interview</div>
                 <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd' }}>{mentor.name}</h3>
-                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} • {mentor.company}</p>
+                <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{mentor.title} â€¢ {mentor.company}</p>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
                 <span className="material-symbols-outlined">close</span>
@@ -155,9 +155,30 @@ export default function Dashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Student').split(' ')[0];
 
-  // Poll student notifications every 3s
+  // Poll student notifications every 3s + auto-fire "meeting live" notification
   useEffect(() => {
-    const load = () => setStudentNotifs(getStudentNotifications(user.name));
+    const NOTIF_KEY = 'alumniconnect_student_notifications';
+    const load = () => {
+      setStudentNotifs(getStudentNotifications(user.name));
+      // Auto-fire "meeting is live" notification when scheduled time arrives
+      const requests = getRequestsByStudent(user.name);
+      requests.forEach(r => {
+        if (r.status === 'slot_booked' && r.scheduledTime && r.roomId) {
+          const now = Date.now();
+          const scheduled = new Date(r.scheduledTime).getTime();
+          if (now >= scheduled - 60000 && now <= scheduled + 2 * 60 * 60 * 1000) {
+            try {
+              const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+              const alreadyLive = all.some(n => n.requestId === r.id && n.type === 'live');
+              if (!alreadyLive) {
+                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: 'ðŸ”´ Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, read: false, createdAt: new Date().toISOString() });
+                localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+              }
+            } catch {}
+          }
+        }
+      });
+    };
     load();
     const interval = setInterval(load, 3000);
     return () => clearInterval(interval);
@@ -198,7 +219,7 @@ export default function Dashboard() {
 
   const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
 
-  // Profile completion — use Gemini result if available, else calculate locally
+  // Profile completion â€” use Gemini result if available, else calculate locally
   const profileCompletion = aiProfileStrength?.score ?? (() => {
     const checks = [
       !!profileData.bio, !!profileData.linkedin, !!profileData.github,
@@ -252,11 +273,12 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {allNotifs.map(n => {
                 const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
-                const canJoin = n.type === 'slot_booked' && req?.roomId && req?.scheduledTime &&
+                const isLive = n.type === 'live';
+                const canJoin = (n.type === 'slot_booked' || isLive) && req?.roomId && req?.scheduledTime &&
                   Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
-                const iconMap = { slot_booked: 'event_available', accepted: 'check_circle', declined: 'cancel', default: 'notifications' };
-                const colorMap = { slot_booked: '#4edea3', accepted: '#c3c0ff', declined: '#ffb4ab', default: '#c7c4d8' };
-                const bgMap = { slot_booked: 'rgba(78,222,163,0.1)', accepted: 'rgba(195,192,255,0.1)', declined: 'rgba(255,180,171,0.1)', default: 'rgba(70,69,85,0.1)' };
+                const iconMap = { slot_booked: 'event_available', accepted: 'check_circle', declined: 'cancel', live: 'videocam', default: 'notifications' };
+                const colorMap = { slot_booked: '#4edea3', accepted: '#c3c0ff', declined: '#ffb4ab', live: '#ff4444', default: '#c7c4d8' };
+                const bgMap = { slot_booked: 'rgba(78,222,163,0.1)', accepted: 'rgba(195,192,255,0.1)', declined: 'rgba(255,180,171,0.1)', live: 'rgba(255,68,68,0.1)', default: 'rgba(70,69,85,0.1)' };
                 const type = n.type || 'default';
                 return (
                   <div key={n.id} style={{ background: !n.read ? '#171f33' : '#131b2e', borderRadius: 14, padding: '1.25rem', border: `1px solid ${!n.read ? 'rgba(195,192,255,0.12)' : 'rgba(70,69,85,0.12)'}`, display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s' }}>
@@ -344,7 +366,7 @@ export default function Dashboard() {
               <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
                   <span style={{ fontWeight: 500 }}>{skill}</span>
-                  <span style={{ color: '#c7c4d8' }}>—</span>
+                  <span style={{ color: '#c7c4d8' }}>â€”</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
@@ -377,7 +399,7 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-          {/* Resume CTA — full width */}
+          {/* Resume CTA â€” full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -408,7 +430,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recommended Mentor CTA — clean button, no profile preview */}
+          {/* Recommended Mentor CTA â€” clean button, no profile preview */}
           <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -502,7 +524,7 @@ export default function Dashboard() {
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {/* Search — only visible in Directory tab */}
+            {/* Search â€” only visible in Directory tab */}
             {activeTab === 'directory' && (
               <div style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
@@ -556,7 +578,7 @@ export default function Dashboard() {
                                 </a>
                               ) : (
                                 <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600 }}>
-                                  🕐 {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  ðŸ• {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </div>
                               );
                             })()}
@@ -597,9 +619,9 @@ export default function Dashboard() {
                   {/* Profile details */}
                   <div style={{ padding: '1rem' }}>
                     {[
-                      { icon: 'school', label: 'Year', val: savedProfile.year || '—' },
-                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || '—' },
-                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : '—' },
+                      { icon: 'school', label: 'Year', val: savedProfile.year || 'â€”' },
+                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || 'â€”' },
+                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : 'â€”' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c3c0ff' }}>{item.icon}</span>
@@ -633,7 +655,7 @@ export default function Dashboard() {
         </section>
 
         <footer style={{ marginTop: 'auto', padding: '3rem 2rem', borderTop: '1px solid rgba(70,69,85,0.2)', background: '#0b1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNEX. The Intelligence Platform.</p>
+          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>Â© 2026 AlumNEX. The Intelligence Platform.</p>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             {['Privacy','Terms','API','Contact'].map(l => <a key={l} href="#" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', textDecoration: 'none' }}>{l}</a>)}
           </div>
@@ -647,3 +669,4 @@ const glass = { background: 'rgba(23,31,51,0.7)', backdropFilter: 'blur(20px)', 
 const label = { fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', fontWeight: 700, marginBottom: '1rem' };
 const btnOutline = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', background: 'transparent', borderRadius: 8, cursor: 'pointer' };
 const btnPrimary = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer' };
+
