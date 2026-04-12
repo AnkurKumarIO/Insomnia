@@ -598,6 +598,34 @@ export default function AlumniDashboard() {
     }]);
   };
 
+  // ── Instant Meet — start right now, notify student ────────────────────────
+  const handleInstantMeet = (req) => {
+    const now = new Date().toISOString();
+    const roomId = `room-instant-${req.id.slice(-8)}-${Date.now()}`;
+    // Update request to slot_booked with current time
+    bookSlot(req.id, now);
+    setLiveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'slot_booked', scheduledTime: now, roomId } : r));
+    // Push instant notification to student
+    try {
+      const NOTIF_KEY = 'alumniconnect_student_notifications';
+      const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+      all.unshift({
+        id: `instant-${req.id}-${Date.now()}`,
+        studentName: req.studentName,
+        type: 'live',
+        title: '🔴 Instant Meeting Started!',
+        message: `${user.name} has started an instant mock interview session. Join now!`,
+        requestId: req.id,
+        roomId,
+        read: false,
+        createdAt: now,
+      });
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+    } catch {}
+    // Navigate alumni to the room
+    navigate(`/interview/${roomId}`);
+  };
+
   const handleRescheduled = (requestId, newScheduledTime) => {
     setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, scheduledTime: newScheduledTime } : r));
     const formatted = formatScheduledTime(newScheduledTime);
@@ -702,7 +730,12 @@ export default function AlumniDashboard() {
                       <button onClick={() => { setViewingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>View</button>
                     )}
                     {r.status === 'accepted' && (
-                      <button onClick={() => { setBookingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(78,222,163,0.15)', color: '#4edea3', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>Book Slot</button>
+                      <>
+                        <button onClick={() => { setBookingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(78,222,163,0.15)', color: '#4edea3', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>Book Slot</button>
+                        <button onClick={() => handleInstantMeet(r)} style={{ padding: '0.3rem 0.7rem', background: 'rgba(255,68,68,0.15)', color: '#ff6b6b', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: '1px solid rgba(255,68,68,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>videocam</span>Instant Meet
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

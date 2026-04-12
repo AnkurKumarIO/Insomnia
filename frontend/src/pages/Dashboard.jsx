@@ -297,13 +297,18 @@ export default function Dashboard() {
                         {new Date(n.createdAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
                       {/* Join Now button */}
-                      {n.type === 'slot_booked' && req && (
+                      {(n.type === 'slot_booked' || n.type === 'live') && (
                         <div style={{ marginTop: 10 }}>
-                          {canJoin ? (
+                          {/* Instant meet — roomId stored directly on notification */}
+                          {n.type === 'live' && n.roomId ? (
+                            <a href={`/interview/${n.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
+                            </a>
+                          ) : canJoin && req ? (
                             <a href={`/interview/${req.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
                             </a>
-                          ) : req.scheduledTime ? (
+                          ) : req?.scheduledTime ? (
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
                               {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -453,6 +458,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }`}</style>
       {showMentorBook && (
         <MentorBookModal
           mentor={recommendedMentor}
@@ -556,9 +562,9 @@ export default function Dashboard() {
                         </div>
                       ) : studentNotifs.map((n, i) => (
                         <div key={n.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: !n.read ? 'rgba(195,192,255,0.04)' : 'transparent' }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'slot_booked' ? 'rgba(78,222,163,0.12)' : n.type === 'accepted' ? 'rgba(195,192,255,0.12)' : 'rgba(255,180,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'slot_booked' ? '#4edea3' : n.type === 'accepted' ? '#c3c0ff' : '#ffb4ab', fontVariationSettings: "'FILL' 1" }}>
-                              {n.type === 'slot_booked' ? 'event_available' : n.type === 'accepted' ? 'check_circle' : 'cancel'}
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'live' ? 'rgba(255,68,68,0.12)' : n.type === 'slot_booked' ? 'rgba(78,222,163,0.12)' : n.type === 'accepted' ? 'rgba(195,192,255,0.12)' : 'rgba(255,180,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'live' ? '#ff6b6b' : n.type === 'slot_booked' ? '#4edea3' : n.type === 'accepted' ? '#c3c0ff' : '#ffb4ab', fontVariationSettings: "'FILL' 1" }}>
+                              {n.type === 'live' ? 'videocam' : n.type === 'slot_booked' ? 'event_available' : n.type === 'accepted' ? 'check_circle' : 'cancel'}
                             </span>
                           </div>
                           <div style={{ flex: 1 }}>
@@ -567,7 +573,14 @@ export default function Dashboard() {
                             <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
                               {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
-                            {/* Join Now button for slot_booked notifications */}
+                            {
+                            {/* Join Now — instant meet */}
+                            {n.type === 'live' && n.roomId && (
+                              <a href={`/interview/${n.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now — Live
+                              </a>
+                            )}
+                            /* Join Now button for slot_booked notifications */}
                             {n.type === 'slot_booked' && (() => {
                               const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
                               if (!req?.roomId) return null;
@@ -669,4 +682,5 @@ const glass = { background: 'rgba(23,31,51,0.7)', backdropFilter: 'blur(20px)', 
 const label = { fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', fontWeight: 700, marginBottom: '1rem' };
 const btnOutline = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', background: 'transparent', borderRadius: 8, cursor: 'pointer' };
 const btnPrimary = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer' };
+
 
