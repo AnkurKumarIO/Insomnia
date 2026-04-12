@@ -67,8 +67,7 @@ export default function StudentRegistration() {
     const e = {};
     if (!creds.username || creds.username.length < 4) e.username = 'Min 4 characters';
     else if (!/^[a-z0-9._]+$/.test(creds.username)) e.username = 'Lowercase letters, numbers, dots and underscores only';
-    else if (usernameStatus === 'taken') e.username = 'Username already taken';
-    else if (usernameStatus !== 'available') e.username = 'Please wait for availability check';
+    else if (usernameStatus === 'taken') e.username = 'Username already taken — choose another';
     if (creds.password.length < 8) e.password = 'Min 8 characters';
     if (creds.password !== creds.confirmPassword) e.confirmPassword = 'Passwords do not match';
     setErrors(e);
@@ -259,7 +258,7 @@ export default function StudentRegistration() {
             </div>
             <div style={{ display:'flex', gap:10, marginTop:4 }}>
               <button onClick={() => setStep(1)} style={{ flex:1, padding:'0.875rem', background:'rgba(70,69,85,0.2)', border:'1px solid rgba(70,69,85,0.3)', borderRadius:12, color:'#c7c4d8', fontWeight:700, fontSize:'0.875rem', cursor:'pointer' }}>Back</button>
-              <button onClick={handleSubmit} disabled={loading} style={{ flex:2, padding:'0.875rem', background: loading ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: loading ? '#c7c4d8' : '#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor: loading ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <button onClick={handleSubmit} disabled={loading || usernameStatus !== 'available'} style={{ flex:2, padding:'0.875rem', background: loading || usernameStatus !== 'available' ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: loading || usernameStatus !== 'available' ? '#c7c4d8' : '#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor: loading || usernameStatus !== 'available' ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                 {loading ? <><div style={{ width:16, height:16, border:'2px solid rgba(199,196,216,0.3)', borderTop:'2px solid #c7c4d8', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />Creating...</> : <><span className="material-symbols-outlined" style={{ fontSize:18 }}>person_add</span>Create Account</>}
               </button>
             </div>
