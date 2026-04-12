@@ -206,9 +206,9 @@ export default function ProfileSetup() {
   ];
 
   const handleComplete = async () => {
-    const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+    const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || '{}');
     const fullProfile = { ...pending, ...profile, photoPreview, profileComplete: true };
-    localStorage.setItem('alumniconnect_profile', JSON.stringify(fullProfile));
+    localStorage.setItem('alumnex_profile', JSON.stringify(fullProfile));
 
     const userId = pending.id;
     const profilePayload = {
@@ -236,7 +236,7 @@ export default function ProfileSetup() {
     };
 
     // Update pending profile to mark as complete
-    localStorage.setItem('alumniconnect_pending_profile', JSON.stringify({ ...pending, profileComplete: true }));
+    localStorage.setItem('alumnex_pending_profile', JSON.stringify({ ...pending, profileComplete: true }));
 
     login(userData, `token-${Date.now()}`);
     navigate('/dashboard');

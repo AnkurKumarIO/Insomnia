@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { sendRequest, getRequestsByStudent } from '../interviewRequests';
+import { getAllAlumni } from '../lib/db';
 
 const ALL_ALUMNI = [
   { name: 'Sarah Chen',      role: 'Senior PM • Google',          score: 98, scoreColor: '#4edea3', tags: ['Strategy','Growth','AI/ML'],       bio: 'Expert in scaling AI consumer products from 0 to 1. Mentoring early-stage founders and product enthusiasts.' },
@@ -176,43 +177,32 @@ export default function AlumniDiscovery({ searchQuery = '' }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const FILTER_OPTIONS = ['Google', 'Product Management', '5-10 Years', 'Engineering', 'Design'];
 
-  // 1. Fetch real alumni from backend on mount
+  // 1. Fetch real alumni from Supabase on mount
   useEffect(() => {
     let active = true;
     const loadAlumni = async () => {
       try {
-        const { api } = await import('../api');
-        const realAlumni = await api.fetchAlumni();
-        
-        if (!active || !Array.isArray(realAlumni)) {
-          if (!Array.isArray(realAlumni)) console.warn('Alumni API did not return an array:', realAlumni);
-          return;
-        }
-        const mappedList = realAlumni.map(a => {
-          // If it's already a full pro profile (e.g. from mock), keep it
-          if (a.role && a.tags) return a;
+        const realAlumni = await getAllAlumni();
 
-          // Otherwise, map minimal DB user data
+        if (!active || !Array.isArray(realAlumni)) return;
+
+        const mappedList = realAlumni.map(a => {
+          const p = a.profile_data || {};
+          const yrs = a.batch_year ? new Date().getFullYear() - a.batch_year : null;
           return {
-            name: a.name || a.username,
-            role: `Alumni • ${a.department || 'General'}`,
-            score: Math.floor(Math.random() * 20) + 70, // Mock score for new users
-            scoreColor: '#c3c0ff',
-            tags: [a.department || 'Mentorship'],
-            bio: a.bio || `Passionate alumni from ${a.department || 'the community'} ready to help students.`,
-            isReal: true
+            id:         a.id,
+            name:       a.name,
+            role:       p.title || (a.company ? `Alumni at ${a.company}` : `Alumni • ${a.department || 'General'}`),
+            score:      Math.min(99, 70 + ((p.skills?.length || 0) * 3) + (yrs || 0)),
+            scoreColor: yrs >= 8 ? '#ffb95f' : '#4edea3',
+            tags:       (p.skills || []).slice(0, 5),
+            bio:        p.bio || `Experienced alumni from ${a.department || 'the community'} ready to help students.`,
+            company:    a.company || '',
+            isReal:     true,
           };
         });
 
-        // Merge — avoid duplicates and prioritize pro profiles for first impression
-        const merged = [...ALL_ALUMNI];
-        mappedList.forEach(m => {
-          if (!merged.find(existing => existing.name === m.name)) {
-            merged.push(m);
-          }
-        });
-
-        setAlumniList(merged);
+        if (active && mappedList.length > 0) setAlumniList(mappedList);
       } catch (e) {
         console.error('Failed to load real alumni:', e);
       } finally {

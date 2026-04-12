@@ -1,5 +1,5 @@
-const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api';
-const ROOT_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE  = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const ROOT_BASE = API_BASE;
 
 // ─── Mock data (used when backend is unreachable) ───────────────────────────
 
@@ -321,6 +321,11 @@ export const api = {
   getUserByEmail: (email) => callOrMock(
     () => fetch(`${API_BASE}/users/by-email/${encodeURIComponent(email)}`).then(r => r.json()),
     async () => { await mockDelay(300); return null; }
+  ),
+
+  getInterviewRecords: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/stats/interviews?userId=${userId}`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
   ),
 
   getPlatformStats: () => callOrMock(

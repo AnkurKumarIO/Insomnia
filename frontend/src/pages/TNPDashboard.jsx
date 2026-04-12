@@ -47,7 +47,7 @@ export default function TNPDashboard() {
       const notifs = [];
       // Pending student registrations (awaiting TNP approval)
       try {
-        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+        const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || '{}');
         if (pending.username && pending.name) {
           notifs.push({
             id: `pending-${pending.username}`,
@@ -62,7 +62,7 @@ export default function TNPDashboard() {
       } catch {}
       // Pending alumni applications (awaiting TNP approval)
       try {
-        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumnex_pending_alumni') || '[]');
         pendingAlumni.forEach(acc => {
           notifs.push({
             id: `pending-alumni-${acc.id || acc.email}`,
@@ -139,13 +139,13 @@ export default function TNPDashboard() {
   const handleApprove = (q) => {
     const username = genUsername(q.name);
     const password = genPassword();
-    const email = `${username}@alumniconnect.edu`;
+    const email = `${username}@alumnex.edu`;
     const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
 
     // Save to approved accounts store
-    const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
+    const existing = JSON.parse(localStorage.getItem('alumnex_approved_accounts') || '[]');
     existing.push({ username, password, role, name: q.name, email, department: q.sub });
-    localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
+    localStorage.setItem('alumnex_approved_accounts', JSON.stringify(existing));
 
     setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
     setCredModal({ name: q.name, username, password, email, role });
@@ -458,7 +458,7 @@ export default function TNPDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <h2 style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 8 }}>Command Center</h2>
-              <p style={{ color: '#c7c4d8', maxWidth: 500, fontSize: '0.875rem' }}>Overseeing the growth and integration of AlumNex across all active placement departments.</p>
+              <p style={{ color: '#c7c4d8', maxWidth: 500, fontSize: '0.875rem' }}>Overseeing the growth and integration of AlumNEX across all active placement departments.</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#171f33', border: '1px solid rgba(70,69,85,0.2)', padding: '0.5rem 1rem', borderRadius: 12 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4edea3' }} />

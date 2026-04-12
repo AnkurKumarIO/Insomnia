@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import { api } from '../api';
+import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -457,7 +458,7 @@ export default function AlumniDashboard() {
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
-  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+  const savedProfile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
   const [profileForm, setProfileForm] = useState({
     username: savedProfile.username || user?.name || '',
     email:    savedProfile.email    || '',
@@ -484,15 +485,13 @@ export default function AlumniDashboard() {
 
         if (isMockId) {
           // Look up by name from alumni list
-          const { getAllAlumni } = await import('../lib/db');
           const alumniList = await getAllAlumni();
           const match = alumniList.find(a => a.name === user.name);
           if (match) alumniId = match.id;
         }
 
         if (alumniId && !String(alumniId).startsWith('alm-')) {
-          const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
-          const data = await dbGetRequests(alumniId);
+          const data = await getRequestsForAlumni(alumniId);
 
           const mapped = data.map(r => ({
             id:            r.request_id,
@@ -510,13 +509,13 @@ export default function AlumniDashboard() {
           }));
 
           // Merge into localStorage
-          const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+          const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
           mapped.forEach(dbReq => {
             const idx = local.findIndex(l => l.id === dbReq.id);
             if (idx === -1) local.push(dbReq);
             else local[idx] = { ...local[idx], ...dbReq };
           });
-          localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
+          localStorage.setItem('alumnex_interview_requests', JSON.stringify(local));
           setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
           return;
         }
@@ -557,7 +556,7 @@ export default function AlumniDashboard() {
 
   const saveProfileForm = () => {
     const updated = { ...savedProfile, ...profileForm };
-    localStorage.setItem('alumniconnect_profile', JSON.stringify(updated));
+    localStorage.setItem('alumnex_profile', JSON.stringify(updated));
     setEditProfile(false);
   };
 
