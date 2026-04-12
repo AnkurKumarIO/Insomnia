@@ -56,11 +56,11 @@ export default function UnifiedLogin() {
 
       const userData = { id: dbUser.id, name: dbUser.name, role: dbUser.role, department: dbUser.department, email: dbUser.email };
       if (dbUser.profile_data) {
-        localStorage.setItem('alumniconnect_profile', JSON.stringify(dbUser.profile_data));
+        localStorage.setItem('alumnex_profile', JSON.stringify(dbUser.profile_data));
       }
 
       // Store for session restoration
-      localStorage.setItem('alumniconnect_pending_profile', JSON.stringify({
+      localStorage.setItem('alumnex_pending_profile', JSON.stringify({
         id: dbUser.id, email, password, role: dbUser.role, name: dbUser.name,
         profileComplete: dbUser.profile_data?.profileComplete || false,
       }));

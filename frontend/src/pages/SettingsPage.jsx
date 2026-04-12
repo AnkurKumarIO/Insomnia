@@ -14,8 +14,8 @@ export default function SettingsPage() {
   const { user, login } = useContext(AuthContext);
 
   // Load saved profile or fall back to user data
-  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
-  const savedNotifs  = JSON.parse(localStorage.getItem('alumniconnect_notifs')  || '{}');
+  const savedProfile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
+  const savedNotifs  = JSON.parse(localStorage.getItem('alumnex_notifs')  || '{}');
 
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
@@ -59,10 +59,10 @@ export default function SettingsPage() {
 
   const saveProfile = async () => {
     const updated = { ...savedProfile, ...profile };
-    localStorage.setItem('alumniconnect_profile', JSON.stringify(updated));
+    localStorage.setItem('alumnex_profile', JSON.stringify(updated));
     // Update auth context name/department
     const updatedUser = { ...user, name: profile.name, department: profile.department };
-    login(updatedUser, localStorage.getItem('alumniconnect_token'));
+    login(updatedUser, localStorage.getItem('alumnex_token'));
 
     // Save to Supabase directly
     if (user?.id && !user.id.startsWith('stu-') && !user.id.startsWith('alm-')) {
@@ -73,7 +73,7 @@ export default function SettingsPage() {
   };
 
   const saveNotifs = () => {
-    localStorage.setItem('alumniconnect_notifs', JSON.stringify(notifs));
+    localStorage.setItem('alumnex_notifs', JSON.stringify(notifs));
     flashSaved();
   };
 

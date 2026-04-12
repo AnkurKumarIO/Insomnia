@@ -323,6 +323,11 @@ export const api = {
     async () => { await mockDelay(300); return null; }
   ),
 
+  getInterviewRecords: (userId) => callOrMock(
+    () => fetch(`${API_BASE}/stats/interviews?userId=${userId}`).then(r => r.json()),
+    async () => { await mockDelay(400); return []; }
+  ),
+
   getPlatformStats: () => callOrMock(
     () => fetch(`${API_BASE}/stats/platform`).then(r => r.json()),
     async () => { await mockDelay(400); return { verified_students: 5, active_mentors: 6, mock_interviews: 0, scheduled_today: 0 }; }

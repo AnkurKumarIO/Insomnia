@@ -56,7 +56,7 @@ export default function StudentRegistration() {
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 8 }}>Student Portal</div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 8 }}>Register</h2>
-          <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Join AlumniConnect AI and start your career journey.</p>
+          <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Join AlumNEX AI and start your career journey.</p>
         </div>
 
         {status && (

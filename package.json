@@ -1,7 +1,7 @@
 {
-  "name": "alumniconnect-ai",
+  "name": "alumnex-ai",
   "version": "1.0.0",
-  "description": "AlumniConnect AI Platform",
+  "description": "AlumNEX AI Platform",
   "scripts": {
     "install:all": "npm install --prefix frontend && npm install --prefix backend",
     "dev": "npx concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",

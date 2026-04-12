@@ -26,7 +26,7 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
   if (!mentor) return null;
 
   const handleSend = () => {
-    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+    const profile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
     sendRequest({
       studentName,
       studentId: studentName,
@@ -180,17 +180,17 @@ export default function Dashboard() {
 
     if (user?.id) {
       getUserById(user.id).then(u => {
-        const pd = u?.profile_data || JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        const pd = u?.profile_data || JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
         setProfileData(pd);
         if (Object.keys(pd).length > 0) {
           api.profileStrength(pd).then(r => { if (r && !r.error) setAiProfileStrength(r); }).catch(() => {});
         }
       }).catch(() => {
-        const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+        const saved = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
         setProfileData(saved);
       });
     } else {
-      const saved = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+      const saved = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
       setProfileData(saved);
     }
   }, [user?.id]);
@@ -449,7 +449,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlumNexLogo size={28} />
             <div>
-              <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+          <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
               <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginTop: 1 }}>Intelligence Suite</div>
             </div>
           </div>
@@ -632,7 +632,7 @@ export default function Dashboard() {
         </section>
 
         <footer style={{ marginTop: 'auto', padding: '3rem 2rem', borderTop: '1px solid rgba(70,69,85,0.2)', background: '#0b1326', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNex. The Intelligence Platform.</p>
+          <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNEX. The Intelligence Platform.</p>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             {['Privacy','Terms','API','Contact'].map(l => <a key={l} href="#" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', textDecoration: 'none' }}>{l}</a>)}
           </div>

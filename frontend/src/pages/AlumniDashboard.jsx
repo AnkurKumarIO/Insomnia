@@ -458,7 +458,7 @@ export default function AlumniDashboard() {
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
-  const savedProfile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
+  const savedProfile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
   const [profileForm, setProfileForm] = useState({
     username: savedProfile.username || user?.name || '',
     email:    savedProfile.email    || '',
@@ -509,13 +509,13 @@ export default function AlumniDashboard() {
           }));
 
           // Merge into localStorage
-          const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+          const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
           mapped.forEach(dbReq => {
             const idx = local.findIndex(l => l.id === dbReq.id);
             if (idx === -1) local.push(dbReq);
             else local[idx] = { ...local[idx], ...dbReq };
           });
-          localStorage.setItem('alumniconnect_interview_requests', JSON.stringify(local));
+          localStorage.setItem('alumnex_interview_requests', JSON.stringify(local));
           setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
           return;
         }
@@ -556,7 +556,7 @@ export default function AlumniDashboard() {
 
   const saveProfileForm = () => {
     const updated = { ...savedProfile, ...profileForm };
-    localStorage.setItem('alumniconnect_profile', JSON.stringify(updated));
+    localStorage.setItem('alumnex_profile', JSON.stringify(updated));
     setEditProfile(false);
   };
 

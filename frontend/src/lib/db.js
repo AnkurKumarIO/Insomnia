@@ -85,7 +85,7 @@ export async function createRequest({ studentId, alumniId, topic, message, stude
   if (!session) {
     // Try to sign in using stored credentials
     try {
-      const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+      const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || '{}');
       if (pending.email && pending.password) {
         await supabase.auth.signInWithPassword({ email: pending.email, password: pending.password });
       }

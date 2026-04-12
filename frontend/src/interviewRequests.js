@@ -3,8 +3,8 @@
 
 import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
 
-const STORAGE_KEY = 'alumniconnect_interview_requests';
-const NOTIF_KEY   = 'alumniconnect_student_notifications';
+const STORAGE_KEY = 'alumnex_interview_requests';
+const NOTIF_KEY   = 'alumnex_student_notifications';
 
 // ── localStorage helpers (fallback) ──────────────────────────────────────────
 function loadLocal() {
@@ -44,7 +44,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
   // Get the real student UUID from auth context
   let realStudentId = studentId;
   try {
-    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
     if (authUser.id && !authUser.id.startsWith('stu-') && !authUser.id.startsWith('alm-')) {
       realStudentId = authUser.id;
     }
@@ -121,7 +121,7 @@ function normalizeStatus(status) {
 export async function getRequestsFromDB(alumniId) {
   try {
     if (alumniId) {
-      const data = await api.getRequests({ alumniId });
+      const data = await dbGetRequestsForAlumni(alumniId);
       if (Array.isArray(data)) return data;
     }
   } catch {}
@@ -133,9 +133,8 @@ export async function getRequestsFromDB(alumniId) {
 export async function syncStudentRequests(studentId) {
   try {
     if (studentId) {
-      const data = await api.getRequests({ studentId });
+      const data = await getRequestsForStudent(studentId);
       if (Array.isArray(data)) {
-        // Merge DB records into localStorage
         const local = loadLocal();
         data.forEach(dbReq => {
           const idx = local.findIndex(r => r.id === dbReq.request_id);
@@ -147,7 +146,7 @@ export async function syncStudentRequests(studentId) {
             alumniRole:    '',
             topic:         dbReq.topic,
             message:       dbReq.message,
-            status:        dbReq.status?.toLowerCase().replace('_booked', '_booked') || 'pending',
+            status:        (dbReq.status || 'PENDING').toLowerCase(),
             scheduledTime: dbReq.scheduled_time || null,
             roomId:        dbReq.room_id || null,
             createdAt:     dbReq.created_at,
@@ -190,7 +189,7 @@ export async function acceptRequestOnly(requestId) {
   // Push notification to student in Supabase
   try {
     const req = requests[idx];
-    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
     if (req.studentId && !String(req.studentId).startsWith('stu-')) {
       await createNotification({
         userId:    req.studentId,

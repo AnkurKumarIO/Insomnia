@@ -34,12 +34,12 @@ require('./socket/interviewRoom')(io);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'AlumniConnect Backend is running' });
+  res.status(200).json({ status: 'ok', message: 'AlumNEX Backend is running' });
 });
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'AlumniConnect AI API',
+    name: 'AlumNEX AI API',
     version: '2.0.0',
     database: 'Supabase (PostgreSQL)',
     endpoints: {
@@ -60,7 +60,7 @@ app.get('/api', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`\n🚀 AlumniConnect Backend running on http://localhost:${PORT}`);
+  console.log(`\n🚀 AlumNEX Backend running on http://localhost:${PORT}`);
   console.log(`📡 Socket.io ready on ws://localhost:${PORT}/interview`);
   console.log(`🗄️  Database: Supabase (PostgreSQL)\n`);
 });
