@@ -4,12 +4,7 @@
  */
 import { supabase } from './supabaseClient';
 
-// Service-role client for writes that bypass RLS (anon key can't do these)
-// We use the anon key but with open RLS policies — see rls_fix.sql
-const db = supabase;
-
 // ── Users ─────────────────────────────────────────────────────────────────────
-
 export async function getUserByEmail(email) {
   const { data } = await supabase
     .from('users')

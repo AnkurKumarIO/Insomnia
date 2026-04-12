@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import { api } from '../api';
+import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -484,15 +485,13 @@ export default function AlumniDashboard() {
 
         if (isMockId) {
           // Look up by name from alumni list
-          const { getAllAlumni } = await import('../lib/db');
           const alumniList = await getAllAlumni();
           const match = alumniList.find(a => a.name === user.name);
           if (match) alumniId = match.id;
         }
 
         if (alumniId && !String(alumniId).startsWith('alm-')) {
-          const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
-          const data = await dbGetRequests(alumniId);
+          const data = await getRequestsForAlumni(alumniId);
 
           const mapped = data.map(r => ({
             id:            r.request_id,

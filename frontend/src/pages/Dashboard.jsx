@@ -9,6 +9,7 @@ import AlumNexLogo from '../AlumNexLogo';
 import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import { api } from '../api';
+import { getAllAlumni, getUserById } from '../lib/db';
 
 // ── Inline BookModal for Recommended Mentor ───────────────────────────────────
 const TOPICS = [
@@ -163,7 +164,7 @@ export default function Dashboard() {
 
   // Fetch recommended mentor + profile data
   useEffect(() => {
-    api.getAlumni().then(alumni => {
+    getAllAlumni().then(alumni => {
       if (Array.isArray(alumni) && alumni.length > 0) {
         const a = alumni[0];
         const p = a.profile_data || {};
@@ -178,10 +179,9 @@ export default function Dashboard() {
     }).catch(() => {});
 
     if (user?.id) {
-      api.getUser(user.id).then(u => {
+      getUserById(user.id).then(u => {
         const pd = u?.profile_data || JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
         setProfileData(pd);
-        // Ask Gemini to evaluate profile strength
         if (Object.keys(pd).length > 0) {
           api.profileStrength(pd).then(r => { if (r && !r.error) setAiProfileStrength(r); }).catch(() => {});
         }
