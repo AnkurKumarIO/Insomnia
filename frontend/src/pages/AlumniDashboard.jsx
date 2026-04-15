@@ -163,77 +163,88 @@ function BookSlotModal({ request, onClose, onBooked }) {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('10:00');
-  const [step, setStep] = useState('calendar'); // calendar | confirm | done
+  const [timeHH, setTimeHH]   = useState('10');
+  const [timeMM, setTimeMM]   = useState('00');
+  const [ampm, setAmpm]       = useState('AM');
+  const [timeError, setTimeError] = useState('');
+  const [step, setStep] = useState('calendar');
 
-  const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const firstDay   = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const todayStr = today.toDateString();
+  const todayStr   = today.toDateString();
 
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
-
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y-1); } else setViewMonth(m => m-1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y+1); } else setViewMonth(m => m+1); };
   const isPast = (day) => new Date(viewYear, viewMonth, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
+  const to24h = () => {
+    let h = parseInt(timeHH, 10) || 12;
+    const m = parseInt(timeMM, 10) || 0;
+    if (ampm === 'AM') { if (h === 12) h = 0; }
+    else { if (h !== 12) h += 12; }
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+
   const handleBook = () => {
-    const scheduledTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${selectedTime}`).toISOString();
+    const h = parseInt(timeHH, 10);
+    const m = parseInt(timeMM, 10);
+    if (isNaN(h) || h < 1 || h > 12) { setTimeError('Hour must be 1-12'); return; }
+    if (isNaN(m) || m < 0 || m > 59) { setTimeError('Minutes must be 00-59'); return; }
+    setTimeError('');
+    const time24 = to24h();
+    const scheduledTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${time24}`).toISOString();
     bookSlot(request.id, scheduledTime);
     setStep('done');
     setTimeout(() => { onBooked(scheduledTime); onClose(); }, 1800);
   };
 
+  const displayTime = () => `${String(timeHH).padStart(2,'0')}:${String(timeMM).padStart(2,'0')} ${ampm}`;
+
   const formattedSelected = selectedDate
     ? new Date(viewYear, viewMonth, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : null;
 
+  const inputStyle = {
+    background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10,
+    color: '#dae2fd', fontSize: '1.4rem', fontWeight: 700, textAlign: 'center',
+    width: '100%', padding: '0.6rem 0.25rem', outline: 'none', fontFamily: 'Inter, monospace',
+    boxSizing: 'border-box',
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
         {step === 'done' ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ“…</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>📅</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Slot Booked!</h3>
-            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>
-              {request.studentName} has been notified with the interview date and time.
-            </p>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>{request.studentName} has been notified with the interview date and time.</p>
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Book Interview Slot</div>
                 <h3 style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>with {request.studentName}</h3>
               </div>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}><span className="material-symbols-outlined">close</span></button>
             </div>
-
-            <div style={{ padding: '1.25rem 1.5rem' }}>
-              {/* Month navigation */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
+              {/* Month nav */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
-                </button>
+                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span></button>
                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{MONTHS[viewMonth]} {viewYear}</span>
-                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
-                </button>
+                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span></button>
               </div>
-
               {/* Day headers */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
                 {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#c7c4d8', padding: '0.25rem 0' }}>{d}</div>)}
               </div>
-
               {/* Calendar grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.5rem' }}>
                 {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                   const past = isPast(day);
@@ -245,50 +256,51 @@ function BookSlotModal({ request, onClose, onBooked }) {
                         background: selected ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : isToday ? 'rgba(78,222,163,0.15)' : 'transparent',
                         color: selected ? '#1d00a5' : past ? 'rgba(199,196,216,0.25)' : isToday ? '#4edea3' : '#dae2fd',
                         outline: isToday && !selected ? '1px solid rgba(78,222,163,0.4)' : 'none',
-                      }}>
-                      {day}
-                    </button>
+                      }}>{day}</button>
                   );
                 })}
               </div>
-
-              {/* Time slot picker */}
+              {/* Time input */}
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>
-                    Select Time â€” {formattedSelected}
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: '0.75rem' }}>
+                    Select Time — {formattedSelected}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
-                    {TIME_SLOTS.map(t => (
-                      <button key={t} onClick={() => setSelectedTime(t)}
-                        style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, transition: 'all 0.15s',
-                          background: selectedTime === t ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d',
-                          color: selectedTime === t ? '#1d00a5' : '#c7c4d8',
-                        }}>
-                        {t}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: timeError ? 6 : '1.25rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hour</div>
+                      <input type="number" min="1" max="12" value={timeHH}
+                        onChange={e => { setTimeHH(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(12, Math.max(1, parseInt(e.target.value)||1)); setTimeHH(String(v)); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#c3c0ff', paddingTop: 18 }}>:</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Min</div>
+                      <input type="number" min="0" max="59" value={timeMM}
+                        onChange={e => { setTimeMM(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(59, Math.max(0, parseInt(e.target.value)||0)); setTimeMM(String(v).padStart(2,'0')); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 18 }}>
+                      {['AM','PM'].map(p => (
+                        <button key={p} onClick={() => setAmpm(p)} style={{ width: 52, padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', background: ampm === p ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d', color: ampm === p ? '#1d00a5' : '#c7c4d8', transition: 'all 0.15s' }}>{p}</button>
+                      ))}
+                    </div>
                   </div>
-
-                  {/* Confirm summary */}
+                  {timeError && <div style={{ fontSize: '0.7rem', color: '#ffb4ab', marginBottom: '1rem' }}>⚠ {timeError}</div>}
                   <div style={{ background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: 4 }}>Scheduled Slot</div>
-                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {selectedTime}</div>
+                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {displayTime()}</div>
                     <div style={{ fontSize: '0.72rem', color: '#c7c4d8', marginTop: 3 }}>A notification will be sent to {request.studentName}</div>
                   </div>
-
                   <button onClick={handleBook} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_available</span>
                     Confirm & Notify Student
                   </button>
                 </>
               )}
-
-              {!selectedDate && (
-                <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>
-                  Select a date to choose a time slot
-                </div>
-              )}
+              {!selectedDate && <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>Select a date to set a time</div>}
             </div>
           </>
         )}
@@ -296,7 +308,6 @@ function BookSlotModal({ request, onClose, onBooked }) {
     </div>
   );
 }
-
 // â”€â”€ Reschedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function RescheduleModal({ request, onClose, onRescheduled }) {
   const today = new Date();
