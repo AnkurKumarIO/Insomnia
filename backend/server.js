@@ -13,13 +13,17 @@ const allowedOrigins = [
   process.env.FRONTEND_URL || 'https://insomnia-roan.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:4173',
 ];
 
 app.use(cors({
   origin: (origin, cb) => {
     // Allow requests with no origin (curl, mobile apps, Postman)
     if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // In production allow the configured frontend; in dev allow all localhost
+    if (allowedOrigins.some(o => origin.startsWith(o) || origin === o)) return cb(null, true);
+    // Also allow any vercel preview deployments
+    if (origin.endsWith('.vercel.app')) return cb(null, true);
     cb(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
@@ -42,11 +46,17 @@ app.use('/meet',          require('./routes/meetRoutes'));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.some(o => origin.startsWith(o) || origin === o)) return cb(null, true);
+      if (origin.endsWith('.vercel.app')) return cb(null, true);
+      cb(new Error(`Socket CORS blocked: ${origin}`));
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
+  allowEIO3: true,
 });
 require('./socket/interviewRoom')(io);
 

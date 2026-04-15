@@ -217,18 +217,33 @@ export default function DualAgentInterviewRoom() {
         transports: ['websocket', 'polling'],
         upgrade: true,
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1500,
+        timeout: 10000,
+        forceNew: true,
       });
       socketRef.current = socket;
 
+      socket.on('connect_error', (err) => {
+        console.error('[Socket] Connection error:', err.message);
+        setHints(p => [{
+          text: `⚠ Cannot reach backend at ${SOCKET_URL}. Make sure the backend server is running and VITE_SOCKET_URL is set to the deployed backend URL.`,
+          category: 'system', time: new Date().toLocaleTimeString(), type: 'system'
+        }, ...p]);
+      });
+
       socket.on('connect', () => {
-        console.log('[Socket] Connected as', myId);
+        console.log('[Socket] Connected as', myId, 'to', SOCKET_URL);
         setIsConnected(true);
         socket.emit('join-room', roomId, myId);
       });
 
-      socket.on('disconnect', () => setIsConnected(false));
+      socket.on('disconnect', (reason) => {
+        console.log('[Socket] Disconnected:', reason);
+        setIsConnected(false);
+        // Auto-reconnect on transport close
+        if (reason === 'io server disconnect') socket.connect();
+      });
 
       socket.on('user-connected', async (uid) => {
         console.log('[Socket] Peer joined:', uid);
