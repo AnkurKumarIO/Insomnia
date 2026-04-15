@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
@@ -949,11 +949,20 @@ export default function AlumniDashboard() {
                     <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{s.title}</div>
                     <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{s.sub}</div>
                   </div>
-                  {s.active && (
-                    <Link to={`/interview/${s.roomId || 'demo-room'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
-                    </Link>
-                  )}
+                  {s.active && (() => {
+                    const now = Date.now();
+                    const endMs = s.scheduledTime ? new Date(s.scheduledTime).getTime() + 2 * 60 * 60 * 1000 : null;
+                    const isEnded = endMs && now > endMs;
+                    return isEnded ? (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(100,100,100,0.15)', color: '#6b7280', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam_off</span> Ended
+                      </div>
+                    ) : (
+                      <Link to={`/interview/${s.roomId || 'demo-room'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
+                      </Link>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -1028,10 +1037,12 @@ export default function AlumniDashboard() {
                 {r.status === 'slot_booked' && (() => {
                   const now = Date.now();
                   const scheduledMs = new Date(r.scheduledTime).getTime();
-                  const canJoin = now >= scheduledMs - 5 * 60 * 1000 && now <= scheduledMs + 2 * 60 * 60 * 1000;
+                  const endMs = scheduledMs + 2 * 60 * 60 * 1000;
+                  const isEnded = now > endMs;
+                  const canJoin = !isEnded && now >= scheduledMs - 5 * 60 * 1000;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                      {canJoin ? (
+                      {isEnded ? (<div style={{ padding: '0.45rem 1rem', background: 'rgba(100,100,100,0.12)', color: '#6b7280', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, opacity: 0.7 }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam_off</span> Ended</div>) : canJoin ? (
                         <a href={`/interview/${r.roomId}`} style={{ padding: '0.45rem 1rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
                         </a>
@@ -1151,16 +1162,23 @@ export default function AlumniDashboard() {
                           <button onClick={() => setBookingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>calendar_month</span> Book Slot
                           </button>
-                        )}
-                        {r.status === 'slot_booked' && (() => {
-                          const canJoin = Date.now() >= new Date(r.scheduledTime).getTime() - 5 * 60 * 1000;
-                          return canJoin ? (
+                        )}                        {r.status === 'slot_booked' && (() => {
+                          const now = Date.now();
+                          const scheduledMs = new Date(r.scheduledTime).getTime();
+                          const endMs = scheduledMs + 2 * 60 * 60 * 1000;
+                          const isEnded = now > endMs;
+                          const canJoin = !isEnded && now >= scheduledMs - 5 * 60 * 1000;
+                          return isEnded ? (
+                            <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, opacity: 0.7 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam_off</span> Ended
+                            </div>
+                          ) : canJoin ? (
                             <a href={`/interview/${r.roomId}`} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam</span> Join
                             </a>
                           ) : (
                             <div style={{ fontSize: '0.65rem', color: '#4edea3', fontWeight: 600 }}>
-                              ðŸ“… {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
                           );
                         })()}
