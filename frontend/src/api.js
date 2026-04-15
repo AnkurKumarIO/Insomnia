@@ -352,6 +352,69 @@ export const api = {
       ]};
     }
   ),
+
+  // ─── Google Meet Integration ─────────────────────────────────────────────
+
+  createMeetLink: (roomId, title) => callOrMock(
+    () => fetch(`${API_BASE}/meet/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId, title, consistent: true }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(300);
+      return {
+        success: true,
+        meetLink: `https://meet.google.com/alumnex-${roomId}`,
+        roomId,
+        title: title || `AlumNEX Interview - Room ${roomId}`,
+      };
+    }
+  ),
+
+  getMeetLink: (roomId) => callOrMock(
+    () => fetch(`${API_BASE}/meet/${roomId}`).then(r => r.json()),
+    async () => {
+      await mockDelay(200);
+      return {
+        success: true,
+        meetLink: `https://meet.google.com/alumnex-${roomId}`,
+        roomId,
+      };
+    }
+  ),
+
+  createCustomMeetLink: (code) => callOrMock(
+    () => fetch(`${API_BASE}/meet/custom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(200);
+      return {
+        success: true,
+        meetLink: `https://meet.google.com/${code}`,
+        code,
+      };
+    }
+  ),
+
+  validateMeetUrl: (url) => callOrMock(
+    () => fetch(`${API_BASE}/meet/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }).then(r => r.json()),
+    async () => {
+      await mockDelay(100);
+      return {
+        success: true,
+        isValid: /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i.test(url),
+        url,
+      };
+    }
+  ),
 };
 
 export const SOCKET_URL = ROOT_BASE;

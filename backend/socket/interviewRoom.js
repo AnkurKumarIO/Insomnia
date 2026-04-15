@@ -7,16 +7,43 @@ const {
 module.exports = (io) => {
   const ns = io.of('/interview');
 
+  // Track who is in each room: Map<roomId, Set<{socketId, userId}>>
+  const rooms = new Map();
+
   ns.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
     // ── Room management ──────────────────────────────────────────────────
     socket.on('join-room', (roomId, userId) => {
       socket.join(roomId);
-      console.log(`[${roomId}] ${userId} joined`);
+      socket.data = { roomId, userId };
+
+      // Track membership
+      if (!rooms.has(roomId)) rooms.set(roomId, new Map());
+      const members = rooms.get(roomId);
+      members.set(socket.id, userId);
+
+      console.log(`[${roomId}] ${userId} joined (${members.size} in room)`);
+
+      // Tell the joiner about everyone already in the room
+      const existingUsers = [];
+      for (const [sid, uid] of members.entries()) {
+        if (sid !== socket.id) existingUsers.push(uid);
+      }
+      if (existingUsers.length > 0) {
+        socket.emit('room-users', existingUsers);
+      }
+
+      // Tell existing members about the new joiner
       socket.to(roomId).emit('user-connected', userId);
+
       socket.on('disconnect', () => {
         socket.to(roomId).emit('user-disconnected', userId);
+        const m = rooms.get(roomId);
+        if (m) {
+          m.delete(socket.id);
+          if (m.size === 0) rooms.delete(roomId);
+        }
         console.log(`[${roomId}] ${userId} disconnected`);
       });
     });

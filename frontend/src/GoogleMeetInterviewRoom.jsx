@@ -1,0 +1,660 @@
+import React, { useEffect, useRef, useState, useContext } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
+import { api } from './api';
+import { AuthContext } from './context/AuthContext';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+
+// AI whisperer suggestion pool
+const WHISPERER_POOL = [
+  'Ask them how they handled state management or component lifecycles.',
+  'Probe deeper: "Can you walk me through a time you debugged a production issue?"',
+  'Ask about their experience with query optimization and index design.',
+  'Follow up: "How would you design this system to handle 10x traffic?"',
+  'Ask about a time they disagreed with a teammate on architecture.',
+  'Dig into soft skills: "How do you communicate technical decisions to non-engineers?"',
+  'Ask: "What is the most complex feature you have shipped end-to-end?"',
+  'Challenge them: "How would you optimize token efficiency in a production LLM pipeline?"',
+];
+
+function useAnimatedMetric(target, speed = 0.06) {
+  const [val, setVal] = useState(target);
+  const ref = useRef(target);
+  useEffect(() => { ref.current = target; }, [target]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setVal(p => {
+        const d = ref.current - p;
+        return Math.abs(d) < 0.5 ? ref.current : p + d * speed;
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, [speed]);
+  return Math.round(val);
+}
+
+function fmt(s) {
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export default function GoogleMeetInterviewRoom() {
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const myId = user?.name || user?.role || 'User';
+
+  // ── Connection & Meet ───────────────────────────────────────────────────
+  const [isConnected, setIsConnected] = useState(false);
+  const [meetLink, setMeetLink] = useState('');
+  const [meetLoading, setMeetLoading] = useState(true);
+  const [peerName, setPeerName] = useState('Peer');
+  const [peerPresent, setPeerPresent] = useState(false);
+
+  // ── Controls ────────────────────────────────────────────────────────────
+  const [handRaised, setHandRaised] = useState(false);
+  const [sidePanel, setSidePanel] = useState('ai');
+  const [elapsed, setElapsed] = useState(0);
+
+  // ── Chat ────────────────────────────────────────────────────────────────
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+
+  // ── AI Whisperer ────────────────────────────────────────────────────────
+  const [hints, setHints] = useState([]);
+  const [aiInput, setAiInput] = useState('');
+  const [currentSuggestion, setCurrentSuggestion] = useState(WHISPERER_POOL[0]);
+  const [suggestionIdx, setSuggestionIdx] = useState(0);
+  const [factChecks, setFactChecks] = useState([
+    { claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' },
+  ]);
+  const [factInput, setFactInput] = useState('');
+  const [coachingTip, setCoachingTip] = useState('');
+  const [profileSummary, setProfileSummary] = useState(null);
+
+  // ── Live metrics ────────────────────────────────────────────────────────
+  const [confT, setConfT] = useState(72);
+  const [clarT, setClarT] = useState(65);
+  const [energyT, setEnergyT] = useState(80);
+  const confidence = useAnimatedMetric(confT);
+  const clarity = useAnimatedMetric(clarT);
+  const energy = useAnimatedMetric(energyT);
+
+  // ── Post-session ────────────────────────────────────────────────────────
+  const [ended, setEnded] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
+
+  // ── Refs ────────────────────────────────────────────────────────────────
+  const socketRef = useRef(null);
+  const timerRef = useRef(null);
+  const metricsRef = useRef(null);
+  const suggestionRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  // ── Initialize Google Meet & Socket.io ─────────────────────────────────
+  useEffect(() => {
+    console.log('[GoogleMeet] Entering room:', roomId);
+    
+    // 1. Get or create Google Meet link
+    const initMeet = async () => {
+      try {
+        const data = await api.getMeetLink(roomId);
+        if (data.success && data.meetLink) {
+          setMeetLink(data.meetLink);
+          console.log('[GoogleMeet] Meet link:', data.meetLink);
+        }
+      } catch (error) {
+        console.error('[GoogleMeet] Error getting meet link:', error);
+      } finally {
+        setMeetLoading(false);
+      }
+    };
+    initMeet();
+
+    // 2. Initialize Socket.io for AI features
+    const socket = io(`${SOCKET_URL}/interview`);
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setIsConnected(true);
+      socket.emit('join-room', roomId, myId);
+    });
+
+    socket.on('user-connected', (uid) => {
+      console.log('[Socket] Peer joined:', uid);
+      setPeerName(uid);
+      setPeerPresent(true);
+    });
+
+    socket.on('user-disconnected', () => {
+      console.log('[Socket] Peer left');
+      setPeerPresent(false);
+    });
+
+    // AI Agents - Socket events
+    socket.on('whisperer_feed', (data) => {
+      const hint = typeof data === 'string' ? data : data.hint;
+      const category = typeof data === 'object' ? data.category : 'general';
+      setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
+    });
+
+    socket.on('speech_coaching', (result) => {
+      setCoachingTip(result.coaching_tip || '');
+      if (result.confidence) setConfT(result.confidence);
+      if (result.clarity) setClarT(result.clarity);
+      if (result.energy) setEnergyT(result.energy);
+    });
+
+    socket.on('fact_check_result', ({ claim, result }) => {
+      setFactChecks(p => [
+        { claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note },
+        ...p.slice(0, 4),
+      ]);
+      setHints(p => [{
+        text: `🔍 Fact-check: "${claim.slice(0, 50)}" — ${result.verified ? '✓ Confirmed' : '⚠ Disputed'} (${result.confidence}%)`,
+        category: 'fact-check',
+        time: new Date().toLocaleTimeString(),
+        type: result.verified ? 'fact-ok' : 'fact-warn',
+      }, ...p]);
+    });
+
+    socket.on('coach_metrics_update', (m) => {
+      if (m.confidence !== undefined) setConfT(m.confidence);
+      if (m.clarity !== undefined) setClarT(m.clarity);
+      if (m.energy !== undefined) setEnergyT(m.energy);
+    });
+
+    socket.on('chat_message', (msg) => {
+      setChatMessages(p => [...p, msg]);
+    });
+
+    socket.on('hand_raised', (uid) => {
+      setHints(p => [{ text: `✋ ${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]);
+    });
+
+    // Timers
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    metricsRef.current = setInterval(() => {
+      const wpm = Math.floor(Math.random() * 80 + 100);
+      const fillers = Math.floor(Math.random() * 5);
+      socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
+    }, 3000);
+    suggestionRef.current = setInterval(() => {
+      setSuggestionIdx(i => {
+        const next = (i + 1) % WHISPERER_POOL.length;
+        setCurrentSuggestion(WHISPERER_POOL[next]);
+        return next;
+      });
+    }, 12000);
+
+    return () => {
+      console.log('[GoogleMeet] Cleaning up');
+      socket.disconnect();
+      clearInterval(timerRef.current);
+      clearInterval(metricsRef.current);
+      clearInterval(suggestionRef.current);
+    };
+  }, [roomId, myId]);
+
+  // ── AI Functions ────────────────────────────────────────────────────────
+  const sendTranscript = (text) => {
+    if (!text.trim()) return;
+    socketRef.current?.emit('transcript_chunk', roomId, text);
+  };
+
+  const triggerHint = () => sendTranscript(currentSuggestion);
+
+  const nextSuggestion = () => {
+    const next = (suggestionIdx + 1) % WHISPERER_POOL.length;
+    setSuggestionIdx(next);
+    setCurrentSuggestion(WHISPERER_POOL[next]);
+  };
+
+  const triggerFactCheck = (claim) => {
+    if (!claim.trim()) return;
+    socketRef.current?.emit('fact_check_request', roomId, claim);
+    setFactInput('');
+  };
+
+  const loadProfileSummary = async () => {
+    try {
+      const data = await api.summarizeProfile({ name: peerName, role: 'STUDENT' });
+      setProfileSummary(data.summary);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const toggleHand = () => {
+    const next = !handRaised;
+    setHandRaised(next);
+    if (next) socketRef.current?.emit('hand_raised', roomId, myId);
+  };
+
+  // ── Chat ────────────────────────────────────────────────────────────────
+  const sendChat = () => {
+    if (!chatInput.trim()) return;
+    const msg = { from: myId, text: chatInput, time: new Date().toLocaleTimeString() };
+    setChatMessages(p => [...p, msg]);
+    socketRef.current?.emit('chat_message', roomId, msg);
+    setChatInput('');
+  };
+
+  // ── End session ─────────────────────────────────────────────────────────
+  const endSession = async () => {
+    clearInterval(timerRef.current);
+    clearInterval(metricsRef.current);
+    clearInterval(suggestionRef.current);
+    setEnded(true);
+    
+    try {
+      const data = await api.interviewAnalytics({
+        interviewId: roomId,
+        metricsArray: [{ confidence, clarity, energy }],
+        fullTranscript: hints.filter(h => h.type === 'ai').map(h => h.text).join(' '),
+      });
+      setAnalytics(data.analytics);
+
+      // Save to localStorage for ProgressAnalytics
+      try {
+        const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
+        const HISTORY_KEY = 'alumnex_interview_history';
+        const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        const score = Math.round((confidence + clarity + energy) / 3);
+        const report = {
+          id: `iv-${roomId}-${Date.now()}`,
+          label: `Mock Interview #${String(existing.filter(r => r.userId === authUser.id || r.studentName === authUser.name).length + 1).padStart(2, '0')}`,
+          score,
+          date: new Date().toISOString(),
+          userId: authUser.id,
+          studentName: authUser.name,
+          roomId,
+          metrics: { confidence, clarity, energy },
+          analytics: data.analytics,
+          checklist: (data.analytics?.actionable_insights || []).map(t => ({ done: false, text: t })),
+        };
+        existing.unshift(report);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+      } catch (saveErr) {
+        console.warn('Could not save interview report:', saveErr);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const remaining = Math.max(0, 3600 - elapsed);
+
+  // ── Analytics screen ────────────────────────────────────────────────────
+  if (ended && analytics) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
+        <div style={{ maxWidth:720, width:'100%' }}>
+          <div style={{ textAlign:'center', marginBottom:'2rem' }}>
+            <div style={{ fontSize:'3rem', marginBottom:'0.5rem' }}>📊</div>
+            <h2 style={{ fontSize:'2rem', fontWeight:900, letterSpacing:'-0.03em' }}>Post-Interview Analytics</h2>
+            <p style={{ color:'#c7c4d8', marginTop:8 }}>Session complete — here's your performance breakdown</p>
+          </div>
+          
+          {/* Live metric snapshot */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem', marginBottom:'1.5rem' }}>
+            {[{l:'Confidence',v:`${confidence}%`,c:'#c3c0ff'},{l:'Clarity',v:`${clarity}%`,c:'#4edea3'},{l:'Energy',v:`${energy}%`,c:'#ffb95f'}].map(m=>(
+              <div key={m.l} style={{ background:'#171f33', borderRadius:16, padding:'1.5rem', textAlign:'center', border:`1px solid ${m.c}30` }}>
+                <div style={{ fontSize:'1.75rem', fontWeight:900, color:m.c, marginBottom:6 }}>{m.v}</div>
+                <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8' }}>{m.l}</div>
+              </div>
+            ))}
+          </div>
+          
+          {/* AI analytics */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem', marginBottom:'1.5rem' }}>
+            {[{l:'AI Confidence',v:analytics.overall_confidence,c:'#c3c0ff'},{l:'Clarity',v:analytics.communication_clarity,c:'#4edea3'},{l:'Tech Depth',v:analytics.technical_depth,c:'#ffb95f'}].map(m=>(
+              <div key={m.l} style={{ background:'#131b2e', borderRadius:16, padding:'1.25rem', textAlign:'center', border:`1px solid rgba(70,69,85,0.2)` }}>
+                <div style={{ fontSize:'1.25rem', fontWeight:900, color:m.c, marginBottom:4 }}>{m.v}</div>
+                <div style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8' }}>{m.l}</div>
+              </div>
+            ))}
+          </div>
+          
+          <div style={{ background:'#131b2e', borderRadius:16, padding:'1.5rem', marginBottom:'1rem' }}>
+            <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'1rem' }}>Actionable Insights</div>
+            {analytics.actionable_insights?.map((ins,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:10 }}>
+                <span className="material-symbols-outlined" style={{ color:'#c3c0ff', fontSize:16, marginTop:1, flexShrink:0 }}>arrow_right</span>
+                <span style={{ fontSize:'0.875rem', color:'#c7c4d8', lineHeight:1.6 }}>{ins}</span>
+              </div>
+            ))}
+          </div>
+          
+          {analytics.suggested_readings?.length > 0 && (
+            <div style={{ background:'#131b2e', borderRadius:16, padding:'1.25rem', marginBottom:'1.5rem' }}>
+              <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'0.75rem' }}>Suggested Readings</div>
+              {analytics.suggested_readings.map((url,i)=>(
+                <a key={i} href={url} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', gap:8, color:'#c3c0ff', fontSize:'0.8rem', marginBottom:6, textDecoration:'none' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:14 }}>open_in_new</span>{url}
+                </a>
+              ))}
+            </div>
+          )}
+          
+          <button onClick={()=>navigate('/dashboard')} style={{ width:'100%', padding:'1rem', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', color:'#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.1em' }}>
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+  // ── Main UI ─────────────────────────────────────────────────────────────
+  return (
+    <div style={{ height:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+      {/* ── Top bar ── */}
+      <nav style={{ height:60, background:'rgba(11,19,38,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(195,192,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 1.5rem', flexShrink:0, zIndex:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'1.25rem' }}>
+          <span style={{ fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#c3c0ff' }}>AlumNEX AI + Google Meet</span>
+          <div style={{ display:'flex', alignItems:'center', gap:7, background:'#222a3d', padding:'0.25rem 0.65rem', borderRadius:999, border:'1px solid rgba(70,69,85,0.3)' }}>
+            <div style={{ width:7, height:7, borderRadius:'50%', background: isConnected ? '#4edea3' : '#ffb4ab', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
+            <span style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: isConnected ? '#4edea3' : '#ffb4ab' }}>
+              {isConnected ? (peerPresent ? 'PEER CONNECTED' : 'WAITING FOR PEER') : 'CONNECTING...'}
+            </span>
+          </div>
+          <span style={{ fontSize:'0.72rem', color:'#c7c4d8' }}>Room: <strong style={{ color:'#c3c0ff' }}>{roomId}</strong></span>
+          {handRaised && <span style={{ fontSize:'0.6rem', fontWeight:700, color:'#4edea3' }}>✋ Hand Raised</span>}
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:'0.72rem', color:'#c7c4d8' }}>You: <strong style={{ color:'#c3c0ff' }}>{myId}</strong></span>
+          <button onClick={()=>navigate('/dashboard')} style={{ padding:'0.4rem 1rem', background:'rgba(79,70,229,0.15)', color:'#c3c0ff', border:'1px solid rgba(195,192,255,0.2)', borderRadius:8, fontWeight:700, fontSize:'0.75rem', cursor:'pointer' }}>Leave</button>
+        </div>
+      </nav>
+
+      {/* ── Canvas ── */}
+      <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+
+        {/* Google Meet area */}
+        <div style={{ flex:1, padding:'1rem', display:'flex', flexDirection:'column', gap:'0.75rem', overflow:'hidden' }}>
+          {meetLoading ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', background:'#131b2e', borderRadius:14, border:'1px solid rgba(70,69,85,0.2)' }}>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:'2rem', marginBottom:'1rem' }}>🔄</div>
+                <div style={{ fontSize:'0.9rem', fontWeight:600, color:'#c7c4d8' }}>Loading Google Meet...</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex:1, position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:'1px solid rgba(70,69,85,0.2)' }}>
+              {/* Google Meet Instructions */}
+              <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'2rem', textAlign:'center' }}>
+                <div style={{ fontSize:'3rem', marginBottom:'1rem' }}>📹</div>
+                <h3 style={{ fontSize:'1.5rem', fontWeight:700, marginBottom:'1rem', color:'#c3c0ff' }}>Join Google Meet</h3>
+                <p style={{ fontSize:'0.9rem', color:'#c7c4d8', marginBottom:'1.5rem', maxWidth:500, lineHeight:1.6 }}>
+                  Click the button below to open Google Meet in a new tab. All AI features will continue working in this window.
+                </p>
+                
+                <div style={{ background:'#222a3d', borderRadius:12, padding:'1rem', marginBottom:'1.5rem', maxWidth:600, width:'100%' }}>
+                  <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'0.5rem' }}>Meeting Link</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                    <input 
+                      value={meetLink} 
+                      readOnly 
+                      style={{ flex:1, background:'#131b2e', border:'1px solid rgba(70,69,85,0.3)', borderRadius:8, padding:'0.6rem', color:'#dae2fd', fontSize:'0.8rem', fontFamily:'monospace' }}
+                    />
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(meetLink)}
+                      style={{ padding:'0.6rem 1rem', background:'rgba(195,192,255,0.15)', color:'#c3c0ff', border:'1px solid rgba(195,192,255,0.2)', borderRadius:8, fontWeight:700, fontSize:'0.75rem', cursor:'pointer', whiteSpace:'nowrap' }}
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                </div>
+
+                <a 
+                  href={meetLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ display:'inline-flex', alignItems:'center', gap:'0.5rem', padding:'1rem 2rem', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', color:'#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.9rem', cursor:'pointer', textDecoration:'none', textTransform:'uppercase', letterSpacing:'0.1em' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize:20 }}>video_call</span>
+                  Open Google Meet
+                </a>
+
+                <p style={{ fontSize:'0.75rem', color:'#c7c4d8', marginTop:'1.5rem', opacity:0.6 }}>
+                  💡 Tip: Keep this tab open to use AI features during your interview
+                </p>
+              </div>
+
+              {/* Live metrics overlay */}
+              <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)', zIndex:5 }}>
+                {[{l:'Confidence',v:confidence,c:'#4edea3'},{l:'Clarity',v:clarity,c:'#c3c0ff'},{l:'Energy',v:energy,c:'#ffb95f'}].map(m=>(
+                  <div key={m.l} style={{ marginBottom:7 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.58rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'#c7c4d8', marginBottom:3 }}>
+                      <span>{m.l}</span><span style={{ color:m.c, transition:'color 0.5s' }}>{m.v}%</span>
+                    </div>
+                    <div style={{ height:3, background:'rgba(255,255,255,0.06)', borderRadius:999, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${m.v}%`, background:m.c, borderRadius:999, transition:'width 0.8s ease' }} />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:5, paddingTop:5, borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:10, color:'#4edea3' }}>auto_fix_high</span>
+                  <span style={{ fontSize:'0.58rem', color:'#c7c4d8' }}>AI coaching live</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* ── Side panel ── */}
+        <div style={{ width:340, background:'#131b2e', borderLeft:'1px solid rgba(70,69,85,0.2)', display:'flex', flexDirection:'column', flexShrink:0 }}>
+          {/* Panel tabs */}
+          <div style={{ display:'flex', borderBottom:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
+            {[['ai','auto_awesome','AI'],['chat','chat_bubble','Chat'],['participants','group','People']].map(([tab,icon,label])=>(
+              <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>{label}
+              </button>
+            ))}
+          </div>
+
+          {/* AI Whisperer panel */}
+          {sidePanel === 'ai' && (
+            <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+              <div style={{ padding:'0.875rem', borderBottom:'1px solid rgba(70,69,85,0.15)', flexShrink:0, display:'flex', flexDirection:'column', gap:'0.65rem', overflowY:'auto', maxHeight:340 }}>
+
+                {/* Agent 6: Speech coaching tip */}
+                {coachingTip && (
+                  <div style={{ background:'rgba(78,222,163,0.07)', border:'1px solid rgba(78,222,163,0.2)', borderRadius:9, padding:'0.6rem 0.8rem', display:'flex', alignItems:'flex-start', gap:7 }}>
+                    <span className="material-symbols-outlined" style={{ color:'#4edea3', fontSize:13, marginTop:1, flexShrink:0 }}>tips_and_updates</span>
+                    <div>
+                      <div style={{ fontSize:'0.55rem', fontWeight:700, color:'#4edea3', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:2 }}>Agent 6 · Speech Coach</div>
+                      <span style={{ fontSize:'0.72rem', color:'#dae2fd', lineHeight:1.5 }}>{coachingTip}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Agent 2: Socratic Whisperer */}
+                <div style={{ background:'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(11,19,38,0.85))', border:'1px solid rgba(79,70,229,0.35)', borderRadius:11, padding:'0.8rem' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span className="material-symbols-outlined" style={{ color:'#c3c0ff', fontSize:12 }}>psychology_alt</span>
+                      <span style={{ fontSize:'0.55rem', fontWeight:700, color:'#c3c0ff', textTransform:'uppercase', letterSpacing:'0.1em' }}>Agent 2 · Socratic Whisperer</span>
+                    </div>
+                    <button onClick={nextSuggestion} style={{ background:'none', border:'none', cursor:'pointer', color:'#c7c4d8', display:'flex' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:13 }}>refresh</span>
+                    </button>
+                  </div>
+                  <p style={{ fontSize:'0.75rem', color:'#dae2fd', lineHeight:1.55, fontWeight:500, marginBottom:7 }}>"{currentSuggestion}"</p>
+                  <div style={{ display:'flex', gap:5 }}>
+                    <button onClick={triggerHint} style={{ background:'rgba(195,192,255,0.15)', color:'#c3c0ff', border:'none', borderRadius:6, padding:'0.25rem 0.65rem', fontSize:'0.58rem', fontWeight:700, textTransform:'uppercase', cursor:'pointer' }}>🎤 Send to AI</button>
+                    <button onClick={nextSuggestion} style={{ background:'rgba(70,69,85,0.3)', color:'#c7c4d8', border:'none', borderRadius:6, padding:'0.25rem 0.65rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Skip</button>
+                  </div>
+                </div>
+
+                {/* Agent 7: Fact Checker */}
+                <div style={{ background:'rgba(42,23,0,0.45)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:9, padding:'0.7rem' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:5 }}>
+                    <span className="material-symbols-outlined" style={{ color:'#ffb95f', fontSize:12 }}>verified_user</span>
+                    <span style={{ fontSize:'0.55rem', fontWeight:700, color:'#ffb95f', textTransform:'uppercase', letterSpacing:'0.1em' }}>Agent 7 · Live Fact-Check</span>
+                  </div>
+                  {factChecks.slice(0,3).map((f,i)=>(
+                    <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:'0.65rem', color:'#c7c4d8', fontStyle:'italic', flex:1, marginRight:6 }}>{f.claim.slice(0,38)}{f.claim.length>38?'…':''}</span>
+                      <span style={{ fontSize:'0.62rem', fontWeight:700, color: f.status==='confirmed' ? '#4edea3' : '#ffb4ab', flexShrink:0 }}>{f.status==='confirmed'?'✓':'⚠'} {f.pct}</span>
+                    </div>
+                  ))}
+                  <div style={{ display:'flex', gap:5, marginTop:6 }}>
+                    <input value={factInput} onChange={e=>setFactInput(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==='Enter') triggerFactCheck(factInput); }}
+                      placeholder="Type a claim to fact-check..."
+                      style={{ flex:1, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:6, padding:'0.28rem 0.5rem', color:'#dae2fd', fontSize:'0.65rem', outline:'none' }} />
+                    <button onClick={()=>triggerFactCheck(factInput)} style={{ background:'rgba(255,185,95,0.15)', color:'#ffb95f', border:'none', borderRadius:6, padding:'0.28rem 0.6rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Check</button>
+                  </div>
+                </div>
+
+                {/* Agent 5: Peer Profile Summary */}
+                {!profileSummary ? (
+                  <button onClick={loadProfileSummary} style={{ width:'100%', padding:'0.45rem', background:'rgba(195,192,255,0.07)', border:'1px solid rgba(195,192,255,0.15)', borderRadius:8, color:'#c3c0ff', fontSize:'0.62rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', cursor:'pointer' }}>
+                    🧠 Agent 5 · Load Peer Profile Summary
+                  </button>
+                ) : (
+                  <div style={{ background:'rgba(23,31,51,0.8)', border:'1px solid rgba(195,192,255,0.15)', borderRadius:9, padding:'0.7rem' }}>
+                    <div style={{ fontSize:'0.55rem', fontWeight:700, color:'#c3c0ff', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:5 }}>Agent 5 · Peer Profile Summary</div>
+                    <p style={{ fontSize:'0.7rem', color:'#c7c4d8', lineHeight:1.55, marginBottom:5 }}>{profileSummary.summary}</p>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:5 }}>
+                      {profileSummary.top_skills?.map(s=>(
+                        <span key={s} style={{ padding:'0.12rem 0.45rem', background:'rgba(78,222,163,0.1)', color:'#4edea3', fontSize:'0.58rem', borderRadius:999, fontWeight:600 }}>{s}</span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:'0.62rem', color:'#ffb95f' }}>Focus: {profileSummary.interview_focus_areas?.[0]}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Live hints feed */}
+              <div style={{ flex:1, overflowY:'auto', padding:'0.875rem', display:'flex', flexDirection:'column', gap:'0.55rem' }}>
+                <div style={{ fontSize:'0.55rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(199,196,216,0.3)', marginBottom:2 }}>Live AI Feed</div>
+                {hints.length === 0 ? (
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flex:1, color:'#c7c4d8', textAlign:'center', padding:'1.5rem' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:28, opacity:0.2, marginBottom:8 }}>hearing</span>
+                    <p style={{ fontSize:'0.72rem', opacity:0.4, lineHeight:1.6 }}>All 7 AI agents active...<br/>Click "Send to AI" or type below.</p>
+                  </div>
+                ) : hints.map((h,i)=>{
+                  const CAT_COLOR = { frontend:'#4edea3', backend:'#c3c0ff', database:'#ffb95f', 'system-design':'#c3c0ff', debugging:'#ffb4ab', 'soft-skills':'#4edea3', 'ai-ml':'#ffb95f', 'fact-check':'#ffb95f', general:'#c7c4d8' };
+                  const bc = h.type==='fact-ok'?'#4edea3':h.type==='fact-warn'?'#ffb4ab':h.type==='system'?'#4edea3':'#c3c0ff';
+                  const bg = h.type==='fact-ok'?'rgba(78,222,163,0.05)':h.type==='fact-warn'?'rgba(255,107,107,0.05)':h.type==='system'?'rgba(78,222,163,0.05)':'#171f33';
+                  return (
+                    <div key={i} style={{ background:bg, border:'1px solid rgba(70,69,85,0.2)', borderLeft:`3px solid ${bc}`, borderRadius:8, padding:'0.6rem 0.8rem', fontSize:'0.74rem', lineHeight:1.5, animation:'slideIn 0.3s ease' }}>
+                      {h.category && h.category!=='general' && (
+                        <span style={{ display:'inline-block', padding:'0.08rem 0.38rem', background:`${CAT_COLOR[h.category]||'#c7c4d8'}18`, color:CAT_COLOR[h.category]||'#c7c4d8', fontSize:'0.52rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', borderRadius:4, marginBottom:4 }}>{h.category}</span>
+                      )}
+                      <div>{h.text}</div>
+                      <div style={{ fontSize:'0.58rem', color:'rgba(199,196,216,0.3)', marginTop:3 }}>{h.time}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Transcript input */}
+              <div style={{ padding:'0.7rem', borderTop:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
+                <div style={{ position:'relative' }}>
+                  <input value={aiInput} onChange={e=>setAiInput(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter'){ sendTranscript(aiInput); setAiInput(''); } }}
+                    placeholder="Type transcript → Agent 2 responds..."
+                    style={{ width:'100%', background:'#222a3d', border:'1px solid rgba(70,69,85,0.3)', borderRadius:9, padding:'0.58rem 2.2rem 0.58rem 0.8rem', color:'#dae2fd', fontSize:'0.74rem', outline:'none', boxSizing:'border-box' }} />
+                  <button onClick={()=>{ sendTranscript(aiInput); setAiInput(''); }} style={{ position:'absolute', right:7, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer' }}>
+                    <span className="material-symbols-outlined" style={{ color:'#c3c0ff', fontSize:15 }}>send</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Chat panel */}
+          {sidePanel === 'chat' && (
+            <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+              <div style={{ flex:1, overflowY:'auto', padding:'0.875rem', display:'flex', flexDirection:'column', gap:'0.6rem' }}>
+                {chatMessages.length === 0 ? (
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flex:1, color:'#c7c4d8', textAlign:'center', padding:'1.5rem' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:30, opacity:0.2, marginBottom:8 }}>chat_bubble</span>
+                    <p style={{ fontSize:'0.75rem', opacity:0.45 }}>No messages yet</p>
+                  </div>
+                ) : chatMessages.map((m,i)=>(
+                  <div key={i} style={{ display:'flex', flexDirection:'column', alignItems: m.from===myId ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ fontSize:'0.6rem', color:'#c7c4d8', marginBottom:3 }}>{m.from} · {m.time}</div>
+                    <div style={{ background: m.from===myId ? 'rgba(79,70,229,0.25)' : '#222a3d', border:`1px solid ${m.from===myId ? 'rgba(195,192,255,0.2)' : 'rgba(70,69,85,0.2)'}`, borderRadius:10, padding:'0.5rem 0.75rem', fontSize:'0.8rem', maxWidth:'85%', lineHeight:1.5 }}>{m.text}</div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <div style={{ padding:'0.75rem', borderTop:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
+                <div style={{ position:'relative' }}>
+                  <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter') sendChat(); }}
+                    placeholder="Send a message..."
+                    style={{ width:'100%', background:'#222a3d', border:'1px solid rgba(70,69,85,0.3)', borderRadius:9, padding:'0.6rem 2.2rem 0.6rem 0.8rem', color:'#dae2fd', fontSize:'0.76rem', outline:'none', boxSizing:'border-box' }} />
+                  <button onClick={sendChat} style={{ position:'absolute', right:7, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer' }}>
+                    <span className="material-symbols-outlined" style={{ color:'#c3c0ff', fontSize:15 }}>send</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Participants panel */}
+          {sidePanel === 'participants' && (
+            <div style={{ flex:1, padding:'1rem', overflowY:'auto' }}>
+              <div style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(199,196,216,0.4)', marginBottom:'1rem' }}>In this room</div>
+              {[{name:myId,role:'You',color:'#c3c0ff',online:true},{name:peerName,role:'Peer',color:'#4edea3',online:peerPresent},{name:'AI Whisperer',role:'AI Agent',color:'#ffb95f',online:true}].map((p,i)=>(
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'0.75rem', background:'#171f33', borderRadius:10, marginBottom:8, border:'1px solid rgba(70,69,85,0.15)', opacity: p.online ? 1 : 0.45 }}>
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:`linear-gradient(135deg,${p.color}40,${p.color}20)`, border:`1px solid ${p.color}40`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem', fontWeight:700, color:p.color, flexShrink:0 }}>{p.name[0]?.toUpperCase()}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:600, fontSize:'0.85rem' }}>{p.name}</div>
+                    <div style={{ fontSize:'0.65rem', color:'#c7c4d8' }}>{p.role}</div>
+                  </div>
+                  <div style={{ width:7, height:7, borderRadius:'50%', background: p.online ? '#4edea3' : '#464555' }} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Bottom controls ── */}
+      <div style={{ height:72, background:'rgba(11,19,38,0.97)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 2rem', flexShrink:0 }}>
+        {/* Timer */}
+        <div style={{ display:'flex', alignItems:'center', gap:'1rem' }}>
+          <div>
+            <div style={{ fontSize:'0.52rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(199,196,216,0.45)', marginBottom:1 }}>Elapsed</div>
+            <div style={{ fontSize:'1.1rem', fontFamily:'monospace', fontWeight:700, color:'#c3c0ff' }}>{fmt(elapsed)}</div>
+          </div>
+          <div style={{ width:1, height:24, background:'rgba(255,255,255,0.07)' }} />
+          <div>
+            <div style={{ fontSize:'0.52rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(199,196,216,0.45)', marginBottom:1 }}>Remaining</div>
+            <div style={{ fontSize:'1.1rem', fontFamily:'monospace', fontWeight:700, color: remaining < 300 ? '#ffb4ab' : '#c7c4d8' }}>{fmt(remaining)}</div>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <button onClick={toggleHand} title={handRaised ? 'Lower Hand' : 'Raise Hand'} style={{ width:40, height:40, borderRadius:'50%', background: handRaised ? 'rgba(195,192,255,0.15)' : '#222a3d', border:`1px solid ${handRaised ? 'rgba(195,192,255,0.4)' : 'rgba(255,255,255,0.06)'}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color: handRaised ? '#c3c0ff' : '#dae2fd', transition:'all 0.2s' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18 }}>{handRaised ? 'back_hand' : 'pan_tool'}</span>
+          </button>
+          <div style={{ width:10 }} />
+          <button onClick={endSession} style={{ display:'flex', alignItems:'center', gap:6, padding:'0 1.1rem', height:40, borderRadius:999, background:'#ffb4ab', color:'#690005', border:'none', fontWeight:700, fontSize:'0.82rem', cursor:'pointer', boxShadow:'0 4px 14px rgba(255,107,107,0.22)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:16 }}>call_end</span>End Session
+          </button>
+        </div>
+
+        {/* Participants avatars */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ display:'flex' }}>
+            {[myId[0]||'Y', peerName[0]||'?', 'AI'].map((l,i)=>(
+              <div key={i} style={{ width:32, height:32, borderRadius:'50%', background: i===2 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : i===1&&peerPresent ? 'linear-gradient(135deg,#00a572,#4edea3)' : '#222a3d', border:'2px solid #0b1326', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:700, color: i===2 ? '#1d00a5' : '#c3c0ff', marginLeft: i>0 ? -7 : 0, opacity: i===1&&!peerPresent ? 0.35 : 1, transition:'all 0.3s' }}>{l.toUpperCase()}</div>
+            ))}
+          </div>
+          <span style={{ fontSize:'0.7rem', color:'#c7c4d8' }}>{peerPresent ? '3 active' : 'Peer offline'}</span>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(78,222,163,0.4)} 50%{opacity:0.7;box-shadow:0 0 0 6px rgba(78,222,163,0)} }
+        @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+      `}</style>
+    </div>
+  );
+}

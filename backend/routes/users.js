@@ -90,4 +90,64 @@ router.get('/by-email/:email', async (req, res) => {
   }
 });
 
+// POST /users/:id/rating — store an interviewer rating for a candidate
+router.post('/:id/rating', async (req, res) => {
+  try {
+    const candidateId = req.params.id;
+    const { rating, feedback, interviewerName, interviewerId, roomId } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Try to find the candidate by id or by name
+    let user = null;
+    try {
+      user = await prisma.user.findUnique({ where: { id: candidateId } });
+    } catch (_) {}
+
+    // If not found by id, try finding by name (candidateId might be a name string)
+    if (!user) {
+      try {
+        user = await prisma.user.findFirst({ where: { name: candidateId } });
+      } catch (_) {}
+    }
+
+    const ratingEntry = {
+      rating: Number(rating),
+      feedback: feedback || '',
+      interviewerName: interviewerName || 'Anonymous',
+      interviewerId: interviewerId || null,
+      roomId: roomId || null,
+      date: new Date().toISOString(),
+    };
+
+    if (user) {
+      // Append rating to profile_data
+      const profileData = JSON.parse(user.profile_data || '{}');
+      if (!profileData.ratings) profileData.ratings = [];
+      profileData.ratings.unshift(ratingEntry);
+
+      // Calculate average rating
+      const allRatings = profileData.ratings.map(r => r.rating);
+      profileData.averageRating = Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 10) / 10;
+      profileData.totalRatings = allRatings.length;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { profile_data: JSON.stringify(profileData) },
+      });
+
+      res.json({ success: true, message: 'Rating saved', averageRating: profileData.averageRating, totalRatings: profileData.totalRatings });
+    } else {
+      // User not in DB — still return success (rating stored in localStorage on frontend)
+      console.warn(`[Rating] Candidate "${candidateId}" not found in DB — rating stored client-side only`);
+      res.json({ success: true, message: 'Rating acknowledged (candidate not in DB)', clientOnly: true });
+    }
+  } catch (err) {
+    console.error('Rating save error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

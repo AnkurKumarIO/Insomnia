@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumniDiscovery from './AlumniDiscovery';
@@ -6,17 +6,17 @@ import ProgressAnalytics from './ProgressAnalytics';
 import PremiumPage from './PremiumPage';
 import SettingsPage from './SettingsPage';
 import AlumNexLogo from '../AlumNexLogo';
-import { sendRequest, getRequestsByStudent } from '../interviewRequests';
+import { getStudentNotifications, markStudentNotifsRead, sendRequest, getRequestsByStudent } from '../interviewRequests';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import { api } from '../api';
-import { getAllAlumni, getUserById, getSlotBookedRequestsForStudent } from '../lib/db';
+import { getAllAlumni, getUserById } from '../lib/db';
 import { useNotifications } from '../hooks/useNotifications';
 import { useInterviewRequests } from '../hooks/useInterviewRequests';
 
 // â”€â”€ Inline BookModal for Recommended Mentor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOPICS = [
-  'Mock Interview "“ General', 'Mock Interview "“ System Design',
-  'Mock Interview "“ Frontend', 'Mock Interview "“ Backend',
+  'Mock Interview — General', 'Mock Interview — System Design',
+  'Mock Interview — Frontend', 'Mock Interview — Backend',
   'Career Guidance', 'Resume Review',
 ];
 
@@ -133,7 +133,6 @@ export default function Dashboard() {
   const [recommendedMentor, setRecommendedMentor] = useState(null);
   const [profileData, setProfileData] = useState({});
   const [aiProfileStrength, setAiProfileStrength] = useState(null);
-  const [bookedRequests, setBookedRequests] = useState([]);
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -158,15 +157,89 @@ export default function Dashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Student').split(' ')[0];
 
-  // Poll student notifications every 3s + auto-fire "meeting live" notification
-  useEffect(() => {
+  // Deterministic roomId from requestId — MUST match bookSlot formula
+  const deriveRoomId = (requestId) =>
+    requestId ? `room-${String(requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null;
+
+  // Helper: merge a DB notification into local storage and refresh state
+  const mergeDbNotif = (dn) => {
     const NOTIF_KEY = 'alumniconnect_student_notifications';
-    const load = () => {
+    const localId = `dbnotif-${dn.id}`;
+    const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+    if (!currentLocal.some(cn => cn.id === localId)) {
+      const computedRoomId = dn.request_id ? deriveRoomId(dn.request_id) : null;
+      currentLocal.unshift({
+        id: localId,
+        studentName: user.name,
+        type: dn.type?.toLowerCase() || 'default',
+        title: dn.title,
+        message: dn.message,
+        requestId: dn.request_id,
+        read: dn.read || false,
+        createdAt: dn.created_at,
+        roomId: computedRoomId,
+      });
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
       setStudentNotifs(getStudentNotifications(user.name));
-      // Auto-fire "meeting is live" notification when scheduled time arrives
+    }
+  };
+
+  // ── Realtime subscription + initial load ──────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const NOTIF_KEY = 'alumniconnect_student_notifications';
+    import('../lib/supabaseClient').then(({ supabase }) => {});
+
+    // 1. Initial bulk load
+    const initialLoad = async () => {
+      try {
+        // Sync interview requests from DB into localStorage
+        const { syncStudentRequests } = await import('../interviewRequests');
+        await syncStudentRequests(user.id);
+
+        // Load all notifications from DB and merge
+        const { getNotificationsForUser } = await import('../lib/db');
+        const dbNotifs = await getNotificationsForUser(user.id);
+        if (dbNotifs?.length > 0) dbNotifs.forEach(mergeDbNotif);
+      } catch {}
+      setStudentNotifs(getStudentNotifications(user.name));
+    };
+    initialLoad();
+
+    // 2. Supabase Realtime — fires instantly when a new notification row is inserted
+    let channel;
+    import('../lib/supabaseClient').then(({ supabase }) => {
+      channel = supabase
+        .channel(`notifs-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            // New notification arrived in real-time — merge immediately
+            if (payload.new) mergeDbNotif(payload.new);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'interview_requests', filter: `student_id=eq.${user.id}` },
+          async () => {
+            // Status change (accepted, slot_booked) — re-sync requests
+            try {
+              const { syncStudentRequests } = await import('../interviewRequests');
+              await syncStudentRequests(user.id);
+              setStudentNotifs(getStudentNotifications(user.name));
+            } catch {}
+          }
+        )
+        .subscribe();
+    });
+
+    // 3. Lightweight 10s timer only for the scheduled "meeting is live" trigger
+    const liveCheckInterval = setInterval(() => {
       const requests = getRequestsByStudent(user.name);
       requests.forEach(r => {
-        if (r.status === 'slot_booked' && r.scheduledTime && r.roomId) {
+        if (r.status === 'slot_booked' && r.scheduledTime) {
+          const roomId = r.roomId || deriveRoomId(r.id);
           const now = Date.now();
           const scheduled = new Date(r.scheduledTime).getTime();
           if (now >= scheduled - 60000 && now <= scheduled + 2 * 60 * 60 * 1000) {
@@ -174,32 +247,23 @@ export default function Dashboard() {
               const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
               const alreadyLive = all.some(n => n.requestId === r.id && n.type === 'live');
               if (!alreadyLive) {
-                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: 'ðŸ”´ Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, read: false, createdAt: new Date().toISOString() });
+                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, roomId, read: false, createdAt: new Date().toISOString() });
                 localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+                setStudentNotifs(getStudentNotifications(user.name));
               }
             } catch {}
           }
         }
       });
-    };
-    load();
-    const interval = setInterval(load, 3000);
-    return () => clearInterval(interval);
-  }, [user.name]);
+    }, 10000);
 
-  // Use real-time booked requests (automatically synced via useInterviewRequests hook)
-  useEffect(() => {
-    if (bookedRequests.length > 0) {
-      const mapped = bookedRequests.map(r => ({
-        request_id: r.id,
-        room_id: r.roomId || null,
-        scheduled_time: r.scheduledTime || null,
-        alumniName: r.alumniName || r.alumniRole || 'Alumni',
-        topic: r.topic || '',
-      }));
-      setBookedRequests(mapped);
-    }
-  }, [bookedRequests]);
+    return () => {
+      clearInterval(liveCheckInterval);
+      import('../lib/supabaseClient').then(({ supabase }) => {
+        if (channel) supabase.removeChannel(channel);
+      });
+    };
+  }, [user.name, user.id]);
 
   // Fetch recommended mentor + profile data
   useEffect(() => {
@@ -234,10 +298,9 @@ export default function Dashboard() {
     }
   }, [user?.id]);
 
-  // Use Realtime unread count, fallback to localStorage
-  const unreadNotifCount = realtimeNotifs.length > 0 ? unreadCount : studentNotifs.filter(n => !n.read).length;
+  const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
 
-  // Profile completion "” use Gemini result if available, else calculate locally
+  // Profile completion — use Gemini result if available, else calculate locally
   const profileCompletion = aiProfileStrength?.score ?? (() => {
     const checks = [
       !!profileData.bio, !!profileData.linkedin, !!profileData.github,
@@ -275,7 +338,7 @@ export default function Dashboard() {
               <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Updates from your interview requests and scheduled sessions</p>
             </div>
             {allNotifs.some(n => !n.read) && (
-              <button onClick={() => markAllAsRead()} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => markStudentNotifsRead(user.name)} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                 Mark all read
               </button>
             )}
@@ -290,20 +353,19 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {allNotifs.map(n => {
-                const req = realtimeRequests.find(r => r.id === (n.request_id || n.requestId));
-                const isLive = n.type === 'LIVE' || n.type === 'live';
-                const canJoin = (n.type === 'ACCEPTED' || n.type === 'SLOT_BOOKED' || isLive) && req?.roomId && req?.scheduledTime &&
+                const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                const isLive = n.type === 'live';
+                const canJoin = (n.type === 'slot_booked' || isLive) && req?.roomId && req?.scheduledTime &&
                   Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
-                const typeMap = { SLOT_BOOKED: 'slot_booked', ACCEPTED: 'accepted', DECLINED: 'declined', LIVE: 'live' };
-                const displayType = typeMap[n.type] || n.type || 'default';
                 const iconMap = { slot_booked: 'event_available', accepted: 'check_circle', declined: 'cancel', live: 'videocam', default: 'notifications' };
                 const colorMap = { slot_booked: '#4edea3', accepted: '#c3c0ff', declined: '#ffb4ab', live: '#ff4444', default: '#c7c4d8' };
                 const bgMap = { slot_booked: 'rgba(78,222,163,0.1)', accepted: 'rgba(195,192,255,0.1)', declined: 'rgba(255,180,171,0.1)', live: 'rgba(255,68,68,0.1)', default: 'rgba(70,69,85,0.1)' };
+                const type = n.type || 'default';
                 return (
                   <div key={n.id} style={{ background: !n.read ? '#171f33' : '#131b2e', borderRadius: 14, padding: '1.25rem', border: `1px solid ${!n.read ? 'rgba(195,192,255,0.12)' : 'rgba(70,69,85,0.12)'}`, display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: bgMap[displayType] || bgMap.default, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: colorMap[displayType] || colorMap.default, fontVariationSettings: "'FILL' 1" }}>
-                        {iconMap[displayType] || iconMap.default}
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: bgMap[type] || bgMap.default, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: colorMap[type] || colorMap.default, fontVariationSettings: "'FILL' 1" }}>
+                        {iconMap[type] || iconMap.default}
                       </span>
                     </div>
                     <div style={{ flex: 1 }}>
@@ -316,23 +378,51 @@ export default function Dashboard() {
                         {new Date(n.createdAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
                       {/* Join Now button */}
-                      {(n.type === 'SLOT_BOOKED' || n.type === 'slot_booked' || isLive) && (
+                      {(n.type === 'slot_booked' || n.type === 'live') && (
                         <div style={{ marginTop: 10 }}>
-                          {/* Instant meet — roomId stored directly on notification */}
-                          {(isLive && n.room_id) || (isLive && n.roomId) ? (
-                            <a href={`/interview/${n.room_id || n.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
-                            </a>
-                          ) : canJoin && req ? (
-                            <a href={`/interview/${req.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
-                            </a>
-                          ) : req?.scheduledTime ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
-                              {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          ) : null}
+                          {(() => {
+                            // roomId: prefer stored, then derive deterministically from requestId
+                            const joinRoomId = n.roomId || req?.roomId
+                              || (n.requestId ? `room-${String(n.requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null);
+                            const scheduledTime = req?.scheduledTime;
+                            const isNowJoinable = scheduledTime
+                              ? Date.now() >= new Date(scheduledTime).getTime() - 5 * 60 * 1000
+                              : !!joinRoomId; // instant meet = always joinable
+                            if (n.type === 'live' && joinRoomId) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
+                                </a>
+                              );
+                            }
+                            if (joinRoomId && isNowJoinable) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                                </a>
+                              );
+                            }
+                            if (scheduledTime) {
+                              return (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
+                                  {new Date(scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              );
+                            }
+                            // slot_booked with no scheduled time = instant meet, show join
+                            if (joinRoomId) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                                </a>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       )}
                     </div>
@@ -390,7 +480,7 @@ export default function Dashboard() {
               <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
                   <span style={{ fontWeight: 500 }}>{skill}</span>
-                  <span style={{ color: '#c7c4d8' }}>"”</span>
+                  <span style={{ color: '#c7c4d8' }}>—</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
@@ -423,36 +513,7 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-                    {/* Scheduled Interviews — from Supabase SLOT_BOOKED requests */}
-          {bookedRequests.length > 0 && (
-            <div style={{ background: '#131b2e', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(78,222,163,0.15)' }}>
-              <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: '1rem' }}>Scheduled Interviews</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {bookedRequests.map(req => (
-                  <div key={req.request_id} style={{ background: '#171f33', borderRadius: 12, padding: '1rem 1.25rem', border: '1px solid rgba(78,222,163,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#dae2fd', marginBottom: 3 }}>{req.alumniName || 'Alumni'}</div>
-                      {req.scheduled_time && (
-                        <div style={{ fontSize: '0.72rem', color: '#c7c4d8', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#4edea3' }}>schedule</span>
-                          {new Date(req.scheduled_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      )}
-                    </div>
-                    {req.room_id ? (
-                      <Link to={`/interview/${req.room_id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>videocam</span>
-                        Join Interview
-                      </Link>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ffb95f', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, padding: '0.4rem 0.875rem', flexShrink: 0 }}>Room not ready yet</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-{/* Resume CTA "” full width */}
+          {/* Resume CTA — full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -483,7 +544,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recommended Mentor CTA "” clean button, no profile preview */}
+          {/* Recommended Mentor CTA — clean button, no profile preview */}
           <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -578,7 +639,7 @@ export default function Dashboard() {
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {/* Search "” only visible in Directory tab */}
+            {/* Search — only visible in Directory tab */}
             {activeTab === 'directory' && (
               <div style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
@@ -621,25 +682,34 @@ export default function Dashboard() {
                             <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
                               {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
-                            {
                             {/* Join Now — instant meet */}
                             {n.type === 'live' && n.roomId && (
                               <a href={`/interview/${n.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now — Live
                               </a>
                             )}
-                            /* Join Now button for slot_booked notifications */}
+                            {/* Join Now button for slot_booked notifications */}
                             {n.type === 'slot_booked' && (() => {
                               const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
-                              if (!req?.roomId) return null;
-                              const canJoin = req.scheduledTime && Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
-                              return canJoin ? (
-                                <a href={`/interview/${req.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
+                              const joinRoomId = n.roomId || req?.roomId;
+                              const scheduledTime = req?.scheduledTime;
+                              if (!joinRoomId) return null;
+                              const nowMs = Date.now();
+                              const endMs = scheduledTime ? new Date(scheduledTime).getTime() + 2 * 60 * 60 * 1000 : null;
+                              const isEnded = endMs && nowMs > endMs;
+                              const canJoin = !isEnded && (scheduledTime ? nowMs >= new Date(scheduledTime).getTime() - 5 * 60 * 1000 : true);
+                              return isEnded ? (
+                                <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#6b7280', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam_off</span> Session ended
+                                </div>
+                              ) : canJoin ? (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
                                 </a>
                               ) : (
-                                <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600 }}>
-                                  🕐 {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                <div style={{ marginTop: 6, fontSize: '0.68rem', color: '#4edea3', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>schedule</span>
+                                  {scheduledTime ? new Date(scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Scheduled'}
                                 </div>
                               );
                             })()}
@@ -680,9 +750,9 @@ export default function Dashboard() {
                   {/* Profile details */}
                   <div style={{ padding: '1rem' }}>
                     {[
-                      { icon: 'school', label: 'Year', val: savedProfile.year || '"”' },
-                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || '"”' },
-                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : '"”' },
+                      { icon: 'school', label: 'Year', val: savedProfile.year || '—' },
+                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || '—' },
+                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : '—' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c3c0ff' }}>{item.icon}</span>
@@ -693,6 +763,34 @@ export default function Dashboard() {
                     {savedProfile.bio && (
                       <p style={{ fontSize: '0.72rem', color: '#c7c4d8', lineHeight: 1.5, marginTop: '0.75rem', fontStyle: 'italic' }}>"{savedProfile.bio.slice(0, 80)}{savedProfile.bio.length > 80 ? '...' : ''}"</p>
                     )}
+                    {/* Interview Ratings from Alumni */}
+                    {(() => {
+                      const profileRatings = JSON.parse(localStorage.getItem('alumnex_candidate_ratings') || '{}');
+                      const myRatings = profileRatings[user?.name] || [];
+                      if (myRatings.length === 0) return null;
+                      const avg = (myRatings.reduce((s, r) => s + r.rating, 0) / myRatings.length).toFixed(1);
+                      return (
+                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255,185,95,0.06)', border: '1px solid rgba(255,185,95,0.15)', borderRadius: 10 }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#ffb95f', marginBottom: 6 }}>Interview Ratings</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffb95f' }}>{avg}</span>
+                            <div>
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                {[1,2,3,4,5].map(s => (
+                                  <span key={s} style={{ fontSize: '0.75rem', color: s <= Math.round(avg) ? '#ffb95f' : 'rgba(70,69,85,0.5)' }}>★</span>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: '0.6rem', color: '#c7c4d8' }}>{myRatings.length} review{myRatings.length > 1 ? 's' : ''}</div>
+                            </div>
+                          </div>
+                          {myRatings.slice(0, 2).map((r, i) => r.feedback && (
+                            <div key={i} style={{ fontSize: '0.65rem', color: '#c7c4d8', fontStyle: 'italic', marginBottom: 3, lineHeight: 1.4 }}>
+                              "{r.feedback.slice(0, 60)}{r.feedback.length > 60 ? '...' : ''}" — {r.by}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Actions */}

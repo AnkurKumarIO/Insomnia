@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard';
 import AlumniDashboard from './pages/AlumniDashboard';
 import TNPDashboard from './pages/TNPDashboard';
 import InterviewRoom from './pages/InterviewRoom';
+import GoogleMeetInterviewRoom from './GoogleMeetInterviewRoom';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
 
 function DashboardRouter() {
@@ -65,18 +66,9 @@ function App() {
           <Route path="/tnp/login"             element={<TNPLogin />} />
           <Route path="/dashboard"             element={<DashboardRouter />} />
           <Route path="/interview/:roomId"     element={<InterviewRoom />} />
+          <Route path="/meet-interview/:roomId" element={<GoogleMeetInterviewRoom />} />
           <Route path="/resume-analyzer"       element={<ResumeAnalyzer />} />
-          {/* Legacy aliases */}
-          <Route path="/auth/student/register" element={<StudentRegistration />} />
-          <Route path="/auth/student/login" element={<StudentLogin />} />
-          <Route path="/profile-setup" element={<ProfileSetup />} />
-          <Route path="/auth/tnp" element={<TNPLogin />} />
-          <Route path="/auth/alumni" element={<AlumniLogin />} />
-          <Route path="/auth/alumni/register" element={<AlumniRegistration />} />
-          <Route path="/dashboard" element={<DashboardRouter />} />
-          <Route path="/interview/:roomId" element={<InterviewRoom />} />
-          <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*"                      element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

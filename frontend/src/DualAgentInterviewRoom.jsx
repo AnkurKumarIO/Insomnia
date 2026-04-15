@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './context/AuthContext';
@@ -8,9 +8,8 @@ import { supabase } from './lib/supabaseClient';
 import VideoStreamManager from './utils/VideoStreamManager';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+const API_URL    = import.meta.env.VITE_API_URL    || 'http://localhost:5001';
 
-// AI whisperer suggestion pool — rotates automatically
 const WHISPERER_POOL = [
   'Ask them how they handled state management or component lifecycles.',
   'Probe deeper: "Can you walk me through a time you debugged a production issue?"',
@@ -28,10 +27,7 @@ function useAnimatedMetric(target, speed = 0.06) {
   useEffect(() => { ref.current = target; }, [target]);
   useEffect(() => {
     const id = setInterval(() => {
-      setVal(p => {
-        const d = ref.current - p;
-        return Math.abs(d) < 0.5 ? ref.current : p + d * speed;
-      });
+      setVal(p => { const d = ref.current - p; return Math.abs(d) < 0.5 ? ref.current : p + d * speed; });
     }, 50);
     return () => clearInterval(id);
   }, [speed]);
@@ -42,486 +38,528 @@ function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// Feature: alumnex-interview-room
-function RatingReviewForm({ roomId, requestId, alumniId, studentId, onSubmitted }) {
-  const [ratings, setRatings] = useState({ technical_skills: 0, communication: 0, problem_solving: 0, cultural_fit: 0 });
-  const [review, setReview] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  const DIMENSIONS = [
-    { key: 'technical_skills', label: 'Technical Skills' },
-    { key: 'communication', label: 'Communication' },
-    { key: 'problem_solving', label: 'Problem Solving' },
-    { key: 'cultural_fit', label: 'Cultural Fit' },
-  ];
-
-  const avgRating = Object.values(ratings).filter(v => v > 0).reduce((a, b, _, arr) => a + b / arr.length, 0);
-
-  const handleSubmit = async () => {
-    setSaving(true); setError(null);
-    try {
-      const { updateInterviewRecord } = await import('./lib/db');
-      const { error: err } = await updateInterviewRecord(requestId || roomId, {
-        alumni_feedback: JSON.stringify({ ratings, review }),
-        student_score: Math.round(avgRating * 20), // convert 1-5 to 0-100
-        status: 'COMPLETED',
-      });
-      if (err) throw new Error(err.message);
-      onSubmitted();
-    } catch (e) {
-      setError(e.message || 'Failed to save. Please retry.');
-    }
-    setSaving(false);
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ maxWidth: 560, width: '100%', background: '#171f33', borderRadius: 20, padding: '2.5rem', border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⭐</div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Rate the Session</h2>
-          <p style={{ color: '#c7c4d8', marginTop: 8, fontSize: '0.875rem' }}>Your feedback helps the student improve</p>
-        </div>
-        {DIMENSIONS.map(({ key, label }) => (
-          <div key={key} style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>{label}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[1, 2, 3, 4, 5].map(star => (
-                <button key={star} onClick={() => setRatings(r => ({ ...r, [key]: star }))}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 28, color: ratings[key] >= star ? '#ffb95f' : 'rgba(70,69,85,0.5)', transition: 'color 0.15s' }}>
-                  {ratings[key] >= star ? '★' : '☆'}
-                </button>
-              ))}
-              {ratings[key] > 0 && <span style={{ fontSize: '0.75rem', color: '#ffb95f', alignSelf: 'center', marginLeft: 4 }}>{ratings[key]}/5</span>}
-            </div>
-          </div>
-        ))}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Written Feedback <span style={{ fontWeight: 400, textTransform: 'none', opacity: 0.5 }}>(optional)</span></div>
-          <textarea value={review} onChange={e => setReview(e.target.value)} placeholder="Share specific observations about the candidate's performance..." rows={4}
-            style={{ width: '100%', background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10, padding: '0.75rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-        </div>
-        {error && <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#ffb4ab' }}>{error}</div>}
-        <button onClick={handleSubmit} disabled={saving || Object.values(ratings).every(v => v === 0)}
-          style={{ width: '100%', padding: '0.875rem', background: saving || Object.values(ratings).every(v => v === 0) ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: saving || Object.values(ratings).every(v => v === 0) ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          {saving ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #c7c4d8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Saving...</> : 'Submit Feedback & Finish'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function DualAgentInterviewRoom() {
   const { roomId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
-  // Auth guard
-  if (!user) { navigate('/login'); return null; }
+  // Identity computed once — ref never triggers re-renders
+  const myIdRef = useRef(null);
+  if (!myIdRef.current) {
+    const fromUrl = searchParams.get('name');
+    if (fromUrl) {
+      myIdRef.current = fromUrl;
+    } else if (user?.name) {
+      myIdRef.current = user.name;
+    } else {
+      const key = `alumnex_guest_${roomId}`;
+      let stored = sessionStorage.getItem(key);
+      if (!stored) {
+        stored = window.prompt('Enter your name to join:') || `Guest-${Math.floor(Math.random() * 9000) + 1000}`;
+        sessionStorage.setItem(key, stored);
+      }
+      myIdRef.current = stored;
+    }
+  }
+  const myId = myIdRef.current;
 
-  const myId = user?.name || user?.role || 'User';
-  const isAlumni = user?.role === 'ALUMNI';
-  const isStudent = !isAlumni;
+  // Role: alumni = interviewer, student = candidate
+  const isInterviewer = user?.role === 'ALUMNI' || searchParams.get('role') === 'alumni';
 
-  // ── Connection ──────────────────────────────────────────────────────────
-  // ── Connection ──────────────────────────────────────────────────────────
-  const [isConnected, setIsConnected]   = useState(false);
-  const [socketPeerPresent, setSocketPeerPresent] = useState(false); // Someone else in the socket room
-  const [videoConnected, setVideoConnected] = useState(false);     // Real WebRTC track received
-  const [peerName, setPeerName]         = useState('Peer');
-
-  // ── Controls ────────────────────────────────────────────────────────────
-  const [micOn, setMicOn]       = useState(true);
-  const [camOn, setCamOn]       = useState(true);
-  const [sharing, setSharing]   = useState(false);   // screen share active
-  const [handRaised, setHandRaised] = useState(false);
-  const [sidePanel, setSidePanel]   = useState('ai'); // 'ai' | 'chat' | 'participants'
-  const [elapsed, setElapsed]   = useState(0);
-
-  // ── Chat ────────────────────────────────────────────────────────────────
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput]       = useState('');
-
-  // ── AI Whisperer ────────────────────────────────────────────────────────
-  const [hints, setHints]               = useState([]);
-  const [aiInput, setAiInput]           = useState('');
+  // UI State
+  const [isConnected,       setIsConnected]       = useState(false);
+  const [socketPeerPresent, setSocketPeerPresent] = useState(false);
+  const [videoConnected,    setVideoConnected]    = useState(false);
+  const [peerName,          setPeerName]          = useState('Peer');
+  const [micOn,             setMicOn]             = useState(true);
+  const [camOn,             setCamOn]             = useState(true);
+  const [sharing,           setSharing]           = useState(false);
+  const [handRaised,        setHandRaised]        = useState(false);
+  const [sidePanel,         setSidePanel]         = useState(isInterviewer ? 'ai' : 'chat');
+  const [elapsed,           setElapsed]           = useState(0);
+  const [chatMessages,      setChatMessages]      = useState([]);
+  const [chatInput,         setChatInput]         = useState('');
+  const [unreadChat,        setUnreadChat]        = useState(0);
+  const [hints,             setHints]             = useState([]);
+  const [aiInput,           setAiInput]           = useState('');
   const [currentSuggestion, setCurrentSuggestion] = useState(WHISPERER_POOL[0]);
-  const [suggestionIdx, setSuggestionIdx] = useState(0);
-  const [factChecks, setFactChecks]     = useState([
-    { claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' },
-  ]);
-  const [factInput, setFactInput]       = useState('');
-  const [coachingTip, setCoachingTip]   = useState('');
-  const [profileSummary, setProfileSummary] = useState(null);
+  const [suggestionIdx,     setSuggestionIdx]     = useState(0);
+  const [factChecks,        setFactChecks]        = useState([{ claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' }]);
+  const [factInput,         setFactInput]         = useState('');
+  const [coachingTip,       setCoachingTip]       = useState('');
+  const [profileSummary,    setProfileSummary]    = useState(null);
+  const [confT,             setConfT]             = useState(72);
+  const [clarT,             setClarT]             = useState(65);
+  const [energyT,           setEnergyT]           = useState(80);
+  const [ended,             setEnded]             = useState(false);
+  const [analytics,         setAnalytics]         = useState(null);
+  const [analyticsLoading,  setAnalyticsLoading]  = useState(false);
+  const [rating,            setRating]            = useState(0);
+  const [ratingFeedback,    setRatingFeedback]    = useState('');
+  const [ratingSubmitted,   setRatingSubmitted]   = useState(false);
+  const [ratingSubmitting,  setRatingSubmitting]  = useState(false);
 
-  // ── Live metrics ────────────────────────────────────────────────────────
-  const [confT, setConfT]   = useState(72);
-  const [clarT, setClarT]   = useState(65);
-  const [energyT, setEnergyT] = useState(80);
   const confidence = useAnimatedMetric(confT);
   const clarity    = useAnimatedMetric(clarT);
   const energy     = useAnimatedMetric(energyT);
 
-  // ── Post-session ────────────────────────────────────────────────────────
-  const [ended, setEnded]       = useState(false);
-  const [analytics, setAnalytics] = useState(null);
+  // Refs — mutable, never cause re-renders
+  const localVideoRef   = useRef(null);
+  const remoteVideoRef  = useRef(null);
+  const screenVideoRef  = useRef(null);
+  const socketRef       = useRef(null);
+  const pcRef           = useRef(null);
+  const streamRef       = useRef(null);
+  const screenStreamRef = useRef(null);
+  const timerRef        = useRef(null);
+  const metricsRef      = useRef(null);
+  const suggestionRef   = useRef(null);
+  const chatEndRef      = useRef(null);
+  const iceBuf          = useRef([]);
+  const makingOfferRef  = useRef(false);
+  const politeRef       = useRef(true);
+  const peerReadyRef    = useRef(false); // true once peer is detected via socket
+  const videoConnRef    = useRef(false); // track video state inside callbacks
+  const retryTimerRef   = useRef(null);
+  const sidePanelRef    = useRef(sidePanel);
 
-  // ── Role-based / face detection state ───────────────────────────────────
-  const [faceDetected, setFaceDetected] = useState(true);
-  const [showRating, setShowRating] = useState(false);
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [resolvedRequestId, setResolvedRequestId] = useState(null);
-  const [resolvedStudentId, setResolvedStudentId] = useState(null);
+  // Keep refs in sync with state for use inside socket callbacks
+  useEffect(() => { sidePanelRef.current = sidePanel; }, [sidePanel]);
+  useEffect(() => { videoConnRef.current = videoConnected; }, [videoConnected]);
 
-  // ── Refs ────────────────────────────────────────────────────────────────
-  const localVideoRef  = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const screenVideoRef = useRef(null);   // shows local screen share preview
-  const socketRef      = useRef(null);
-  const pcRef          = useRef(null);
-  const streamRef      = useRef(null);   // camera stream
-  const screenStreamRef = useRef(null);  // screen stream
-  const timerRef       = useRef(null);
-  const metricsRef     = useRef(null);
-  const suggestionRef  = useRef(null);
-  const makingOffer    = useRef(false);
-  const ignoreOffer    = useRef(false);
-  const chatEndRef     = useRef(null);
-  const faceCanvasRef  = useRef(null);
-
-  // ── WebRTC PC Initialization ──────────────────────────────────────────
-  const initPC = useCallback(() => {
-    if (pcRef.current) return pcRef.current;
-    console.log('[WebRTC] Initializing PeerConnection');
-    const pc = new RTCPeerConnection(ICE);
-    pcRef.current = pc;
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socketRef.current?.emit('ice-candidate', roomId, e.candidate);
-    };
-
-    pc.ontrack = (e) => {
-      console.log('[WebRTC] Remote track received');
-      if (remoteVideoRef.current && e.streams[0]) {
-        remoteVideoRef.current.srcObject = e.streams[0];
-        setVideoConnected(true);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('[WebRTC] Connection state:', pc.connectionState);
-      if (pc.connectionState === 'connected') setVideoConnected(true);
-      if (['disconnected','failed','closed'].includes(pc.connectionState)) setVideoConnected(false);
-    };
-
-    pc.onnegotiationneeded = async () => {
-      try {
-        console.log('[WebRTC] Negotiation needed');
-        makingOffer.current = true;
-        await pc.setLocalDescription(await pc.createOffer());
-        socketRef.current?.emit('offer', roomId, pc.localDescription);
-      } catch (err) {
-        console.error('[WebRTC] Negotiation error:', err);
-      } finally {
-        makingOffer.current = false;
-      }
-    };
-
-    return pc;
-  }, [roomId]);
-
-  // ── Init ────────────────────────────────────────────────────────────────
+  // Clear unread when switching to chat panel
   useEffect(() => {
-    console.log('[Room] Entering room:', roomId);
-    const socket = io(`${SOCKET_URL}/interview`);
-    socketRef.current = socket;
+    if (sidePanel === 'chat') setUnreadChat(0);
+  }, [sidePanel]);
 
-    // 1. Initialize PC immediately so signaling can start
-    const pc = initPC();
+  // Single effect — runs ONCE on mount
+  useEffect(() => {
+    let pc = null;
+    let socket = null;
+    let destroyed = false;
 
-    // 2. Start Camera with improved error handling
-    const videoManager = new VideoStreamManager();
-    
-    videoManager.getCameraStream(true)
-      .then(async stream => {
-        console.log('[Media] Camera/Mic access granted, quality:', videoManager.qualityLevel);
-        streamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+    async function flushIceBuf() {
+      if (!pc?.remoteDescription?.type) return;
+      const buf = iceBuf.current.splice(0);
+      for (const c of buf) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
+      }
+      if (buf.length) console.log('[WebRTC] Flushed', buf.length, 'buffered ICE candidates');
+    }
+
+    // Create and send an offer (with safety checks)
+    async function createAndSendOffer(reason) {
+      if (!pc || pc.signalingState === 'closed' || !socket?.connected) {
+        console.warn('[WebRTC] Cannot create offer:', reason, '- pc or socket not ready');
+        return;
+      }
+      try {
+        makingOfferRef.current = true;
+        // If stuck in have-local-offer from a previous attempt, rollback first
+        if (pc.signalingState === 'have-local-offer') {
+          console.log('[WebRTC] Rolling back stale local offer before creating new one');
+          await pc.setLocalDescription({ type: 'rollback' });
         }
-        stream.getTracks().forEach(t => pc.addTrack(t, stream));
-        
-        // Check device capabilities for quality info
-        const devices = await videoManager.checkDeviceAvailability();
-        console.log('[Media] Available devices:', devices);
-      })
-      .catch(err => {
-        console.error('[Media] Camera access error:', err.message);
-        alert('Camera/Microphone Error:\n' + err.message + '\n\nPlease check your permissions and device.');
-        // Don't fail entirely - could use audio-only mode as fallback
-      });
+        const offer = await pc.createOffer();
+        // Double-check state hasn't changed during async gap
+        if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', roomId, pc.localDescription);
+          console.log(`[WebRTC] Offer sent (${reason})`);
+        }
+      } catch (err) {
+        console.error(`[WebRTC] createAndSendOffer(${reason}) error:`, err);
+      } finally {
+        makingOfferRef.current = false;
+      }
+    }
 
-    // 3. Socket Events
-    socket.on('connect', () => {
-      setIsConnected(true);
-      socket.emit('join-room', roomId, myId);
-      // Resolve request_id and student_id from Supabase for this room
-      supabase.from('interview_requests').select('request_id, student_id, alumni_id').eq('room_id', roomId).single()
-        .then(({ data }) => {
-          if (data) {
-            setResolvedRequestId(data.request_id);
-            setResolvedStudentId(data.student_id);
+    async function start() {
+      // 1. Fetch ICE config
+      let iceConfig = {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'turn:openrelay.metered.ca:80',                username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443',               username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:numb.viagenie.ca',                       username: 'webrtc@live.com',  credential: 'muazkh' },
+          { urls: 'turn:standard.relay.metered.ca:80',           username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:standard.relay.metered.ca:443',          username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:standard.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        ],
+        iceCandidatePoolSize: 10,
+      };
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const r = await fetch(`${API_URL}/meet/ice-config`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (r.ok) { iceConfig = await r.json(); console.log('[ICE] Loaded', iceConfig.iceServers.length, 'servers from backend'); }
+      } catch (_) { console.warn('[ICE] Could not fetch from backend — using built-in defaults'); }
+
+      if (destroyed) return;
+
+      // 2. Create PeerConnection
+      pc = new RTCPeerConnection(iceConfig);
+      pcRef.current = pc;
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) socket?.emit('ice-candidate', roomId, e.candidate);
+      };
+
+      // onnegotiationneeded — ONLY create offer if peer is already in room
+      // This fires when addTrack is called before socket connects, so we MUST gate it
+      pc.onnegotiationneeded = async () => {
+        console.log('[WebRTC] negotiationneeded fired, peerReady:', peerReadyRef.current, 'socketConnected:', socket?.connected);
+        if (!peerReadyRef.current || !socket?.connected) {
+          console.log('[WebRTC] Skipping negotiationneeded — peer not ready or socket not connected');
+          return;
+        }
+        await createAndSendOffer('negotiationneeded');
+      };
+
+      pc.ontrack = (e) => {
+        console.log('[WebRTC] ontrack:', e.track.kind, 'streams:', e.streams.length);
+        const remoteVideo = remoteVideoRef.current;
+        if (!remoteVideo) return;
+
+        if (e.streams?.[0]) {
+          if (remoteVideo.srcObject !== e.streams[0]) {
+            remoteVideo.srcObject = e.streams[0];
           }
-        }).catch(() => {});
-    });
+        } else {
+          if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = new MediaStream();
+          }
+          remoteVideo.srcObject.addTrack(e.track);
+        }
+        remoteVideo.muted = false;
+        remoteVideo.play().catch(() => {});
+        setVideoConnected(true);
+      };
 
-    socket.on('user-connected', (uid) => {
-      console.log('[Socket] Peer joined:', uid);
-      setPeerName(uid);
-      setSocketPeerPresent(true);
-    });
+      pc.onconnectionstatechange = () => {
+        console.log('[WebRTC] connectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') setVideoConnected(true);
+        if (pc.connectionState === 'failed')    setVideoConnected(false);
+        if (pc.connectionState === 'closed')    setVideoConnected(false);
+      };
 
-    socket.on('user-disconnected', () => {
-      console.log('[Socket] Peer left');
-      setSocketPeerPresent(false);
-      setVideoConnected(false);
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    });
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WebRTC] iceState:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setVideoConnected(true);
+        }
+        if (pc.iceConnectionState === 'failed') {
+          console.log('[WebRTC] ICE failed — restarting');
+          pc.restartIce();
+        }
+      };
 
-    // 4. Signaling
-    socket.on('offer', async (offer) => {
-      console.log('[WebRTC] Received offer');
-      const pc = pcRef.current; if (!pc) return;
-      
-      const offerCollision = makingOffer.current || pc.signalingState !== 'stable';
-      ignoreOffer.current = offerCollision && !makingOffer.current; // Simple polite peer logic part 1
-      if (ignoreOffer.current) return;
-
+      // 3. Get camera + mic — tracks added here will fire onnegotiationneeded
+      //    but we gate it above so the premature offer is suppressed
       try {
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        await pc.setLocalDescription(await pc.createAnswer());
-        socket.emit('answer', roomId, pc.localDescription);
-      } catch (err) {
-        console.error('[WebRTC] Offer handling error:', err);
+        const videoManager = new VideoStreamManager();
+        const stream = await videoManager.getCameraStream(true);
+        if (destroyed) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.muted = true; }
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+        console.log('[Media] Tracks added to PC with intelligent quality negotiation');
+      } catch (err) { 
+        console.error('[Media] Camera setup failed:', err.message);
+        // User-friendly error already shown by VideoStreamManager
       }
-    });
 
-    socket.on('answer', async (ans) => {
-      console.log('[WebRTC] Received answer');
-      const pc = pcRef.current; if (!pc) return;
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(ans));
-      } catch (err) {
-        console.error('[WebRTC] Answer handling error:', err);
-      }
-    });
-
-    socket.on('ice-candidate', async (c) => {
-      try { await pcRef.current?.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
-    });
-
-    // Agents feed ... existing logic
-    socket.on('whisperer_feed', (data) => {
-      const hint = typeof data === 'string' ? data : data.hint;
-      const category = typeof data === 'object' ? data.category : 'general';
-      setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
-    });
-
-    socket.on('speech_coaching', (result) => {
-      setCoachingTip(result.coaching_tip || '');
-      if (result.confidence) setConfT(result.confidence);
-      if (result.clarity)    setClarT(result.clarity);
-      if (result.energy)     setEnergyT(result.energy);
-    });
-
-    socket.on('fact_check_result', ({ claim, result }) => {
-      setFactChecks(p => [
-        { claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note },
-        ...p.slice(0, 4),
-      ]);
-      setHints(p => [{
-        text: `🔍 Fact-check: "${claim.slice(0, 50)}" — ${result.verified ? '✓ Confirmed' : '⚠ Disputed'} (${result.confidence}%)`,
-        category: 'fact-check',
-        time: new Date().toLocaleTimeString(),
-        type: result.verified ? 'fact-ok' : 'fact-warn',
-      }, ...p]);
-    });
-
-    socket.on('coach_metrics_update', (m) => {
-      if (m.confidence !== undefined) setConfT(m.confidence);
-      if (m.clarity    !== undefined) setClarT(m.clarity);
-      if (m.energy     !== undefined) setEnergyT(m.energy);
-    });
-
-    socket.on('chat_message', (msg) => {
-      setChatMessages(p => [...p, msg]);
-    });
-
-    socket.on('hand_raised', (uid) => {
-      setHints(p => [{ text: `✋ ${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]);
-    });
-
-    // Timers
-    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-    metricsRef.current = setInterval(() => {
-      const wpm = Math.floor(Math.random() * 80 + 100);
-      const fillers = Math.floor(Math.random() * 5);
-      socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
-    }, 3000);
-    suggestionRef.current = setInterval(() => {
-      setSuggestionIdx(i => {
-        const next = (i + 1) % WHISPERER_POOL.length;
-        setCurrentSuggestion(WHISPERER_POOL[next]);
-        return next;
+      // 4. Connect socket AFTER media is ready
+      socket = io(`${SOCKET_URL}/interview`, {
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1500,
+        timeout: 10000,
+        forceNew: true,
       });
-    }, 12000);
+      socketRef.current = socket;
+
+      socket.on('connect_error', (err) => {
+        console.error('[Socket] Connection error:', err.message);
+        setHints(p => [{
+          text: `⚠ Cannot reach backend at ${SOCKET_URL}. Make sure the backend server is running.`,
+          category: 'system', time: new Date().toLocaleTimeString(), type: 'system'
+        }, ...p]);
+      });
+
+      socket.on('connect', () => {
+        console.log('[Socket] Connected as', myId, 'to', SOCKET_URL);
+        setIsConnected(true);
+        socket.emit('join-room', roomId, myId);
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log('[Socket] Disconnected:', reason);
+        setIsConnected(false);
+        if (reason === 'io server disconnect') socket.connect();
+      });
+
+      // Room users already present — we are the late joiner (polite peer)
+      socket.on('room-users', (users) => {
+        console.log('[Socket] Room already has users:', users);
+        if (users.length > 0) {
+          setPeerName(users[0]);
+          setSocketPeerPresent(true);
+          peerReadyRef.current = true;
+          politeRef.current = true;
+          console.log('[WebRTC] I am the POLITE peer (joined late) — waiting for offer from', users[0]);
+
+          // Safety: if no video in 5 seconds, the impolite peer's offer may have been lost
+          // Stay polite so if both retry simultaneously, we yield to the other's offer
+          retryTimerRef.current = setTimeout(() => {
+            if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
+              console.log('[WebRTC] RETRY: No video after 5s as polite peer — sending offer (staying polite)');
+              createAndSendOffer('polite-retry');
+            }
+          }, 5000);
+        }
+      });
+
+      // A new peer joined after us — we are the impolite peer → create offer
+      socket.on('user-connected', async (uid) => {
+        console.log('[Socket] Peer joined:', uid);
+        setPeerName(uid);
+        setSocketPeerPresent(true);
+        peerReadyRef.current = true;
+        politeRef.current = false;
+        console.log('[WebRTC] I am the IMPOLITE peer (was here first) → will send offer to', uid);
+
+        // Small delay to let the new peer's PeerConnection initialize
+        await new Promise(r => setTimeout(r, 800));
+
+        if (streamRef.current && pc && pc.signalingState !== 'closed') {
+          await createAndSendOffer('user-connected');
+        }
+
+        // Safety retry: if video not connected after 8 seconds, re-offer
+        // Staggered at 8s (vs polite peer's 5s) to avoid simultaneous retries 
+        retryTimerRef.current = setTimeout(() => {
+          if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
+            console.log('[WebRTC] RETRY: No video after 8s as impolite peer — re-sending offer');
+            createAndSendOffer('impolite-retry');
+          }
+        }, 8000);
+      });
+
+      socket.on('user-disconnected', () => {
+        console.log('[Socket] Peer left');
+        setSocketPeerPresent(false);
+        peerReadyRef.current = false;
+        setVideoConnected(false);
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+        clearTimeout(retryTimerRef.current);
+      });
+
+      // ── Offer handler ───────────────────────────────────────────────
+      socket.on('offer', async (offer) => {
+        if (!pc || pc.signalingState === 'closed') return;
+        console.log('[WebRTC] Got offer, signalingState:', pc.signalingState, 'polite:', politeRef.current);
+
+        const offerCollision = makingOfferRef.current || pc.signalingState !== 'stable';
+
+        if (offerCollision) {
+          if (!politeRef.current) {
+            console.log('[WebRTC] Impolite peer ignoring colliding offer');
+            return;
+          }
+          console.log('[WebRTC] Polite peer rolling back for incoming offer');
+        }
+
+        try {
+          // Rollback any existing local offer
+          if (pc.signalingState !== 'stable') {
+            await pc.setLocalDescription({ type: 'rollback' });
+          }
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          await flushIceBuf();
+
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('answer', roomId, pc.localDescription);
+          console.log('[WebRTC] Answer sent');
+        } catch (err) {
+          console.error('[WebRTC] offer handler error:', err);
+        }
+      });
+
+      // ── Answer handler ──────────────────────────────────────────────
+      socket.on('answer', async (ans) => {
+        if (!pc || pc.signalingState === 'closed') return;
+        console.log('[WebRTC] Got answer, signalingState:', pc.signalingState);
+        try {
+          if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(ans));
+            await flushIceBuf();
+          } else {
+            console.warn('[WebRTC] Got answer but signalingState is', pc.signalingState, '- ignoring');
+          }
+        } catch (err) { console.error('[WebRTC] answer handler:', err); }
+      });
+
+      socket.on('ice-candidate', async (c) => {
+        if (!pc) return;
+        if (pc.remoteDescription?.type) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); }
+          catch (_) {}
+        } else {
+          iceBuf.current.push(c);
+        }
+      });
+
+      // AI agent events
+      socket.on('whisperer_feed', (data) => {
+        const hint = typeof data === 'string' ? data : data.hint;
+        const category = typeof data === 'object' ? data.category : 'general';
+        setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
+      });
+      socket.on('speech_coaching', (result) => {
+        setCoachingTip(result.coaching_tip || '');
+        if (result.confidence) setConfT(result.confidence);
+        if (result.clarity)    setClarT(result.clarity);
+        if (result.energy)     setEnergyT(result.energy);
+      });
+      socket.on('fact_check_result', ({ claim, result }) => {
+        setFactChecks(p => [{ claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note }, ...p.slice(0, 4)]);
+        setHints(p => [{ text: `Fact-check: "${claim.slice(0, 50)}" - ${result.verified ? 'Confirmed' : 'Disputed'} (${result.confidence}%)`, category: 'fact-check', time: new Date().toLocaleTimeString(), type: result.verified ? 'fact-ok' : 'fact-warn' }, ...p]);
+      });
+      socket.on('coach_metrics_update', (m) => {
+        if (m.confidence !== undefined) setConfT(m.confidence);
+        if (m.clarity    !== undefined) setClarT(m.clarity);
+        if (m.energy     !== undefined) setEnergyT(m.energy);
+      });
+
+      // Chat — only add messages from OTHER users (we add our own locally in sendChat)
+      socket.on('chat_message', (msg) => {
+        setChatMessages(p => [...p, msg]);
+        if (sidePanelRef.current !== 'chat') {
+          setUnreadChat(c => c + 1);
+        }
+      });
+
+      socket.on('hand_raised',  (uid) => setHints(p => [{ text: `${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]));
+
+      // Timers
+      timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+
+      // Speech metrics — only send from candidate side (not interviewer)
+      const isInterviewerUser = (user?.role === 'ALUMNI') || (searchParams.get('role') === 'alumni');
+      if (!isInterviewerUser) {
+        metricsRef.current = setInterval(() => {
+          socket.emit('speech_metrics', roomId, { wordsPerMinute: Math.floor(Math.random() * 80 + 100), fillerCount: Math.floor(Math.random() * 5), pauseCount: 2 });
+        }, 3000);
+      }
+
+      suggestionRef.current = setInterval(() => {
+        setSuggestionIdx(i => { const next = (i + 1) % WHISPERER_POOL.length; setCurrentSuggestion(WHISPERER_POOL[next]); return next; });
+      }, 12000);
+    }
+
+    start();
 
     return () => {
-      console.log('[Room] Cleaning up');
-      socket.disconnect();
-      pcRef.current?.close();
+      destroyed = true;
+      console.log('[Room] Cleanup');
+      socket?.disconnect();
+      pc?.close();
       pcRef.current = null;
+      iceBuf.current = [];
+      peerReadyRef.current = false;
+      clearTimeout(retryTimerRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
-      screenStreamRef.current = null;
-      videoManager.stopAllStreams(); // Use video manager cleanup
       clearInterval(timerRef.current);
       clearInterval(metricsRef.current);
       clearInterval(suggestionRef.current);
     };
-  }, [roomId, initPC, myId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Screen share ─────────────────────────────────────────────────────────
-  const toggleScreenShare = useCallback(async () => {
+  // Screen share
+  const toggleScreenShare = async () => {
     const pc = pcRef.current;
-    const videoManager = new VideoStreamManager();
-    
     if (!sharing) {
       try {
+        const videoManager = new VideoStreamManager();
         const screenStream = await videoManager.getScreenShare();
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
-
-        // Show local preview
         if (screenVideoRef.current) screenVideoRef.current.srcObject = screenStream;
-
-        // Replace video track in peer connection
         if (pc) {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) {
-            await sender.replaceTrack(screenTrack);
-            console.log('[Video] Screen track replaced in WebRTC');
-          }
+          if (sender) await sender.replaceTrack(screenTrack);
         }
-
-        // When user stops sharing via browser UI
-        screenTrack.onended = () => {
-          console.log('[Video] User stopped screen share from browser UI');
-          stopScreenShare();
-        };
+        screenTrack.onended = () => stopScreenShare();
         setSharing(true);
       } catch (e) {
-        console.error('[Video] Screen share initialization error:', e.message);
-        alert('Screen Sharing Error:\n' + e.message);
+        if (e.name !== 'NotAllowedError') console.error('Screen share error:', e);
       }
     } else {
       stopScreenShare();
     }
-  }, [sharing, roomId]);
+  };
 
-  const stopScreenShare = useCallback(async () => {
+  const stopScreenShare = async () => {
     const pc = pcRef.current;
     screenStreamRef.current?.getTracks().forEach(t => t.stop());
     screenStreamRef.current = null;
     if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
-
-    // Restore camera track with robust fallback
-    try {
-      if (pc && streamRef.current) {
-        const camTrack = streamRef.current.getVideoTracks()[0];
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender && camTrack) {
-          await sender.replaceTrack(camTrack);
-          console.log('[Video] Camera track restored after screen share');
-        }
-      }
-    } catch (err) {
-      console.error('[Video] Error restoring camera track:', err.message);
-      // Try to get fresh camera stream as fallback
-      try {
-        const videoManager = new VideoStreamManager();
-        const newStream = await videoManager.getCameraStream(false);
-        if (pc) {
-          const newTrack = newStream.getVideoTracks()[0];
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender && newTrack) {
-            await sender.replaceTrack(newTrack);
-            if (localVideoRef.current) localVideoRef.current.srcObject = newStream;
-            streamRef.current = newStream;
-          }
-        }
-      } catch (fallbackErr) {
-        console.error('[Video] Fallback camera recovery failed:', fallbackErr.message);
-      }
+    if (pc && streamRef.current) {
+      const camTrack = streamRef.current.getVideoTracks()[0];
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && camTrack) await sender.replaceTrack(camTrack);
     }
     setSharing(false);
-  }, []);
+  };
 
-  // ── Face Detection ────────────────────────────────────────────────────────
-  const detectFace = useCallback(async () => {
-    if (!camOn || !localVideoRef.current || !faceCanvasRef.current) return;
-    try {
-      const videoManager = new VideoStreamManager();
-      const faceDetected = await videoManager.detectFace(localVideoRef.current, faceCanvasRef.current);
-      setFaceDetected(faceDetected);
-    } catch (err) {
-      console.warn('[Video] Face detection failed, allowing video:', err.message);
-      setFaceDetected(true); // Don't block on error
-    }
-  }, [camOn]);
-
-  useEffect(() => {
-    const id = setInterval(detectFace, 3000);
-    return () => clearInterval(id);
-  }, [detectFace]);
-
-  // ── Controls ─────────────────────────────────────────────────────────────
   const toggleMic = () => {
     streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
     setMicOn(m => !m);
   };
+
   const toggleCam = () => {
     streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
     setCamOn(c => !c);
   };
+
   const toggleHand = () => {
     const next = !handRaised;
     setHandRaised(next);
     if (next) socketRef.current?.emit('hand_raised', roomId, myId);
   };
 
-  // ── AI Whisperer ──────────────────────────────────────────────────────────
   const sendTranscript = (text) => {
     if (!text.trim()) return;
     socketRef.current?.emit('transcript_chunk', roomId, text);
   };
+
   const triggerHint = () => sendTranscript(currentSuggestion);
+
   const nextSuggestion = () => {
     const next = (suggestionIdx + 1) % WHISPERER_POOL.length;
     setSuggestionIdx(next);
     setCurrentSuggestion(WHISPERER_POOL[next]);
   };
 
-  // ── Agent 7: Fact check trigger ───────────────────────────────────────────
   const triggerFactCheck = (claim) => {
     if (!claim.trim()) return;
     socketRef.current?.emit('fact_check_request', roomId, claim);
     setFactInput('');
   };
 
-  // ── Agent 5: Load peer profile summary ────────────────────────────────────
   const loadProfileSummary = async () => {
     try {
       const data = await api.summarizeProfile({ name: peerName, role: 'STUDENT' });
@@ -529,7 +567,11 @@ export default function DualAgentInterviewRoom() {
     } catch (e) { console.error(e); }
   };
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
+  // Auto-scroll chat to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
   const sendChat = () => {
     if (!chatInput.trim()) return;
     const msg = { from: myId, text: chatInput, time: new Date().toLocaleTimeString() };
@@ -538,20 +580,15 @@ export default function DualAgentInterviewRoom() {
     setChatInput('');
   };
 
-  // ── End session ───────────────────────────────────────────────────────────
   const endSession = async () => {
     clearInterval(timerRef.current);
     clearInterval(metricsRef.current);
     clearInterval(suggestionRef.current);
-
-    if (isAlumni) {
-      // Alumni path: skip Agent 3, just show RatingReviewForm
-      setEnded(true);
-      return;
-    }
-
-    // Student path
     setEnded(true);
+    // Interviewer goes straight to rating screen — no analytics needed
+    if (isInterviewer) return;
+    // Candidate gets analytics
+    setAnalyticsLoading(true);
     try {
       const data = await api.interviewAnalytics({
         interviewId: roomId,
@@ -559,8 +596,6 @@ export default function DualAgentInterviewRoom() {
         fullTranscript: hints.filter(h => h.type === 'ai').map(h => h.text).join(' '),
       });
       setAnalytics(data.analytics);
-
-      // ── Save report to localStorage for ProgressAnalytics ──────────────
       try {
         const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
         const HISTORY_KEY = 'alumnex_interview_history';
@@ -569,51 +604,159 @@ export default function DualAgentInterviewRoom() {
         const report = {
           id: `iv-${roomId}-${Date.now()}`,
           label: `Mock Interview #${String(existing.filter(r => r.userId === authUser.id || r.studentName === authUser.name).length + 1).padStart(2, '0')}`,
-          score,
-          date: new Date().toISOString(),
-          userId: authUser.id,
-          studentName: authUser.name,
-          roomId,
-          metrics: { confidence, clarity, energy },
-          analytics: data.analytics,
+          score, date: new Date().toISOString(), userId: authUser.id, studentName: authUser.name, roomId,
+          metrics: { confidence, clarity, energy }, analytics: data.analytics,
           checklist: (data.analytics?.actionable_insights || []).map(t => ({ done: false, text: t })),
         };
-        existing.unshift(report); // newest first
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50))); // keep last 50
-      } catch (saveErr) { console.warn('Could not save interview report:', saveErr); }
-
-      // ── Upsert to Supabase interview_records ──────────────────────────
-      try {
-        const score = Math.round((confidence + clarity + energy) / 3);
-        const transcript = hints.filter(h => h.type === 'ai').map(h => h.text).join(' ');
-        // Resolve alumni_id from Supabase if not already resolved
-        let alumniId = null;
-        if (resolvedRequestId) {
-          const { data: reqData } = await supabase.from('interview_requests').select('alumni_id').eq('request_id', resolvedRequestId).single();
-          alumniId = reqData?.alumni_id || null;
-        }
-        await upsertInterviewRecord({
-          student_id: user.id,
-          alumni_id: alumniId,
-          request_id: resolvedRequestId,
-          transcript,
-          student_score: score,
-          ai_action_items: data.analytics?.actionable_insights || [],
-          status: 'COMPLETED',
-        });
-      } catch (dbErr) { console.warn('Could not upsert interview record:', dbErr); }
-
+        existing.unshift(report);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+      } catch (saveErr) { console.warn('Could not save report:', saveErr); }
     } catch (e) { console.error(e); }
+    setAnalyticsLoading(false);
   };
 
   const remaining = Math.max(0, 3600 - elapsed);
 
-  // ── Alumni post-session: Rating form ─────────────────────────────────────
-  if (isAlumni && ended) {
-    return <RatingReviewForm roomId={roomId} requestId={resolvedRequestId} alumniId={user.id} studentId={resolvedStudentId} onSubmitted={() => navigate('/dashboard')} />;
+  // ── Post-session: Interviewer rating screen ─────────────────────────────────
+  if (ended && isInterviewer) {
+    const submitRating = async () => {
+      if (rating === 0) return;
+      setRatingSubmitting(true);
+
+      // Store locally
+      const key = 'alumnex_interview_ratings';
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      existing.unshift({
+        id: `rating-${roomId}-${Date.now()}`,
+        roomId,
+        candidateName: peerName,
+        rating,
+        feedback: ratingFeedback,
+        date: new Date().toISOString(),
+        interviewerName: myId,
+      });
+      localStorage.setItem(key, JSON.stringify(existing.slice(0, 100)));
+
+      // Also update candidate's profile rating locally
+      const profileKey = 'alumnex_candidate_ratings';
+      const profileRatings = JSON.parse(localStorage.getItem(profileKey) || '{}');
+      if (!profileRatings[peerName]) profileRatings[peerName] = [];
+      profileRatings[peerName].unshift({ rating, feedback: ratingFeedback, by: myId, date: new Date().toISOString(), roomId });
+      localStorage.setItem(profileKey, JSON.stringify(profileRatings));
+
+      // POST to backend API
+      try {
+        await fetch(`${API_URL}/users/${encodeURIComponent(peerName)}/rating`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rating,
+            feedback: ratingFeedback,
+            interviewerName: myId,
+            interviewerId: user?.id || null,
+            roomId,
+          }),
+        });
+        console.log('[Rating] Saved to backend');
+      } catch (err) {
+        console.warn('[Rating] Could not save to backend:', err);
+      }
+
+      setRatingSubmitting(false);
+      setRatingSubmitted(true);
+    };
+
+    return (
+      <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
+        <div style={{ maxWidth:520, width:'100%' }}>
+          {ratingSubmitted ? (
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'3rem', marginBottom:'1rem' }}>✅</div>
+              <h2 style={{ fontSize:'1.75rem', fontWeight:900, marginBottom:8 }}>Rating Submitted</h2>
+              <p style={{ color:'#c7c4d8', marginBottom:'2rem' }}>Your feedback for <strong style={{ color:'#c3c0ff' }}>{peerName}</strong> has been saved and will reflect in their profile.</p>
+              <button onClick={() => navigate('/dashboard')} style={{ padding:'0.875rem 2rem', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', color:'#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor:'pointer' }}>Back to Dashboard</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ textAlign:'center', marginBottom:'2rem' }}>
+                <div style={{ fontSize:'3rem', marginBottom:'0.5rem' }}>🎯</div>
+                <h2 style={{ fontSize:'1.75rem', fontWeight:900, letterSpacing:'-0.03em' }}>Rate the Candidate</h2>
+                <p style={{ color:'#c7c4d8', marginTop:8 }}>Your rating for <strong style={{ color:'#c3c0ff' }}>{peerName}</strong> will be stored in their profile.</p>
+              </div>
+              {/* Star rating */}
+              <div style={{ background:'#131b2e', borderRadius:16, padding:'1.5rem', marginBottom:'1rem', textAlign:'center' }}>
+                <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'1rem' }}>Overall Performance</div>
+                <div style={{ display:'flex', justifyContent:'center', gap:12, marginBottom:'0.5rem' }}>
+                  {[1,2,3,4,5].map(s => (
+                    <button key={s} onClick={() => setRating(s)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'2.5rem', color: s <= rating ? '#ffb95f' : 'rgba(70,69,85,0.5)', transition:'all 0.15s', transform: s <= rating ? 'scale(1.15)' : 'scale(1)' }}>★</button>
+                  ))}
+                </div>
+                <div style={{ fontSize:'0.8rem', color: rating > 0 ? '#ffb95f' : '#c7c4d8' }}>
+                  {['','Poor','Below Average','Average','Good','Excellent'][rating] || 'Select a rating'}
+                </div>
+              </div>
+              {/* Category ratings */}
+              <div style={{ background:'#131b2e', borderRadius:16, padding:'1.5rem', marginBottom:'1rem' }}>
+                <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'1rem' }}>Quick Assessment</div>
+                {[
+                  { label:'Technical Knowledge', color:'#c3c0ff' },
+                  { label:'Communication',        color:'#4edea3' },
+                  { label:'Problem Solving',      color:'#ffb95f' },
+                ].map(item => (
+                  <div key={item.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <span style={{ fontSize:'0.78rem', color:'#c7c4d8' }}>{item.label}</span>
+                    <div style={{ display:'flex', gap:6 }}>
+                      {[1,2,3,4,5].map(s => (
+                        <div key={s} style={{ width:10, height:10, borderRadius:'50%', background: s <= rating ? item.color : 'rgba(70,69,85,0.4)', transition:'background 0.2s' }} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Feedback text */}
+              <div style={{ background:'#131b2e', borderRadius:16, padding:'1.5rem', marginBottom:'1.5rem' }}>
+                <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:8 }}>Written Feedback (optional)</div>
+                <textarea
+                  value={ratingFeedback}
+                  onChange={e => setRatingFeedback(e.target.value)}
+                  placeholder="Share specific feedback about the candidate's performance..."
+                  rows={4}
+                  style={{ width:'100%', background:'#222a3d', border:'1px solid rgba(70,69,85,0.4)', borderRadius:10, padding:'0.75rem', color:'#dae2fd', fontSize:'0.85rem', outline:'none', resize:'vertical', boxSizing:'border-box', fontFamily:'Inter,sans-serif' }}
+                />
+              </div>
+              <button onClick={submitRating} disabled={rating === 0 || ratingSubmitting} style={{ width:'100%', padding:'1rem', background: rating > 0 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#2d3449', color: rating > 0 ? '#1d00a5' : '#c7c4d8', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor: rating > 0 ? 'pointer' : 'not-allowed', textTransform:'uppercase', letterSpacing:'0.1em', opacity: ratingSubmitting ? 0.6 : 1 }}>
+                {ratingSubmitting ? 'Submitting...' : 'Submit Rating'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
-  // ── Analytics screen ──────────────────────────────────────────────────────
+  // ── Analytics loading screen (candidate) ─────────────────────────────────────
+  if (ended && !isInterviewer && !analytics) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:'3rem', marginBottom:'1rem', animation:'pulse 2s infinite' }}>📊</div>
+          <h2 style={{ fontSize:'1.75rem', fontWeight:900, letterSpacing:'-0.03em', marginBottom:8 }}>Generating Your Report...</h2>
+          <p style={{ color:'#c7c4d8', maxWidth:400, lineHeight:1.6 }}>Our AI is analyzing your interview performance. This will take just a moment.</p>
+          <div style={{ marginTop:'2rem', display:'flex', justifyContent:'center', gap:8 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width:10, height:10, borderRadius:'50%', background:'#c3c0ff', animation:`bounce 1.2s ${i*0.2}s infinite ease-in-out` }} />
+            ))}
+          </div>
+        </div>
+        <style>{`
+          @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+          @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        `}</style>
+      </div>
+    );
+  }
+
+  // ── Analytics screen (candidate only) ────────────────────────────────────────
   if (ended && analytics) {
     return (
       <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
@@ -710,8 +853,8 @@ export default function DualAgentInterviewRoom() {
                   <span className="material-symbols-outlined" style={{ fontSize:48, color:'#464555' }}>videocam_off</span>
                 </div>
               )}
-              {/* Live metrics overlay — Student only */}
-              {isStudent && (
+              {/* Live metrics overlay — candidate only */}
+              {!isInterviewer && (
               <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)' }}>
                 {[{l:'Confidence',v:confidence,c:'#4edea3'},{l:'Clarity',v:clarity,c:'#c3c0ff'},{l:'Energy',v:energy,c:'#ffb95f'}].map(m=>(
                   <div key={m.l} style={{ marginBottom:7 }}>
@@ -728,28 +871,36 @@ export default function DualAgentInterviewRoom() {
                   <span style={{ fontSize:'0.58rem', color:'#c7c4d8' }}>AI coaching live</span>
                 </div>
               </div>
-              )}              <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>
+              )}
+              <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>
                 {myId} {sharing ? '(Screen)' : '(You)'}
               </div>
-              {/* Hidden canvas for face detection */}
-              <canvas ref={faceCanvasRef} style={{ display:'none' }} />
-              {/* Face detection warning overlay */}
-              {!faceDetected && camOn && (
-                <div style={{ position:'absolute', bottom:40, left:0, right:0, background:'rgba(0,0,0,0.75)', padding:'0.5rem 0.75rem', textAlign:'center', fontSize:'0.72rem', fontWeight:700, color:'#ffb95f' }}>
-                  ⚠ Face not visible — please adjust your camera
-                </div>
-              )}
             </div>
 
             {/* Remote */}
             <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:`1px solid ${videoConnected ? 'rgba(78,222,163,0.35)' : 'rgba(70,69,85,0.2)'}`, transition:'border-color 0.5s' }}>
-              <video ref={remoteVideoRef} autoPlay playsInline style={{ width:'100%', height:'100%', objectFit:'cover', display: videoConnected ? 'block' : 'none' }} />
+              {/* Remote video — NOT muted so audio comes through */}
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                onClick={e => e.target.play()}
+                style={{ width:'100%', height:'100%', objectFit:'cover', display: videoConnected ? 'block' : 'none' }}
+              />
               {!videoConnected && (
                 <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'rgba(11,19,38,0.9)', padding:'1rem' }}>
                   <div style={{ width:56, height:56, borderRadius:'50%', background: socketPeerPresent ? 'linear-gradient(135deg,#00a572,#4edea3)' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.25rem', fontWeight:700, color: socketPeerPresent ? '#003d29' : '#1d00a5', marginBottom:10 }}>{socketPeerPresent ? peerName[0]?.toUpperCase() : '?'}</div>
                   <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#c7c4d8', marginBottom:6 }}>{socketPeerPresent ? 'Connecting to video...' : 'Waiting for peer...'}</div>
-                  <div style={{ fontSize:'0.68rem', color:'#c7c4d8', opacity:0.55, textAlign:'center', maxWidth:200, lineHeight:1.5 }}>{socketPeerPresent ? 'Wait a moment for the WebRTC handshake to complete.' : 'Open this URL in another tab and log in as a different user'}</div>
-                  {!socketPeerPresent && <div style={{ marginTop:10, padding:'0.35rem 0.7rem', background:'#222a3d', borderRadius:7, fontSize:'0.65rem', color:'#c3c0ff', fontFamily:'monospace', wordBreak:'break-all', maxWidth:240, textAlign:'center' }}>{window.location.href}</div>}
+                  <div style={{ fontSize:'0.68rem', color:'#c7c4d8', opacity:0.55, textAlign:'center', maxWidth:200, lineHeight:1.5 }}>{socketPeerPresent ? 'WebRTC handshake in progress...' : 'Share this link with the other participant:'}</div>
+                  {!socketPeerPresent && (
+                    <div
+                      onClick={() => navigator.clipboard.writeText(window.location.href)}
+                      style={{ marginTop:10, padding:'0.35rem 0.7rem', background:'#222a3d', borderRadius:7, fontSize:'0.65rem', color:'#c3c0ff', fontFamily:'monospace', wordBreak:'break-all', maxWidth:240, textAlign:'center', cursor:'pointer' }}
+                      title="Click to copy"
+                    >
+                      {window.location.href}
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ position:'absolute', top:10, left:10, display:'flex', alignItems:'center', gap:5, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', padding:'0.2rem 0.55rem', borderRadius:999 }}>
@@ -765,11 +916,16 @@ export default function DualAgentInterviewRoom() {
 
         {/* ── Side panel ── */}
         <div style={{ width:340, background:'#131b2e', borderLeft:'1px solid rgba(70,69,85,0.2)', display:'flex', flexDirection:'column', flexShrink:0 }}>
-          {/* Panel tabs */}
+          {/* Panel tabs — AI (interviewer only) and Chat */}
           <div style={{ display:'flex', borderBottom:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
-            {[['ai','auto_awesome','AI'],['chat','chat_bubble','Chat'],['participants','group','People']].map(([tab,icon,label])=>(
-              <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>{label}
+            {(isInterviewer ? [['ai','auto_awesome','AI'], ['chat','chat_bubble','Chat']] : [['chat','chat_bubble','Chat']]).map(([tab,icon,label])=>(
+              <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s', position:'relative' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>
+                <span>{label}</span>
+                {/* Unread badge on Chat tab */}
+                {tab === 'chat' && unreadChat > 0 && (
+                  <span style={{ position:'absolute', top:6, right:'calc(50% - 20px)', minWidth:16, height:16, borderRadius:999, background:'#ef4444', color:'#fff', fontSize:'0.5rem', fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', animation:'pulse 2s infinite' }}>{unreadChat > 9 ? '9+' : unreadChat}</span>
+                )}
               </button>
             ))}
           </div>
@@ -779,8 +935,8 @@ export default function DualAgentInterviewRoom() {
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
               <div style={{ padding:'0.875rem', borderBottom:'1px solid rgba(70,69,85,0.15)', flexShrink:0, display:'flex', flexDirection:'column', gap:'0.65rem', overflowY:'auto', maxHeight:340 }}>
 
-                {/* Agent 6: Speech coaching tip — Student only */}
-                {isStudent && coachingTip && (
+                {/* Agent 6: Speech coaching tip */}
+                {coachingTip && (
                   <div style={{ background:'rgba(78,222,163,0.07)', border:'1px solid rgba(78,222,163,0.2)', borderRadius:9, padding:'0.6rem 0.8rem', display:'flex', alignItems:'flex-start', gap:7 }}>
                     <span className="material-symbols-outlined" style={{ color:'#4edea3', fontSize:13, marginTop:1, flexShrink:0 }}>tips_and_updates</span>
                     <div>
@@ -790,8 +946,7 @@ export default function DualAgentInterviewRoom() {
                   </div>
                 )}
 
-                {/* Agent 2: Socratic Whisperer — Alumni only */}
-                {isAlumni && (
+                {/* Agent 2: Socratic Whisperer */}
                 <div style={{ background:'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(11,19,38,0.85))', border:'1px solid rgba(79,70,229,0.35)', borderRadius:11, padding:'0.8rem' }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:5 }}>
@@ -808,7 +963,6 @@ export default function DualAgentInterviewRoom() {
                     <button onClick={nextSuggestion} style={{ background:'rgba(70,69,85,0.3)', color:'#c7c4d8', border:'none', borderRadius:6, padding:'0.25rem 0.65rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Skip</button>
                   </div>
                 </div>
-                )}
 
                 {/* Agent 7: Fact Checker */}
                 <div style={{ background:'rgba(42,23,0,0.45)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:9, padding:'0.7rem' }}>
@@ -822,7 +976,6 @@ export default function DualAgentInterviewRoom() {
                       <span style={{ fontSize:'0.62rem', fontWeight:700, color: f.status==='confirmed' ? '#4edea3' : '#ffb4ab', flexShrink:0 }}>{f.status==='confirmed'?'✓':'⚠'} {f.pct}</span>
                     </div>
                   ))}
-                  {isAlumni && (
                   <div style={{ display:'flex', gap:5, marginTop:6 }}>
                     <input value={factInput} onChange={e=>setFactInput(e.target.value)}
                       onKeyDown={e=>{ if(e.key==='Enter') triggerFactCheck(factInput); }}
@@ -830,7 +983,6 @@ export default function DualAgentInterviewRoom() {
                       style={{ flex:1, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,185,95,0.2)', borderRadius:6, padding:'0.28rem 0.5rem', color:'#dae2fd', fontSize:'0.65rem', outline:'none' }} />
                     <button onClick={()=>triggerFactCheck(factInput)} style={{ background:'rgba(255,185,95,0.15)', color:'#ffb95f', border:'none', borderRadius:6, padding:'0.28rem 0.6rem', fontSize:'0.58rem', fontWeight:700, cursor:'pointer' }}>Check</button>
                   </div>
-                  )}
                 </div>
 
                 {/* Agent 5: Peer Profile Summary */}
@@ -922,22 +1074,6 @@ export default function DualAgentInterviewRoom() {
             </div>
           )}
 
-          {/* Participants panel */}
-          {sidePanel === 'participants' && (
-            <div style={{ flex:1, padding:'1rem', overflowY:'auto' }}>
-              <div style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(199,196,216,0.4)', marginBottom:'1rem' }}>In this room</div>
-              {[{name:myId,role:'You',color:'#c3c0ff',online:true},{name:peerName,role:'Peer',color:'#4edea3',online:peerConnected},{name:'AI Whisperer',role:'AI Agent',color:'#ffb95f',online:true}].map((p,i)=>(
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'0.75rem', background:'#171f33', borderRadius:10, marginBottom:8, border:'1px solid rgba(70,69,85,0.15)', opacity: p.online ? 1 : 0.45 }}>
-                  <div style={{ width:36, height:36, borderRadius:'50%', background:`linear-gradient(135deg,${p.color}40,${p.color}20)`, border:`1px solid ${p.color}40`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem', fontWeight:700, color:p.color, flexShrink:0 }}>{p.name[0]?.toUpperCase()}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:600, fontSize:'0.85rem' }}>{p.name}</div>
-                    <div style={{ fontSize:'0.65rem', color:'#c7c4d8' }}>{p.role}</div>
-                  </div>
-                  <div style={{ width:7, height:7, borderRadius:'50%', background: p.online ? '#4edea3' : '#464555' }} />
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -988,8 +1124,8 @@ export default function DualAgentInterviewRoom() {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(78,222,163,0.4)} 50%{opacity:0.7;box-shadow:0 0 0 6px rgba(78,222,163,0)} }
         @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
       `}</style>
     </div>
   );
 }
-

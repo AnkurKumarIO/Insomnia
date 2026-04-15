@@ -19,6 +19,88 @@ const FEED = [
   { icon: 'event_available', color: '#ffb95f', title: '12 Interviews Completed', desc: 'Mock interview session for "Fintech Role" concluded successfully.', time: '4 hours ago' },
 ];
 
+const FULL_FEED = [
+  { icon: 'person_add',        color: '#4edea3', title: 'New Alumni Verified',          desc: 'David K. (Senior UI Designer at Airbnb) has joined the mentor pool.',                    time: '2 minutes ago',  category: 'Alumni' },
+  { icon: 'campaign',          color: '#c3c0ff', title: 'Placement Drive Scheduled',    desc: 'Microsoft Recruitment Drive for Batch 2024 set for Oct 15th.',                          time: '1 hour ago',     category: 'Placement' },
+  { icon: 'event_available',   color: '#ffb95f', title: '12 Interviews Completed',      desc: 'Mock interview session for "Fintech Role" concluded successfully.',                      time: '4 hours ago',    category: 'Interview' },
+  { icon: 'verified_user',     color: '#4edea3', title: 'Student Profile Approved',     desc: 'Priya Sharma (CS, 2024) has been verified and granted portal access.',                  time: '5 hours ago',    category: 'Student' },
+  { icon: 'school',            color: '#c3c0ff', title: 'New Student Registration',     desc: 'Arjun Malhotra submitted documents for B.Tech CS verification.',                        time: '6 hours ago',    category: 'Student' },
+  { icon: 'handshake',         color: '#4edea3', title: 'Mentorship Match Created',     desc: 'Rohan Verma (Student) matched with Neha Gupta (Alumni, Google).',                      time: '8 hours ago',    category: 'Mentorship' },
+  { icon: 'business_center',   color: '#ffb95f', title: 'New Recruiter Onboarded',      desc: 'Infosys Ltd. added as a verified recruiter for Batch 2024 placements.',                 time: '10 hours ago',   category: 'Placement' },
+  { icon: 'psychology',        color: '#c3c0ff', title: 'Alumni Mentor Application',    desc: 'Dr. Elena Rodriguez (PhD AI Ethics, Batch 2015) applied for mentor verification.',      time: '12 hours ago',   category: 'Alumni' },
+  { icon: 'workspace_premium', color: '#ffb95f', title: 'Placement Record Achieved',    desc: 'CS Department hit 94% placement rate — highest in 5 years.',                           time: '1 day ago',      category: 'Placement' },
+  { icon: 'event_repeat',      color: '#4edea3', title: 'Interview Rescheduled',        desc: 'Mock interview for Kavya Nair rescheduled to Oct 18th at 3:00 PM.',                     time: '1 day ago',      category: 'Interview' },
+  { icon: 'group_add',         color: '#c3c0ff', title: 'Batch 2025 Onboarding',        desc: '47 new students from Batch 2025 completed profile setup.',                              time: '2 days ago',     category: 'Student' },
+  { icon: 'star',              color: '#ffb95f', title: 'Top Mentor Recognised',        desc: 'Amit Joshi (Alumni, Microsoft) rated 4.9/5 across 32 mentorship sessions.',             time: '2 days ago',     category: 'Mentorship' },
+  { icon: 'notifications_active', color: '#4edea3', title: 'Drive Reminder Sent',       desc: 'Automated reminder sent to 120 eligible students for Google Drive on Oct 20th.',        time: '3 days ago',     category: 'Placement' },
+  { icon: 'cancel',            color: '#ffb4ab', title: 'Application Rejected',         desc: 'Alumni application from unverified account flagged and rejected by system.',             time: '3 days ago',     category: 'Alumni' },
+  { icon: 'analytics',         color: '#c3c0ff', title: 'Weekly Report Generated',      desc: 'Placement analytics report for Week 41 auto-generated and archived.',                   time: '4 days ago',     category: 'System' },
+];
+
+const CATEGORY_COLORS = {
+  Alumni:     '#4edea3',
+  Placement:  '#c3c0ff',
+  Interview:  '#ffb95f',
+  Student:    '#60a5fa',
+  Mentorship: '#f472b6',
+  System:     '#94a3b8',
+};
+
+function ActivityFeedTab() {
+  const [filter, setFilter] = React.useState('All');
+  const categories = ['All', 'Alumni', 'Student', 'Placement', 'Interview', 'Mentorship', 'System'];
+  const filtered = filter === 'All' ? FULL_FEED : FULL_FEED.filter(f => f.category === filter);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Activity Feed</h2>
+          <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 4 }}>All portal events — verifications, placements, interviews and more.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setFilter(cat)} style={{
+              padding: '0.3rem 0.75rem', borderRadius: 20, fontSize: '0.65rem', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer', border: 'none',
+              background: filter === cat ? (CATEGORY_COLORS[cat] || '#c3c0ff') : 'rgba(70,69,85,0.2)',
+              color: filter === cat ? '#0b1326' : '#c7c4d8',
+              transition: 'all 0.2s',
+            }}>{cat}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Feed list */}
+      <div style={{ background: '#131b2e', borderRadius: 20, padding: '1.5rem', position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 35, top: 24, bottom: 24, width: 1, background: 'rgba(70,69,85,0.25)' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {filtered.map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, position: 'relative' }}>
+              {/* Icon dot */}
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${f.color}20`, border: `1px solid ${f.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1, marginTop: 2 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 12, color: f.color, fontVariationSettings: "'FILL' 1" }}>{f.icon}</span>
+              </div>
+              {/* Content */}
+              <div style={{ flex: 1, background: '#171f33', borderRadius: 12, padding: '0.875rem 1rem', borderLeft: `3px solid ${f.color}40` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#dae2fd' }}>{f.title}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: `${CATEGORY_COLORS[f.category]}18`, color: CATEGORY_COLORS[f.category], padding: '0.15rem 0.5rem', borderRadius: 6, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{f.category}</span>
+                    <span style={{ fontSize: '0.6rem', color: 'rgba(199,196,216,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{f.time}</span>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#c7c4d8', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const HEATMAP = [
   { dept: 'CS Dept',  vals: [92,84,95,62,48] },
   { dept: 'IT Dept',  vals: [78,88,42,81,24] },
@@ -31,7 +113,6 @@ export default function TNPDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [queueStatus, setQueueStatus] = useState({});
-  const [credModal, setCredModal] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [queueSearch, setQueueSearch] = useState('');
@@ -168,66 +249,12 @@ export default function TNPDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Pending approval item waiting for credential setup
-  const [pendingApproval, setPendingApproval] = useState(null); // { name, email, role, sub }
-  // Credential setup modal state
-  const [setupCreds, setSetupCreds] = useState({ username: '', password: '', confirmPassword: '' });
-  const [setupUsernameStatus, setSetupUsernameStatus] = useState(null); // null|checking|available|taken
-  const [setupUsernameTimer, setSetupUsernameTimer] = useState(null);
-  const [setupErrors, setSetupErrors] = useState({});
-  const [setupLoading, setSetupLoading] = useState(false);
+
 
   if (!user) return <Navigate to="/login" replace />;
 
-  // Username availability check for credential setup
-  const handleSetupUsernameChange = (val) => {
-    setSetupCreds(c => ({ ...c, username: val }));
-    setSetupUsernameStatus(null);
-    if (setupUsernameTimer) clearTimeout(setupUsernameTimer);
-    if (!val || val.length < 4 || !/^[a-z0-9._]+$/.test(val)) return;
-    setSetupUsernameStatus('checking');
-    const t = setTimeout(() => {
-      // Check against already approved accounts
-      const approved = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
-      const taken = approved.some(a => a.username === val);
-      setSetupUsernameStatus(taken ? 'taken' : 'available');
-    }, 500);
-    setSetupUsernameTimer(t);
-  };
-
   const handleApprove = (q) => {
-    const role = q.sub.toLowerCase().includes('alumni') ? 'ALUMNI' : 'STUDENT';
-    const email = q.email || `${q.name.toLowerCase().replace(/\s+/g, '.')}@alumniconnect.edu`;
-    // Open credential setup modal instead of auto-generating
-    setPendingApproval({ name: q.name, email, role, sub: q.sub });
-    setSetupCreds({ username: '', password: '', confirmPassword: '' });
-    setSetupUsernameStatus(null);
-    setSetupErrors({});
-  };
-
-  const handleSetupSubmit = () => {
-    const e = {};
-    if (!setupCreds.username || setupCreds.username.length < 4) e.username = 'Min 4 characters';
-    else if (!/^[a-z0-9._]+$/.test(setupCreds.username)) e.username = 'Lowercase letters, numbers, dots, underscores only';
-    else if (setupUsernameStatus !== 'available') e.username = 'Choose an available username';
-    if (setupCreds.password.length < 8) e.password = 'Min 8 characters';
-    if (setupCreds.password !== setupCreds.confirmPassword) e.confirmPassword = 'Passwords do not match';
-    setSetupErrors(e);
-    if (Object.keys(e).length > 0) return;
-
-    setSetupLoading(true);
-    setTimeout(() => {
-      const { name, email, role, sub } = pendingApproval;
-      // Save to approved accounts
-      const existing = JSON.parse(localStorage.getItem('alumniconnect_approved_accounts') || '[]');
-      existing.push({ username: setupCreds.username, password: setupCreds.password, role, name, email, department: sub, id: `${role.toLowerCase()}-${Date.now()}` });
-      localStorage.setItem('alumniconnect_approved_accounts', JSON.stringify(existing));
-
-      setQueueStatus(s => ({ ...s, [name]: 'approved' }));
-      setCredModal({ name, username: setupCreds.username, password: setupCreds.password, email, role });
-      setPendingApproval(null);
-      setSetupLoading(false);
-    }, 600);
+    setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
   };
 
   const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
@@ -235,6 +262,7 @@ export default function TNPDashboard() {
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
     { icon: 'rule',            label: 'Verification Queue', tab: 'queue' },
+    { icon: 'dynamic_feed',    label: 'Activity Feed',      tab: 'activity' },
     { icon: 'analytics',       label: 'Analytics',          tab: 'analytics' },
     { icon: 'policy',          label: 'Compliance & Log',   tab: 'compliance' },
     { icon: 'settings_suggest',label: 'System Settings',    tab: 'settings' },
@@ -309,6 +337,7 @@ export default function TNPDashboard() {
       );
     }
     if (activeTab === 'analytics') return <AnalyticsTab />;
+    if (activeTab === 'activity') return <ActivityFeedTab />;
     if (activeTab === 'compliance') return <ComplianceTab logRole={logRole} setLogRole={setLogRole} logAction={logAction} setLogAction={setLogAction} logDate={logDate} setLogDate={setLogDate} />;
     if (activeTab === 'settings') return <SystemSettingsTab commSettings={commSettings} setCommSettings={setCommSettings} roles={roles} setRoles={setRoles} />;
     return null; // home rendered below
@@ -316,99 +345,6 @@ export default function TNPDashboard() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1326', color: '#dae2fd', fontFamily: 'Inter, sans-serif' }}>
-
-      {/* ── Credential Setup Modal (shown when TNP approves) ── */}
-      {pendingApproval && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(195,192,255,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: '#c3c0ff', display: 'block', marginBottom: 8 }}>manage_accounts</span>
-              <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dae2fd', marginBottom: 6 }}>Set Login Credentials</h3>
-              <p style={{ fontSize: '0.8rem', color: '#c7c4d8', lineHeight: 1.6 }}>
-                Approving <strong style={{ color: '#c3c0ff' }}>{pendingApproval.name}</strong> ({pendingApproval.role})<br />
-                Set a username and password for their account.
-              </p>
-            </div>
-
-            {/* Username */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Username</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  value={setupCreds.username}
-                  onChange={e => handleSetupUsernameChange(e.target.value.toLowerCase())}
-                  placeholder="e.g. priya.sharma"
-                  style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.username ? 'rgba(255,107,107,0.5)' : setupUsernameStatus === 'available' ? 'rgba(78,222,163,0.5)' : setupUsernameStatus === 'taken' ? 'rgba(255,107,107,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 2.5rem 0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }}
-                />
-                <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
-                  {setupUsernameStatus === 'checking' && <div style={{ width: 14, height: 14, border: '2px solid rgba(195,192,255,0.3)', borderTop: '2px solid #c3c0ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
-                  {setupUsernameStatus === 'available' && <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#4edea3' }}>check_circle</span>}
-                  {setupUsernameStatus === 'taken' && <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ffb4ab' }}>cancel</span>}
-                </div>
-              </div>
-              <div style={{ fontSize: '0.68rem', marginTop: 4, color: setupErrors.username ? '#ffb4ab' : setupUsernameStatus === 'available' ? '#4edea3' : setupUsernameStatus === 'taken' ? '#ffb4ab' : '#c7c4d8' }}>
-                {setupErrors.username || (setupUsernameStatus === 'available' ? '✓ Username is available' : setupUsernameStatus === 'taken' ? '✗ Already taken' : 'Lowercase letters, numbers, dots and underscores only')}
-              </div>
-            </div>
-
-            {/* Password */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Password</label>
-              <input type="password" value={setupCreds.password} onChange={e => setSetupCreds(c => ({ ...c, password: e.target.value }))} placeholder="Min 8 characters"
-                style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.password ? 'rgba(255,107,107,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }} />
-              {setupErrors.password && <div style={{ fontSize: '0.68rem', color: '#ffb4ab', marginTop: 4 }}>{setupErrors.password}</div>}
-            </div>
-
-            {/* Confirm Password */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', display: 'block', marginBottom: 6 }}>Confirm Password</label>
-              <input type="password" value={setupCreds.confirmPassword} onChange={e => setSetupCreds(c => ({ ...c, confirmPassword: e.target.value }))} placeholder="Re-enter password"
-                style={{ width: '100%', background: '#222a3d', border: `1px solid ${setupErrors.confirmPassword ? 'rgba(255,107,107,0.5)' : setupCreds.confirmPassword && setupCreds.password === setupCreds.confirmPassword ? 'rgba(78,222,163,0.5)' : 'rgba(70,69,85,0.4)'}`, borderRadius: 10, padding: '0.65rem 0.875rem', color: '#dae2fd', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }} />
-              {setupErrors.confirmPassword && <div style={{ fontSize: '0.68rem', color: '#ffb4ab', marginTop: 4 }}>{setupErrors.confirmPassword}</div>}
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setPendingApproval(null)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(70,69,85,0.2)', border: '1px solid rgba(70,69,85,0.3)', borderRadius: 12, color: '#c7c4d8', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSetupSubmit} disabled={setupLoading || setupUsernameStatus !== 'available'}
-                style={{ flex: 2, padding: '0.75rem', background: setupLoading || setupUsernameStatus !== 'available' ? '#2d3449' : 'linear-gradient(135deg,#4edea3,#3bc490)', color: setupLoading || setupUsernameStatus !== 'available' ? '#c7c4d8' : '#0b1326', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: setupLoading || setupUsernameStatus !== 'available' ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {setupLoading ? <div style={{ width: 16, height: 16, border: '2px solid rgba(11,19,38,0.3)', borderTop: '2px solid #0b1326', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>Approve & Set Credentials</>}
-              </button>
-            </div>
-          </div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      )}
-
-      {/* ── Credentials Confirmation Modal ── */}
-      {credModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: '#171f33', borderRadius: 20, padding: '2rem', width: '100%', maxWidth: 460, border: '1px solid rgba(78,222,163,0.25)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✅</div>
-              <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#4edea3', marginBottom: 6 }}>Account Approved!</h3>
-              <p style={{ fontSize: '0.8rem', color: '#c7c4d8' }}>
-                Credentials for <strong style={{ color: '#dae2fd' }}>{credModal.name}</strong> have been set.<br />
-                <span style={{ color: '#ffb95f' }}>In production, these would be emailed to {credModal.email}</span>
-              </p>
-            </div>
-            {[['Username', credModal.username], ['Password', credModal.password], ['Email', credModal.email], ['Role', credModal.role]].map(([label, val]) => (
-              <div key={label} style={{ background: '#131b2e', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(70,69,85,0.2)' }}>
-                <div>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: '#c3c0ff' }}>{val}</div>
-                </div>
-                <button onClick={() => navigator.clipboard.writeText(val)} style={{ background: 'rgba(195,192,255,0.1)', border: 'none', borderRadius: 6, padding: '0.3rem 0.6rem', color: '#c3c0ff', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}>Copy</button>
-              </div>
-            ))}
-            <div style={{ background: 'rgba(255,185,95,0.08)', border: '1px solid rgba(255,185,95,0.2)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-              <p style={{ fontSize: '0.75rem', color: '#ffb95f', lineHeight: 1.6 }}>📧 Simulated email sent to {credModal.email}. User can now log in at <strong>/login</strong></p>
-            </div>
-            <button onClick={() => setCredModal(null)} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>
-              Done
-            </button>
-          </div>
-        </div>
-      )}
 
       {showLogoutConfirm && (
         <LogoutConfirmModal
@@ -436,9 +372,6 @@ export default function TNPDashboard() {
           })}
         </nav>
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button onClick={() => setActiveTab('analytics')} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', borderRadius: 12, fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>
-            Generate Report
-          </button>
           <a href="#" onClick={e => { e.preventDefault(); setShowLogoutConfirm(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', textDecoration: 'none' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Logout
           </a>
@@ -566,7 +499,7 @@ export default function TNPDashboard() {
                     {/* Menu items */}
                     <div style={{ padding: '0.5rem' }}>
                       {[
-                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); } },
+                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); setActiveTab('settings'); } },
                         { icon: 'settings', label: 'Account Settings', sub: 'Configure your preferences', action: () => { setShowProfile(false); setActiveTab('settings'); } },
                       ].map(item => (
                         <button key={item.label} onClick={item.action} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, textAlign: 'left', transition: 'background 0.15s' }}
@@ -731,7 +664,7 @@ export default function TNPDashboard() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setActiveTab('queue')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                <button onClick={() => setActiveTab('activity')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                   View Full History
                 </button>
               </div>

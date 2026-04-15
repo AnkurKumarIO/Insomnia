@@ -1,10 +1,11 @@
-﻿import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import { api } from '../api';
-import { getAllAlumni, getRequestsForAlumni, getSlotBookedRequestsForAlumni, updateRequest } from '../lib/db';
+import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
+import { useInterviewRequests } from '../hooks/useInterviewRequests';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -163,77 +164,88 @@ function BookSlotModal({ request, onClose, onBooked }) {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('10:00');
-  const [step, setStep] = useState('calendar'); // calendar | confirm | done
+  const [timeHH, setTimeHH]   = useState('10');
+  const [timeMM, setTimeMM]   = useState('00');
+  const [ampm, setAmpm]       = useState('AM');
+  const [timeError, setTimeError] = useState('');
+  const [step, setStep] = useState('calendar');
 
-  const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const firstDay   = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const todayStr = today.toDateString();
+  const todayStr   = today.toDateString();
 
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
-
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y-1); } else setViewMonth(m => m-1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y+1); } else setViewMonth(m => m+1); };
   const isPast = (day) => new Date(viewYear, viewMonth, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
+  const to24h = () => {
+    let h = parseInt(timeHH, 10) || 12;
+    const m = parseInt(timeMM, 10) || 0;
+    if (ampm === 'AM') { if (h === 12) h = 0; }
+    else { if (h !== 12) h += 12; }
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+
   const handleBook = () => {
-    const scheduledTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${selectedTime}`).toISOString();
+    const h = parseInt(timeHH, 10);
+    const m = parseInt(timeMM, 10);
+    if (isNaN(h) || h < 1 || h > 12) { setTimeError('Hour must be 1-12'); return; }
+    if (isNaN(m) || m < 0 || m > 59) { setTimeError('Minutes must be 00-59'); return; }
+    setTimeError('');
+    const time24 = to24h();
+    const scheduledTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${time24}`).toISOString();
     bookSlot(request.id, scheduledTime);
     setStep('done');
     setTimeout(() => { onBooked(scheduledTime); onClose(); }, 1800);
   };
 
+  const displayTime = () => `${String(timeHH).padStart(2,'0')}:${String(timeMM).padStart(2,'0')} ${ampm}`;
+
   const formattedSelected = selectedDate
     ? new Date(viewYear, viewMonth, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : null;
 
+  const inputStyle = {
+    background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10,
+    color: '#dae2fd', fontSize: '1.4rem', fontWeight: 700, textAlign: 'center',
+    width: '100%', padding: '0.6rem 0.25rem', outline: 'none', fontFamily: 'Inter, monospace',
+    boxSizing: 'border-box',
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
         {step === 'done' ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ“…</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>📅</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Slot Booked!</h3>
-            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>
-              {request.studentName} has been notified with the interview date and time.
-            </p>
+            <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>{request.studentName} has been notified with the interview date and time.</p>
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Book Interview Slot</div>
                 <h3 style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>with {request.studentName}</h3>
               </div>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8' }}><span className="material-symbols-outlined">close</span></button>
             </div>
-
-            <div style={{ padding: '1.25rem 1.5rem' }}>
-              {/* Month navigation */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
+              {/* Month nav */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
-                </button>
+                <button onClick={prevMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span></button>
                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dae2fd' }}>{MONTHS[viewMonth]} {viewYear}</span>
-                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
-                </button>
+                <button onClick={nextMonth} style={{ background: '#222a3d', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: '#c7c4d8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span></button>
               </div>
-
               {/* Day headers */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
                 {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#c7c4d8', padding: '0.25rem 0' }}>{d}</div>)}
               </div>
-
               {/* Calendar grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: '1.5rem' }}>
                 {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                   const past = isPast(day);
@@ -245,50 +257,51 @@ function BookSlotModal({ request, onClose, onBooked }) {
                         background: selected ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : isToday ? 'rgba(78,222,163,0.15)' : 'transparent',
                         color: selected ? '#1d00a5' : past ? 'rgba(199,196,216,0.25)' : isToday ? '#4edea3' : '#dae2fd',
                         outline: isToday && !selected ? '1px solid rgba(78,222,163,0.4)' : 'none',
-                      }}>
-                      {day}
-                    </button>
+                      }}>{day}</button>
                   );
                 })}
               </div>
-
-              {/* Time slot picker */}
+              {/* Time input */}
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>
-                    Select Time "” {formattedSelected}
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: '0.75rem' }}>
+                    Select Time — {formattedSelected}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
-                    {TIME_SLOTS.map(t => (
-                      <button key={t} onClick={() => setSelectedTime(t)}
-                        style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, transition: 'all 0.15s',
-                          background: selectedTime === t ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d',
-                          color: selectedTime === t ? '#1d00a5' : '#c7c4d8',
-                        }}>
-                        {t}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: timeError ? 6 : '1.25rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hour</div>
+                      <input type="number" min="1" max="12" value={timeHH}
+                        onChange={e => { setTimeHH(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(12, Math.max(1, parseInt(e.target.value)||1)); setTimeHH(String(v)); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#c3c0ff', paddingTop: 18 }}>:</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Min</div>
+                      <input type="number" min="0" max="59" value={timeMM}
+                        onChange={e => { setTimeMM(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(59, Math.max(0, parseInt(e.target.value)||0)); setTimeMM(String(v).padStart(2,'0')); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 18 }}>
+                      {['AM','PM'].map(p => (
+                        <button key={p} onClick={() => setAmpm(p)} style={{ width: 52, padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', background: ampm === p ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#222a3d', color: ampm === p ? '#1d00a5' : '#c7c4d8', transition: 'all 0.15s' }}>{p}</button>
+                      ))}
+                    </div>
                   </div>
-
-                  {/* Confirm summary */}
+                  {timeError && <div style={{ fontSize: '0.7rem', color: '#ffb4ab', marginBottom: '1rem' }}>⚠ {timeError}</div>}
                   <div style={{ background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: 4 }}>Scheduled Slot</div>
-                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {selectedTime}</div>
+                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {displayTime()}</div>
                     <div style={{ fontSize: '0.72rem', color: '#c7c4d8', marginTop: 3 }}>A notification will be sent to {request.studentName}</div>
                   </div>
-
                   <button onClick={handleBook} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_available</span>
                     Confirm & Notify Student
                   </button>
                 </>
               )}
-
-              {!selectedDate && (
-                <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>
-                  Select a date to choose a time slot
-                </div>
-              )}
+              {!selectedDate && <div style={{ textAlign: 'center', padding: '0.5rem', color: '#c7c4d8', fontSize: '0.8rem', opacity: 0.6 }}>Select a date to set a time</div>}
             </div>
           </>
         )}
@@ -296,7 +309,6 @@ function BookSlotModal({ request, onClose, onBooked }) {
     </div>
   );
 }
-
 // â”€â”€ Reschedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function RescheduleModal({ request, onClose, onRescheduled }) {
   const today = new Date();
@@ -330,7 +342,7 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
       <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(255,185,95,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
         {done ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ”„</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔄</div>
             <h3 style={{ fontWeight: 700, color: '#ffb95f', marginBottom: 8 }}>Slot Rescheduled!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified of the new time.</p>
           </div>
@@ -364,7 +376,7 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
               </div>
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time "” {formattedSelected}</div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time — {formattedSelected}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
                     {TIME_SLOTS.map(t => <button key={t} onClick={() => setSelectedTime(t)} style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, background: selectedTime === t ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: selectedTime === t ? '#1d00a5' : '#c7c4d8' }}>{t}</button>)}
                   </div>
@@ -454,7 +466,6 @@ export default function AlumniDashboard() {
   const [acceptedToast, setAcceptedToast] = useState(null); // { name }
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
-  const [alumniBookedRequests, setAlumniBookedRequests] = useState([]);
 
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
@@ -506,7 +517,7 @@ export default function AlumniDashboard() {
             createdAt:     r.created_at,
             studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
           }));
-          const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+          const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
           mapped.forEach(dbReq => {
             const idx = local.findIndex(l => l.id === dbReq.id);
             if (idx === -1) local.push(dbReq);
@@ -526,17 +537,42 @@ export default function AlumniDashboard() {
       }
     };
     load();
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
-  }, [user.name, user.id]);
 
-  // Fetch SLOT_BOOKED requests for alumni from Supabase (for Join Now links)
-  useEffect(() => {
-    if (!user?.id) return;
-    getSlotBookedRequestsForAlumni(user.id).then(rows => {
-      if (rows && rows.length > 0) setAlumniBookedRequests(rows);
-    }).catch(() => {});
-  }, [user?.id]);
+    // Supabase Realtime — fires instantly on new/updated requests for this alumni
+    let channel = null;
+    let supabaseRef = null;
+    (async () => {
+      try {
+        let alumniId = user.id;
+        const isMockId = !alumniId || String(alumniId).startsWith('alm-') || String(alumniId).startsWith('stu-');
+        if (isMockId) {
+          const { getAllAlumni } = await import('../lib/db');
+          const alumniList = await getAllAlumni();
+          const match = alumniList.find(a => a.name === user.name);
+          if (match) alumniId = match.id;
+        }
+        if (alumniId && !String(alumniId).startsWith('alm-') && !String(alumniId).startsWith('stu-')) {
+          const { supabase } = await import('../lib/supabaseClient');
+          supabaseRef = supabase;
+          channel = supabase
+            .channel(`alumni-reqs-${alumniId}`)
+            .on('postgres_changes',
+              { event: 'INSERT', schema: 'public', table: 'interview_requests', filter: `alumni_id=eq.${alumniId}` },
+              () => load()
+            )
+            .on('postgres_changes',
+              { event: 'UPDATE', schema: 'public', table: 'interview_requests', filter: `alumni_id=eq.${alumniId}` },
+              () => load()
+            )
+            .subscribe();
+        }
+      } catch(e) { console.warn('Alumni Realtime setup failed:', e.message); }
+    })();
+
+    return () => {
+      try { if (channel && supabaseRef) supabaseRef.removeChannel(channel); } catch {}
+    };
+  }, [user.name, user.id]);
 
   // Build notifications list: new requests + meetings in 24h
   const allScheduled = [...SCHEDULE, ...extraSlots];
@@ -548,7 +584,7 @@ export default function AlumniDashboard() {
   });
   const notifications = [
     ...liveRequests.map(r => ({ id: r.id, type: 'request', title: 'New Interview Request', desc: `${r.studentName} wants to book a ${r.topic}`, time: r.createdAt })),
-    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} "” ${s.when}`, time: s.scheduledTime })),
+    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} — ${s.when}`, time: s.scheduledTime })),
   ];
   const unreadCount = notifications.filter(n => !seenNotifIds.includes(n.id)).length;
 
@@ -568,8 +604,16 @@ export default function AlumniDashboard() {
   };
 
   const handleAddSlot = ({ date, time, duration }) => {
-    const label = `${date} • ${time}`;
-    setExtraSlots(s => [...s, { when: label, title: `Open Slot (${duration} min)`, sub: 'Available for booking', active: false }]);
+    const isoTime = new Date(`${date}T${time}`).toISOString();
+    setExtraSlots(s => [...s, {
+      when: formatScheduledTime(isoTime),
+      title: `Open Slot (${duration} min)`,
+      sub: 'Available for booking',
+      active: false,
+      isFreeSlot: true,
+      scheduledTime: isoTime,
+      duration: parseInt(duration),
+    }]);
   };
 
   const handleDeclineRequest = (id) => {
@@ -592,15 +636,10 @@ export default function AlumniDashboard() {
     }
   };
 
-  const handleSlotBooked = async (requestId, scheduledTime) => {
-    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
+  const handleSlotBooked = (requestId, scheduledTime) => {
+    // roomId MUST match bookSlot formula exactly
+    const roomId = `room-${requestId.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
     setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId } : r));
-    // Persist roomId to Supabase
-    try {
-      await updateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime, roomId });
-    } catch (e) {
-      console.warn('handleSlotBooked: failed to persist roomId', e.message);
-    }
     const formatted = formatScheduledTime(scheduledTime);
     const req = liveRequests.find(r => r.id === requestId);
     setExtraSlots(s => [...s, {
@@ -616,29 +655,33 @@ export default function AlumniDashboard() {
   // ── Instant Meet — start right now, notify student ────────────────────────
   const handleInstantMeet = (req) => {
     const now = new Date().toISOString();
-    const roomId = `room-instant-${req.id.slice(-8)}-${Date.now()}`;
-    // Update request to slot_booked with current time
+    // roomId MUST match bookSlot formula exactly — no 'instant-' prefix
+    const roomId = `room-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
+    // bookSlot updates DB (status, roomId, scheduledTime) and creates Supabase notification
     bookSlot(req.id, now);
     setLiveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'slot_booked', scheduledTime: now, roomId } : r));
-    // Push instant notification to student
+    // Also push local notification so it works even without Supabase Realtime
     try {
       const NOTIF_KEY = 'alumniconnect_student_notifications';
       const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-      all.unshift({
-        id: `instant-${req.id}-${Date.now()}`,
-        studentName: req.studentName,
-        type: 'live',
-        title: '🔴 Instant Meeting Started!',
-        message: `${user.name} has started an instant mock interview session. Join now!`,
-        requestId: req.id,
-        roomId,
-        read: false,
-        createdAt: now,
-      });
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+      const alreadyExists = all.some(n => n.requestId === req.id && n.type === 'live');
+      if (!alreadyExists) {
+        all.unshift({
+          id: `live-${req.id}`,
+          studentName: req.studentName,
+          type: 'live',
+          title: '🔴 Interview is Live Now!',
+          message: `${user.name} has started a mock interview session. Join now!`,
+          requestId: req.id,
+          roomId,
+          read: false,
+          createdAt: now,
+        });
+        localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+      }
     } catch {}
     // Navigate alumni to the room
-    navigate(`/interview/${roomId}`);
+    navigate(`/interview/${roomId}?name=${encodeURIComponent(user?.name || 'Alumni')}`);
   };
 
   const handleRescheduled = (requestId, newScheduledTime) => {
@@ -671,7 +714,7 @@ export default function AlumniDashboard() {
   const renderSearchResults = (q) => {
     const ql = q.toLowerCase();
 
-    // Search requests "” include all statuses for this alumni
+    // Search requests — include all statuses for this alumni
     const allRequests = (() => {
       try {
         return getRequests().filter(r => r.alumniName === user.name);
@@ -740,7 +783,7 @@ export default function AlumniDashboard() {
                     <span style={{ padding: '0.2rem 0.6rem', borderRadius: 999, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
                       background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
                       color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
-                    }}>{r.status === 'slot_booked' ? 'âœ“ Booked' : r.status === 'accepted' ? 'Accepted' : 'Pending'}</span>
+                    }}>{r.status === 'slot_booked' ? '✓ Booked' : r.status === 'accepted' ? 'Accepted' : 'Pending'}</span>
                     {r.status === 'pending' && (
                       <button onClick={() => { setViewingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>View</button>
                     )}
@@ -793,184 +836,201 @@ export default function AlumniDashboard() {
 
   const renderContent = () => {
     if (activeTab === 'schedule') {
-      // Build week grid
-      const today = new Date();
-      const dayOfWeek = today.getDay(); // 0=Sun
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
+      const now = new Date();
 
+      // Build Mon–Sun week
+      const dayOfWeek = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+      monday.setHours(0,0,0,0);
       const weekDays = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        return d;
+        const d = new Date(monday); d.setDate(monday.getDate() + i); return d;
+      });
+      const todayIdx = (now.getDay() + 6) % 7;
+
+      // All events with ISO scheduledTime
+      const bookedRequests = liveRequests.filter(r => r.status === 'slot_booked' && r.scheduledTime);
+      const allEvents = [
+        ...bookedRequests.map(r => ({
+          scheduledTime: r.scheduledTime,
+          title: `Mock Interview: ${r.studentName}`,
+          sub: r.topic,
+          isFreeSlot: false,
+          duration: 120,
+          roomId: r.roomId,
+        })),
+        ...extraSlots.filter(s => s.scheduledTime).map(s => ({
+          scheduledTime: s.scheduledTime,
+          title: s.title,
+          sub: s.sub,
+          isFreeSlot: true,
+          duration: s.duration || 60,
+        })),
+      ].sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+
+      const weekStart = new Date(monday);
+      const weekEnd   = new Date(monday); weekEnd.setDate(monday.getDate() + 7);
+      const weekEvents = allEvents.filter(e => {
+        const d = new Date(e.scheduledTime);
+        return d >= weekStart && d < weekEnd;
       });
 
-      const HOURS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
-      const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      // Group by day index Mon=0
+      const eventsByDay = Array.from({ length: 7 }, () => []);
+      weekEvents.forEach(e => {
+        const d = new Date(e.scheduledTime);
+        eventsByDay[(d.getDay() + 6) % 7].push(e);
+      });
 
-      // Collect all booked slots (from SCHEDULE + extraSlots + slot_booked requests)
-      const bookedRequests = liveRequests.filter(r => r.status === 'slot_booked' && r.scheduledTime);
-      const allSlots = [...SCHEDULE, ...extraSlots];
+      const isEnded = (e) => Date.now() > new Date(e.scheduledTime).getTime() + (e.duration || 60) * 60000;
+      const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-      // Check if a day/hour cell has a booking "” using ISO scheduledTime for accuracy
-      const isBooked = (dayIdx, hour) => {
-        // Check bookedRequests by ISO date
-        const cellDate = weekDays[dayIdx];
-        const cellHour = parseInt(hour.split(':')[0]);
-        const hasBookedReq = bookedRequests.some(r => {
-          const d = new Date(r.scheduledTime);
-          return d.getDate() === cellDate.getDate() &&
-                 d.getMonth() === cellDate.getMonth() &&
-                 d.getFullYear() === cellDate.getFullYear() &&
-                 d.getHours() === cellHour;
-        });
-        if (hasBookedReq) return true;
-
-        // Fallback: check string-based slots
-        return allSlots.some(s => {
-          if (!s.when) return false;
-          const parts = s.when.split('•');
-          if (parts.length < 2) return false;
-          const timeStr = parts[1].trim().replace(' PM','').replace(' AM','');
-          const slotHour = parseInt(timeStr.split(':')[0]);
-          const isPM = s.when.includes('PM') && slotHour !== 12;
-          const slotH24 = isPM ? slotHour + 12 : slotHour;
-          const slotHourStr = `${String(slotH24).padStart(2,'0')}:00`;
-          const dayLabel = DAY_LABELS[dayIdx];
-          const isToday = parts[0].trim() === 'Today' && dayIdx === (today.getDay() + 6) % 7;
-          const isTomorrow = parts[0].trim() === 'Tomorrow' && dayIdx === (today.getDay() + 7) % 7;
-          const matchDay = isToday || isTomorrow || parts[0].trim().startsWith(dayLabel);
-          return matchDay && slotHourStr === hour;
-        });
-      };
-
-      const getSlotInfo = (dayIdx, hour) => {
-        // Check bookedRequests first
-        const cellDate = weekDays[dayIdx];
-        const cellHour = parseInt(hour.split(':')[0]);
-        const bookedReq = bookedRequests.find(r => {
-          const d = new Date(r.scheduledTime);
-          return d.getDate() === cellDate.getDate() &&
-                 d.getMonth() === cellDate.getMonth() &&
-                 d.getFullYear() === cellDate.getFullYear() &&
-                 d.getHours() === cellHour;
-        });
-        if (bookedReq) return { title: `Mock Interview: ${bookedReq.studentName}`, sub: bookedReq.topic, active: true, roomId: bookedReq.roomId };
-
-        return allSlots.find(s => {
-          if (!s.when) return false;
-          const parts = s.when.split('•');
-          if (parts.length < 2) return false;
-          const timeStr = parts[1].trim().replace(' PM','').replace(' AM','');
-          const slotHour = parseInt(timeStr.split(':')[0]);
-          const isPM = s.when.includes('PM') && slotHour !== 12;
-          const slotH24 = isPM ? slotHour + 12 : slotHour;
-          const slotHourStr = `${String(slotH24).padStart(2,'0')}:00`;
-          const dayLabel = DAY_LABELS[dayIdx];
-          const isToday = parts[0].trim() === 'Today' && dayIdx === (today.getDay() + 6) % 7;
-          const isTomorrow = parts[0].trim() === 'Tomorrow' && dayIdx === (today.getDay() + 7) % 7;
-          const matchDay = isToday || isTomorrow || parts[0].trim().startsWith(dayLabel);
-          return matchDay && slotHourStr === hour;
-        });
-      };
-
-      const todayIdx = (today.getDay() + 6) % 7; // Mon=0
+      // Unique sorted time labels for calendar rows
+      const allTimes = [...new Set(weekEvents.map(e => {
+        const d = new Date(e.scheduledTime);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }))].sort();
 
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Weekly Schedule</h2>
             <button onClick={() => setShowSlotModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
-              Add Slot
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Add Slot
             </button>
           </div>
 
           {/* Legend */}
-          <div style={{ display: 'flex', gap: 16, fontSize: '0.72rem', color: '#c7c4d8' }}>
+          <div style={{ display: 'flex', gap: 16, fontSize: '0.72rem', color: '#c7c4d8', flexWrap: 'wrap' }}>
             {[
-              { color: 'rgba(195,192,255,0.15)', border: 'rgba(195,192,255,0.3)', label: 'Available' },
-              { color: 'rgba(255,107,107,0.15)', border: 'rgba(255,107,107,0.4)', label: 'Booked / Interview' },
-              { color: 'rgba(78,222,163,0.1)',   border: 'rgba(78,222,163,0.3)',   label: 'Today' },
+              { color: 'rgba(195,192,255,0.2)', border: 'rgba(195,192,255,0.4)', label: 'Interview' },
+              { color: 'rgba(78,222,163,0.15)', border: 'rgba(78,222,163,0.4)',  label: 'Free Slot' },
+              { color: 'rgba(100,100,100,0.15)',border: 'rgba(100,100,100,0.3)', label: 'Ended' },
+              { color: 'rgba(78,222,163,0.06)', border: 'rgba(78,222,163,0.2)',  label: 'Today' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 4, background: l.color, border: `1px solid ${l.border}` }} />
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: l.color, border: `1px solid ${l.border}` }} />
                 {l.label}
               </div>
             ))}
           </div>
 
-          {/* Calendar grid */}
+          {/* Calendar grid — only rows with events */}
           <div style={{ background: '#131b2e', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(70,69,85,0.15)' }}>
             {/* Day headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7,1fr)', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '64px repeat(7,1fr)', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
               <div style={{ padding: '0.75rem', background: '#171f33' }} />
               {weekDays.map((d, i) => {
                 const isToday = i === todayIdx;
                 return (
                   <div key={i} style={{ padding: '0.75rem 0.5rem', textAlign: 'center', background: isToday ? 'rgba(78,222,163,0.08)' : '#171f33', borderLeft: '1px solid rgba(70,69,85,0.15)' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isToday ? '#4edea3' : '#c7c4d8' }}>{DAY_LABELS[i]}</div>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isToday ? '#4edea3' : '#c7c4d8' }}>
+                      {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}
+                    </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 900, color: isToday ? '#4edea3' : '#dae2fd', marginTop: 2 }}>{d.getDate()}</div>
+                    {eventsByDay[i].length > 0 && (
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c3c0ff', margin: '3px auto 0' }} />
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Time rows */}
-            <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-              {HOURS.map(hour => (
-                <div key={hour} style={{ display: 'grid', gridTemplateColumns: '60px repeat(7,1fr)', borderBottom: '1px solid rgba(70,69,85,0.08)' }}>
-                  <div style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: 'rgba(199,196,216,0.4)', background: '#131b2e' }}>{hour}</div>
-                  {weekDays.map((_, dayIdx) => {
-                    const booked = isBooked(dayIdx, hour);
-                    const slotInfo = booked ? getSlotInfo(dayIdx, hour) : null;
-                    const isToday = dayIdx === todayIdx;
-                    return (
-                      <div key={dayIdx}
-                        title={slotInfo ? `${slotInfo.title} "” ${slotInfo.sub}` : 'Available'}
-                        style={{ padding: '0.3rem', borderLeft: '1px solid rgba(70,69,85,0.1)', background: booked ? 'rgba(255,107,107,0.08)' : isToday ? 'rgba(78,222,163,0.03)' : 'transparent', cursor: booked ? 'default' : 'pointer', minHeight: 36, position: 'relative', transition: 'background 0.15s' }}
-                        onMouseEnter={e => { if (!booked) e.currentTarget.style.background = 'rgba(195,192,255,0.06)'; }}
-                        onMouseLeave={e => { if (!booked) e.currentTarget.style.background = isToday ? 'rgba(78,222,163,0.03)' : 'transparent'; }}>
-                        {booked && slotInfo && (
-                          <div style={{ background: slotInfo.active ? 'rgba(195,192,255,0.2)' : 'rgba(255,107,107,0.15)', border: `1px solid ${slotInfo.active ? 'rgba(195,192,255,0.4)' : 'rgba(255,107,107,0.3)'}`, borderRadius: 6, padding: '0.2rem 0.4rem', fontSize: '0.58rem', fontWeight: 700, color: slotInfo.active ? '#c3c0ff' : '#ffb4ab', lineHeight: 1.3, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                            {slotInfo.title.replace('Mock Interview: ','').replace('Open Slot','Slot')}
+            {/* Event-only time rows */}
+            {allTimes.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: '#c7c4d8', opacity: 0.5 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 36, display: 'block', marginBottom: 8 }}>event_busy</span>
+                No meetings this week
+              </div>
+            ) : allTimes.map(timeStr => (
+              <div key={timeStr} style={{ display: 'grid', gridTemplateColumns: '64px repeat(7,1fr)', borderBottom: '1px solid rgba(70,69,85,0.08)', minHeight: 48 }}>
+                <div style={{ padding: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'rgba(199,196,216,0.5)', background: '#131b2e' }}>{timeStr}</div>
+                {weekDays.map((_, dayIdx) => {
+                  const event = eventsByDay[dayIdx].find(e => {
+                    const d = new Date(e.scheduledTime);
+                    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` === timeStr;
+                  });
+                  const ended = event && isEnded(event);
+                  const isToday = dayIdx === todayIdx;
+                  return (
+                    <div key={dayIdx} style={{
+                      padding: '0.25rem',
+                      borderLeft: '1px solid rgba(70,69,85,0.1)',
+                      background: event
+                        ? (ended ? 'rgba(100,100,100,0.06)' : event.isFreeSlot ? 'rgba(78,222,163,0.06)' : 'rgba(195,192,255,0.06)')
+                        : isToday ? 'rgba(78,222,163,0.02)' : 'transparent',
+                      minHeight: 48,
+                    }}>
+                      {event && (
+                        <div style={{
+                          background: ended ? 'rgba(100,100,100,0.18)' : event.isFreeSlot ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.18)',
+                          border: `1px solid ${ended ? 'rgba(100,100,100,0.3)' : event.isFreeSlot ? 'rgba(78,222,163,0.35)' : 'rgba(195,192,255,0.4)'}`,
+                          borderRadius: 6, padding: '0.2rem 0.35rem',
+                          fontSize: '0.55rem', fontWeight: 700,
+                          color: ended ? '#6b7280' : event.isFreeSlot ? '#4edea3' : '#c3c0ff',
+                          lineHeight: 1.4,
+                        }}>
+                          <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                            {event.title.replace('Mock Interview: ','').replace(/Open Slot.*/, 'Free Slot')}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+                          {ended && <div style={{ fontSize: '0.48rem', opacity: 0.8, marginTop: 1 }}>Ended</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
-          {/* Upcoming list */}
+          {/* Sorted session list */}
           <div style={{ background: '#171f33', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(70,69,85,0.1)' }}>
-            <div style={{ background: '#222a3d', padding: '0.875rem 1.5rem' }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>Upcoming Sessions</span>
+            <div style={{ background: '#222a3d', padding: '0.875rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>All Sessions — Sorted by Time</span>
+              <span style={{ fontSize: '0.6rem', color: '#c7c4d8' }}>{allEvents.length} total</span>
             </div>
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[...SCHEDULE, ...extraSlots, ...bookedRequests.map(r => ({
-                when: formatScheduledTime(r.scheduledTime),
-                title: `Mock Interview: ${r.studentName}`,
-                sub: r.topic,
-                active: true,
-                roomId: r.roomId,
-                scheduledTime: r.scheduledTime,
-              }))].map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1rem', background: '#131b2e', borderRadius: 12, borderLeft: `3px solid ${s.active ? '#c3c0ff' : 'rgba(70,69,85,0.3)'}` }}>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: s.active ? '#c3c0ff' : '#c7c4d8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>{s.when}</div>
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{s.title}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{s.sub}</div>
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              {allEvents.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#c7c4d8', opacity: 0.5, fontSize: '0.875rem' }}>No sessions scheduled yet</div>
+              )}
+              {allEvents.map((e, i) => {
+                const ended = isEnded(e);
+                const accentColor = ended ? 'rgba(100,100,100,0.4)' : e.isFreeSlot ? '#4edea3' : '#c3c0ff';
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1rem', background: '#131b2e', borderRadius: 12, borderLeft: `3px solid ${accentColor}`, opacity: ended ? 0.65 : 1, gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: ended ? '#6b7280' : e.isFreeSlot ? '#4edea3' : '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
+                        {fmtDate(e.scheduledTime)} • {fmtTime(e.scheduledTime)}
+                        {ended && <span style={{ marginLeft: 8, color: '#6b7280', fontWeight: 600 }}>— Ended</span>}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: ended ? '#6b7280' : '#dae2fd' }}>{e.title}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{e.sub}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                      {e.isFreeSlot && (
+                        <button
+                          onClick={() => setExtraSlots(s => s.filter(x => x.scheduledTime !== e.scheduledTime))}
+                          style={{ padding: '0.35rem 0.75rem', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, color: '#ffb4ab', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span> Remove
+                        </button>
+                      )}
+                      {!e.isFreeSlot && (
+                        ended ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.75rem', background: 'rgba(100,100,100,0.15)', color: '#6b7280', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam_off</span> Ended
+                          </div>
+                        ) : (
+                          <Link to={`/interview/${e.roomId || 'demo-room'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.75rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join
+                          </Link>
+                        )
+                      )}
+                    </div>
                   </div>
-                  {s.active && (
-                    <Link to={`/interview/${s.roomId || 'demo-room'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
-                    </Link>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1016,7 +1076,7 @@ export default function AlumniDashboard() {
                     background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
                     color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
                   }}>
-                    {r.status === 'slot_booked' ? 'ðŸ“… Booked' : r.status === 'accepted' ? 'âœ“ Accepted' : 'â³ Pending'}
+                    {r.status === 'slot_booked' ? '📅 Booked' : r.status === 'accepted' ? '✓ Accepted' : 'â³ Pending'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
@@ -1043,16 +1103,18 @@ export default function AlumniDashboard() {
                 {r.status === 'slot_booked' && (() => {
                   const now = Date.now();
                   const scheduledMs = new Date(r.scheduledTime).getTime();
-                  const canJoin = now >= scheduledMs - 5 * 60 * 1000 && now <= scheduledMs + 2 * 60 * 60 * 1000;
+                  const endMs = scheduledMs + 2 * 60 * 60 * 1000;
+                  const isEnded = now > endMs;
+                  const canJoin = !isEnded && now >= scheduledMs - 5 * 60 * 1000;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                      {canJoin ? (
+                      {isEnded ? (<div style={{ padding: '0.45rem 1rem', background: 'rgba(100,100,100,0.12)', color: '#6b7280', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, opacity: 0.7 }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam_off</span> Ended</div>) : canJoin ? (
                         <a href={`/interview/${r.roomId}`} style={{ padding: '0.45rem 1rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
                         </a>
                       ) : (
                         <div style={{ padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textAlign: 'right' }}>
-                          ðŸ“… {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       )}
                       <button onClick={() => setReschedulingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, color: '#ffb95f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1154,7 +1216,7 @@ export default function AlumniDashboard() {
                     )}
                     {(r.status === 'accepted' || r.status === 'slot_booked') && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {/* âœ“ Accepted badge */}
+                        {/* ✓ Accepted badge */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.12)', border: '1px solid rgba(78,222,163,0.25)', borderRadius: 8 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#4edea3', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -1166,16 +1228,23 @@ export default function AlumniDashboard() {
                           <button onClick={() => setBookingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>calendar_month</span> Book Slot
                           </button>
-                        )}
-                        {r.status === 'slot_booked' && (() => {
-                          const canJoin = Date.now() >= new Date(r.scheduledTime).getTime() - 5 * 60 * 1000;
-                          return canJoin ? (
+                        )}                        {r.status === 'slot_booked' && (() => {
+                          const now = Date.now();
+                          const scheduledMs = new Date(r.scheduledTime).getTime();
+                          const endMs = scheduledMs + 2 * 60 * 60 * 1000;
+                          const isEnded = now > endMs;
+                          const canJoin = !isEnded && now >= scheduledMs - 5 * 60 * 1000;
+                          return isEnded ? (
+                            <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, opacity: 0.7 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam_off</span> Ended
+                            </div>
+                          ) : canJoin ? (
                             <a href={`/interview/${r.roomId}`} style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam</span> Join
                             </a>
                           ) : (
                             <div style={{ fontSize: '0.65rem', color: '#4edea3', fontWeight: 600 }}>
-                              ðŸ“… {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
                           );
                         })()}
@@ -1205,24 +1274,6 @@ export default function AlumniDashboard() {
                 <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>Upcoming Sessions</span>
               </div>
               <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {/* Supabase-sourced booked sessions */}
-                {alumniBookedRequests.map((r, i) => (
-                  <div key={`sb-${i}`} style={{ position: 'relative', paddingLeft: 24, borderLeft: '2px solid #c3c0ff' }}>
-                    <div style={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', background: '#c3c0ff' }} />
-                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-                      {r.scheduled_time ? new Date(r.scheduled_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Scheduled'}
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>Mock Interview: {r.studentName || 'Student'}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{r.topic || 'Mock Interview'}</div>
-                    {r.room_id ? (
-                      <Link to={`/interview/${r.room_id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now
-                      </Link>
-                    ) : (
-                      <span style={{ display: 'inline-block', marginTop: 6, fontSize: '0.65rem', color: '#ffb95f', fontWeight: 600 }}>Room not ready yet</span>
-                    )}
-                  </div>
-                ))}
                 {SCHEDULE.map((s, i) => (
                   <div key={i} style={{ position: 'relative', paddingLeft: 24, borderLeft: `2px solid ${s.active ? '#c3c0ff' : 'rgba(70,69,85,0.3)'}` }}>
                     <div style={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', background: s.active ? '#c3c0ff' : '#464555' }} />
@@ -1322,7 +1373,7 @@ export default function AlumniDashboard() {
             );
           })}
         </nav>
-        {/* Only Sign Out at bottom "” no "New Mentorship" button */}
+        {/* Only Sign Out at bottom — no "New Mentorship" button */}
         <div style={{ marginTop: 'auto' }}>
           <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
@@ -1339,7 +1390,7 @@ export default function AlumniDashboard() {
             <input
               value={globalSearch}
               onChange={e => setGlobalSearch(e.target.value)}
-              placeholder="Search anything "” names, sessions, topics..."
+              placeholder="Search anything — names, sessions, topics..."
               style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }}
             />
             {globalSearch && (
@@ -1432,10 +1483,10 @@ export default function AlumniDashboard() {
                         </div>
                         <div style={{ padding: '0.75rem 1rem' }}>
                           {[
-                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || '"”' },
-                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || '"”' },
-                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || '"”' },
-                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || '"”' },
+                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || '—' },
+                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || '—' },
+                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || '—' },
+                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || '—' },
                           ].map(item => (
                             <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.45rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#c3c0ff' }}>{item.icon}</span>

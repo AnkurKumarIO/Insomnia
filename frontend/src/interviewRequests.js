@@ -4,7 +4,7 @@
 import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
 
 const STORAGE_KEY = 'alumnex_interview_requests';
-const NOTIF_KEY   = 'alumnex_student_notifications';
+const NOTIF_KEY   = 'alumniconnect_student_notifications';
 
 // ── localStorage helpers (fallback) ──────────────────────────────────────────
 function loadLocal() {
@@ -13,10 +13,10 @@ function loadLocal() {
 function saveLocal(requests) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
 }
-function pushLocalNotif({ studentName, type, title, message, requestId }) {
+function pushLocalNotif({ studentName, type, title, message, requestId, roomId }) {
   try {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-    all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, read: false, createdAt: new Date().toISOString() });
+    all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, roomId: roomId || null, read: false, createdAt: new Date().toISOString() });
     localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
   } catch {}
 }
@@ -30,11 +30,22 @@ export function getStudentNotifications(studentName) {
   } catch { return []; }
 }
 
-export function markStudentNotifsRead(studentName) {
+export async function markStudentNotifsRead(studentName, studentId) {
   try {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
     const updated = all.map(n => n.studentName === studentName ? { ...n, read: true } : n);
     localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+    
+    // Also sync to DB if we have the ID
+    let realStudentId = studentId;
+    if (!realStudentId) {
+      const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
+      if (authUser.id && authUser.name === studentName) realStudentId = authUser.id;
+    }
+    if (realStudentId && !String(realStudentId).startsWith('stu-')) {
+      const { markNotificationsRead } = await import('./lib/db');
+      await markNotificationsRead(realStudentId);
+    }
   } catch {}
 }
 
@@ -215,7 +226,8 @@ export async function acceptRequestOnly(requestId) {
 // ── Book slot (alumni) ────────────────────────────────────────────────────────
 
 export async function bookSlot(requestId, scheduledTime) {
-  const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
+  // roomId derived ONLY from requestId — same on every device, no Date.now()
+  const roomId = `room-${requestId.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
   try {
     await dbUpdateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime, roomId });
   } catch (e) { console.warn('bookSlot DB error:', e.message); }
@@ -243,12 +255,16 @@ export async function bookSlot(requestId, scheduledTime) {
     }
   } catch {}
 
+  const isInstant = Math.abs(new Date(scheduledTime).getTime() - Date.now()) < 60000;
   pushLocalNotif({
     studentName: requests[idx].studentName,
-    type:        'slot_booked',
-    title:       'Interview Slot Confirmed! 📅',
-    message:     `Your interview is scheduled for ${formatted}.`,
+    type:        isInstant ? 'live' : 'slot_booked',
+    title:       isInstant ? '🔴 Interview is Live Now!' : 'Interview Slot Confirmed! 📅',
+    message:     isInstant
+      ? 'Your mock interview is starting now. Click Join to enter the room.'
+      : `Your interview is scheduled for ${formatted}.`,
     requestId,
+    roomId,
   });
   return requests[idx];
 }
