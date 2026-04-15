@@ -139,16 +139,27 @@ export default function DualAgentInterviewRoom() {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:stun.cloudflare.com:3478' },
           { urls: 'turn:openrelay.metered.ca:80',                username: 'openrelayproject', credential: 'openrelayproject' },
           { urls: 'turn:openrelay.metered.ca:443',               username: 'openrelayproject', credential: 'openrelayproject' },
           { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:numb.viagenie.ca',                       username: 'webrtc@live.com',  credential: 'muazkh' },
+          { urls: 'turn:standard.relay.metered.ca:80',           username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:standard.relay.metered.ca:443',          username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:standard.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
         ],
         iceCandidatePoolSize: 10,
       };
       try {
-        const r = await fetch(`${API_URL}/meet/ice-config`);
-        if (r.ok) { iceConfig = await r.json(); console.log('[ICE] Loaded', iceConfig.iceServers.length, 'servers'); }
-      } catch (_) { console.warn('[ICE] Using defaults'); }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout
+        const r = await fetch(`${API_URL}/meet/ice-config`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (r.ok) { iceConfig = await r.json(); console.log('[ICE] Loaded', iceConfig.iceServers.length, 'servers from backend'); }
+      } catch (_) { console.warn('[ICE] Could not fetch from backend — using built-in defaults'); }
 
       if (destroyed) return;
 
