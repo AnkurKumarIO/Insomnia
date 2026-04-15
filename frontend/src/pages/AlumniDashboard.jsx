@@ -603,10 +603,10 @@ export default function AlumniDashboard() {
   };
 
   const handleSlotBooked = (requestId, scheduledTime) => {
-    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId: `room-${requestId.slice(-8)}-${Date.now()}` } : r));
+    const roomId = `room-${requestId.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId } : r));
     const formatted = formatScheduledTime(scheduledTime);
     const req = liveRequests.find(r => r.id === requestId);
-    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
     setExtraSlots(s => [...s, {
       when: formatted,
       title: `Mock Interview: ${req?.studentName || 'Student'}`,
@@ -620,8 +620,8 @@ export default function AlumniDashboard() {
   // ── Instant Meet — start right now, notify student ────────────────────────
   const handleInstantMeet = (req) => {
     const now = new Date().toISOString();
-    // Deterministic roomId from requestId — same on every device
-    const roomId = `room-instant-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
+    // Deterministic roomId from requestId — MUST match bookSlot exactly
+    const roomId = `room-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
     // Update request to slot_booked with current time
     bookSlot(req.id, now);
     setLiveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'slot_booked', scheduledTime: now, roomId } : r));
