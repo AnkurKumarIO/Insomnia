@@ -4,16 +4,18 @@ import { Link } from 'react-router-dom';
 const CARDS = [
   {
     icon: 'rocket_launch',
+    iconColor: '#c3c0ff',
     bgIcon: 'school',
     title: 'I am a Student',
     desc: 'Accelerate your career with AI-matched mentors, personalized internship insights, and real-world alumni journeys.',
     checks: ['AI Mentor Matching', 'Resume Intelligence'],
     btnLabel: 'CREATE STUDENT ACCOUNT',
     btnTo: '/auth/student/register',
-    glowColor: '99, 179, 237',   // blue
+    glowColor: '99, 179, 237',
   },
   {
     icon: 'volunteer_activism',
+    iconColor: '#c3c0ff',
     bgIcon: 'psychology',
     title: 'I am an Alumnus',
     desc: 'Re-engage with your alma mater, mentor the next generation, and tap into an exclusive high-tier professional network.',
@@ -24,6 +26,7 @@ const CARDS = [
   },
   {
     icon: 'admin_panel_settings',
+    iconColor: '#4edea3',
     bgIcon: 'query_stats',
     title: 'I am a TNP Coordinator',
     desc: 'Streamline campus placements with predictive analytics, alumni verified referrals, and automated outreach.',
@@ -34,8 +37,9 @@ const CARDS = [
   },
 ];
 
-function TiltCard({ card, isHovered, onEnter, onLeave }) {
+function TiltCard({ card, onEnter, onLeave }) {
   const ref = useRef(null);
+  const [hovered, setHovered] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = (e) => {
@@ -49,140 +53,95 @@ function TiltCard({ card, isHovered, onEnter, onLeave }) {
     setTilt({ x: dy * -12, y: dx * 12 });
   };
 
-  const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-    onLeave();
-  };
+  const handleMouseEnter = () => { setHovered(true); onEnter(); };
+  const handleMouseLeave = () => { setTilt({ x: 0, y: 0 }); setHovered(false); onLeave(); };
 
-  const { glowColor } = card;
+  const { glowColor, iconColor } = card;
 
   return (
     <div
       ref={ref}
       onMouseMove={handleMouseMove}
-      onMouseEnter={onEnter}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{
         flex: '1 1 280px',
         maxWidth: 360,
-        background: '#111827',
-        borderRadius: 20,
+        background: 'rgba(23,31,51,0.5)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: 14,
         padding: '2rem',
-        border: isHovered
+        border: hovered
           ? `1px solid rgba(${glowColor}, 0.5)`
-          : '1px solid rgba(70,69,85,0.18)',
-        boxShadow: isHovered
-          ? `0 0 0 1px rgba(${glowColor},0.15), 0 8px 32px rgba(${glowColor},0.18), 0 0 60px rgba(${glowColor},0.12)`
-          : '0 4px 24px rgba(0,0,0,0.4)',
-        transform: isHovered
+          : '1px solid rgba(70,69,85,0.15)',
+        boxShadow: hovered
+          ? `0 0 0 1px rgba(${glowColor},0.1), 0 8px 32px rgba(${glowColor},0.2), 0 0 60px rgba(${glowColor},0.1), 0 20px 40px rgba(0,0,0,0.3)`
+          : '0 20px 40px rgba(0,0,0,0.3)',
+        transform: hovered
           ? `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(1.05)`
           : 'perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)',
-        transition: isHovered
+        transition: hovered
           ? 'box-shadow 0.3s ease, border-color 0.3s ease, transform 0.08s linear'
           : 'box-shadow 0.5s ease, border-color 0.5s ease, transform 0.6s cubic-bezier(0.23,1,0.32,1)',
-        cursor: 'default',
         position: 'relative',
         overflow: 'hidden',
-        opacity: isHovered === false ? 0.45 : 1,
         willChange: 'transform',
+        cursor: 'default',
       }}
     >
       {/* Subtle bg icon */}
-      <span
-        className="material-symbols-outlined"
-        style={{
-          position: 'absolute', top: 12, right: 16,
-          fontSize: '5rem', opacity: 0.05, color: '#fff',
-          pointerEvents: 'none', userSelect: 'none',
-        }}
-      >
-        {card.bgIcon}
-      </span>
-
-      {/* Icon box */}
-      <div style={{
-        width: 52, height: 52, borderRadius: 14,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: '1.5rem',
-        background: isHovered
-          ? `rgba(${glowColor}, 0.2)`
-          : 'rgba(255,255,255,0.04)',
-        border: isHovered
-          ? `1px solid rgba(${glowColor}, 0.4)`
-          : '1px solid rgba(255,255,255,0.07)',
-        boxShadow: isHovered ? `0 0 18px rgba(${glowColor},0.35)` : 'none',
-        transition: 'all 0.35s ease',
-      }}>
-        <span
-          className="material-symbols-outlined"
-          style={{
-            fontSize: 26,
-            color: isHovered ? `rgb(${glowColor})` : '#4a5568',
-            transition: 'color 0.35s ease',
-          }}
-        >
-          {card.icon}
-        </span>
+      <div style={{ position: 'absolute', top: 0, right: 0, padding: '1.5rem', opacity: 0.1 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: '5rem', color: '#fff' }}>{card.bgIcon}</span>
       </div>
 
-      {/* Title */}
+      {/* Icon box — original style, glow added on hover */}
+      <div style={{
+        width: 48, height: 48, borderRadius: 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: '1.5rem',
+        background: `${iconColor}18`,
+        border: `1px solid ${iconColor}30`,
+        boxShadow: hovered ? `0 0 18px rgba(${glowColor},0.4)` : 'none',
+        transition: 'box-shadow 0.35s ease',
+      }}>
+        <span className="material-symbols-outlined" style={{ color: iconColor, fontSize: 22 }}>{card.icon}</span>
+      </div>
+
+      {/* Title — original color always */}
       <h3 style={{
-        fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em',
-        color: isHovered ? '#f0f4ff' : '#4a5568',
-        marginBottom: '0.75rem',
-        transition: 'color 0.35s ease',
+        fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em',
+        color: '#dae2fd', marginBottom: '1rem',
       }}>
         {card.title}
       </h3>
 
       {/* Description */}
-      <p style={{
-        fontSize: '0.85rem', lineHeight: 1.7,
-        color: isHovered ? '#94a3b8' : '#2d3748',
-        marginBottom: '1.5rem',
-        transition: 'color 0.35s ease',
-      }}>
+      <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.7, marginBottom: '2rem' }}>
         {card.desc}
       </p>
 
       {/* Checklist */}
-      <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {card.checks.map(item => (
-          <li key={item} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem',
-            color: isHovered ? '#94a3b8' : '#2d3748',
-            transition: 'color 0.35s ease',
-          }}>
-            <span
-              className="material-symbols-outlined"
-              style={{
-                fontSize: 16,
-                color: isHovered ? `rgb(${glowColor})` : '#2d3748',
-                transition: 'color 0.35s ease',
-              }}
-            >
-              check_circle
-            </span>
+          <li key={item} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#c7c4d8' }}>
+            <span className="material-symbols-outlined" style={{ color: '#4edea3', fontSize: 16 }}>check_circle</span>
             {item}
           </li>
         ))}
       </ul>
 
-      {/* CTA Button */}
+      {/* CTA Button — original style, glow added on hover */}
       <Link
         to={card.btnTo}
         style={{
-          display: 'block', width: '100%', padding: '0.875rem',
+          display: 'block', width: '100%', padding: '1rem',
           borderRadius: 12, textAlign: 'center', textDecoration: 'none',
-          fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.12em',
-          boxSizing: 'border-box',
-          background: isHovered
-            ? `linear-gradient(135deg, rgba(${glowColor},0.25), rgba(${glowColor},0.12))`
-            : 'rgba(255,255,255,0.03)',
-          border: isHovered
-            ? `1px solid rgba(${glowColor},0.5)`
-            : '1px solid rgba(255,255,255,0.06)',
-          color: isHovered ? `rgb(${glowColor})` : '#2d3748',
-          boxShadow: isHovered ? `0 0 20px rgba(${glowColor},0.2)` : 'none',
+          fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em',
+          textTransform: 'uppercase', boxSizing: 'border-box',
+          background: hovered ? `rgba(${glowColor}, 0.15)` : '#131b2e',
+          border: hovered ? `1px solid rgba(${glowColor}, 0.5)` : '1px solid rgba(70,69,85,0.3)',
+          color: hovered ? `rgb(${glowColor})` : '#dae2fd',
+          boxShadow: hovered ? `0 0 20px rgba(${glowColor},0.25)` : 'none',
           transition: 'all 0.35s ease',
         }}
       >
@@ -196,19 +155,14 @@ export default function RoleCards() {
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
   return (
-    <section style={{
-      background: '#0b1326',
-      padding: '7rem 2rem',
-      fontFamily: 'Inter, sans-serif',
-    }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <section style={{ background: '#0b1326', padding: '7rem 2rem', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* Heading */}
         <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
           <h2 style={{
             fontSize: 'clamp(2rem, 5vw, 3.5rem)',
             fontWeight: 900, letterSpacing: '-0.04em',
-            lineHeight: 1.1, color: '#e2e8f0',
-            marginBottom: '1.25rem',
+            lineHeight: 1.1, color: '#dae2fd', marginBottom: '1.25rem',
           }}>
             Between Campus and{' '}
             <span style={{
@@ -221,24 +175,17 @@ export default function RoleCards() {
               Career
             </span>
           </h2>
-          <p style={{
-            fontSize: '1rem', color: '#4a5568',
-            lineHeight: 1.7, maxWidth: 580, margin: '0 auto',
-          }}>
+          <p style={{ fontSize: '1rem', color: '#c7c4d8', lineHeight: 1.7, maxWidth: 580, margin: '0 auto', opacity: 0.85 }}>
             AlumNex connects students, alumni, and administrators through AI-powered career pathways, mock interviews, and mentorship.
           </p>
         </div>
 
         {/* Cards */}
-        <div style={{
-          display: 'flex', flexWrap: 'wrap',
-          gap: '1.5rem', justifyContent: 'center',
-        }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', width: '100%' }}>
           {CARDS.map((card, i) => (
             <TiltCard
               key={i}
               card={card}
-              isHovered={hoveredIdx === null ? null : hoveredIdx === i}
               onEnter={() => setHoveredIdx(i)}
               onLeave={() => setHoveredIdx(null)}
             />
