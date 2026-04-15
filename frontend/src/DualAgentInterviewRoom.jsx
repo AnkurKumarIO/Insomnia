@@ -115,11 +115,15 @@ export default function DualAgentInterviewRoom() {
   const chatEndRef      = useRef(null);
   const iceBuf          = useRef([]);
   const makingOfferRef  = useRef(false);
-  const politeRef       = useRef(true); // This peer is polite until we know otherwise
+  const politeRef       = useRef(true);
+  const peerReadyRef    = useRef(false); // true once peer is detected via socket
+  const videoConnRef    = useRef(false); // track video state inside callbacks
+  const retryTimerRef   = useRef(null);
   const sidePanelRef    = useRef(sidePanel);
 
-  // Keep ref in sync with state for use inside socket callbacks
+  // Keep refs in sync with state for use inside socket callbacks
   useEffect(() => { sidePanelRef.current = sidePanel; }, [sidePanel]);
+  useEffect(() => { videoConnRef.current = videoConnected; }, [videoConnected]);
 
   // Clear unread when switching to chat panel
   useEffect(() => {
@@ -139,6 +143,33 @@ export default function DualAgentInterviewRoom() {
         try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
       }
       if (buf.length) console.log('[WebRTC] Flushed', buf.length, 'buffered ICE candidates');
+    }
+
+    // Create and send an offer (with safety checks)
+    async function createAndSendOffer(reason) {
+      if (!pc || pc.signalingState === 'closed' || !socket?.connected) {
+        console.warn('[WebRTC] Cannot create offer:', reason, '- pc or socket not ready');
+        return;
+      }
+      try {
+        makingOfferRef.current = true;
+        // If stuck in have-local-offer from a previous attempt, rollback first
+        if (pc.signalingState === 'have-local-offer') {
+          console.log('[WebRTC] Rolling back stale local offer before creating new one');
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+        const offer = await pc.createOffer();
+        // Double-check state hasn't changed during async gap
+        if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', roomId, pc.localDescription);
+          console.log(`[WebRTC] Offer sent (${reason})`);
+        }
+      } catch (err) {
+        console.error(`[WebRTC] createAndSendOffer(${reason}) error:`, err);
+      } finally {
+        makingOfferRef.current = false;
+      }
     }
 
     async function start() {
@@ -179,19 +210,15 @@ export default function DualAgentInterviewRoom() {
         if (e.candidate) socket?.emit('ice-candidate', roomId, e.candidate);
       };
 
-      // Perfect Negotiation: Handle onnegotiationneeded
+      // onnegotiationneeded — ONLY create offer if peer is already in room
+      // This fires when addTrack is called before socket connects, so we MUST gate it
       pc.onnegotiationneeded = async () => {
-        try {
-          makingOfferRef.current = true;
-          console.log('[WebRTC] negotiationneeded → creating offer');
-          await pc.setLocalDescription();
-          socket?.emit('offer', roomId, pc.localDescription);
-          console.log('[WebRTC] Offer sent via negotiationneeded');
-        } catch (err) {
-          console.error('[WebRTC] negotiationneeded error:', err);
-        } finally {
-          makingOfferRef.current = false;
+        console.log('[WebRTC] negotiationneeded fired, peerReady:', peerReadyRef.current, 'socketConnected:', socket?.connected);
+        if (!peerReadyRef.current || !socket?.connected) {
+          console.log('[WebRTC] Skipping negotiationneeded — peer not ready or socket not connected');
+          return;
         }
+        await createAndSendOffer('negotiationneeded');
       };
 
       pc.ontrack = (e) => {
@@ -200,12 +227,10 @@ export default function DualAgentInterviewRoom() {
         if (!remoteVideo) return;
 
         if (e.streams?.[0]) {
-          // Use the stream directly
           if (remoteVideo.srcObject !== e.streams[0]) {
             remoteVideo.srcObject = e.streams[0];
           }
         } else {
-          // No stream — create one manually from tracks
           if (!remoteVideo.srcObject) {
             remoteVideo.srcObject = new MediaStream();
           }
@@ -228,14 +253,14 @@ export default function DualAgentInterviewRoom() {
         if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
           setVideoConnected(true);
         }
-        // Restart ICE on failure
         if (pc.iceConnectionState === 'failed') {
           console.log('[WebRTC] ICE failed — restarting');
           pc.restartIce();
         }
       };
 
-      // 3. Get camera + mic
+      // 3. Get camera + mic — tracks added here will fire onnegotiationneeded
+      //    but we gate it above so the premature offer is suppressed
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (destroyed) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -245,7 +270,7 @@ export default function DualAgentInterviewRoom() {
         console.log('[Media] Tracks added to PC');
       } catch (err) { console.error('[Media] getUserMedia failed:', err); }
 
-      // 4. Connect socket
+      // 4. Connect socket AFTER media is ready
       socket = io(`${SOCKET_URL}/interview`, {
         transports: ['websocket', 'polling'],
         upgrade: true,
@@ -283,9 +308,18 @@ export default function DualAgentInterviewRoom() {
         if (users.length > 0) {
           setPeerName(users[0]);
           setSocketPeerPresent(true);
-          // We arrived late. We are the polite peer — we wait for their offer
+          peerReadyRef.current = true;
           politeRef.current = true;
-          console.log('[WebRTC] I am the POLITE peer (joined late)');
+          console.log('[WebRTC] I am the POLITE peer (joined late) — waiting for offer from', users[0]);
+
+          // Safety: if no video in 6 seconds, the impolite peer's offer may have been lost → send our own
+          retryTimerRef.current = setTimeout(() => {
+            if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
+              console.log('[WebRTC] RETRY: No video after 6s as polite peer — sending offer anyway');
+              politeRef.current = false; // become impolite to break deadlock
+              createAndSendOffer('polite-retry');
+            }
+          }, 6000);
         }
       });
 
@@ -294,33 +328,36 @@ export default function DualAgentInterviewRoom() {
         console.log('[Socket] Peer joined:', uid);
         setPeerName(uid);
         setSocketPeerPresent(true);
-        // We were here first. We are the impolite peer — we create the offer
+        peerReadyRef.current = true;
         politeRef.current = false;
-        console.log('[WebRTC] I am the IMPOLITE peer (was here first) → sending offer');
+        console.log('[WebRTC] I am the IMPOLITE peer (was here first) → will send offer to', uid);
+
+        // Small delay to let the new peer's PeerConnection initialize
+        await new Promise(r => setTimeout(r, 800));
 
         if (streamRef.current && pc && pc.signalingState !== 'closed') {
-          await new Promise(r => setTimeout(r, 500));
-          try {
-            makingOfferRef.current = true;
-            await pc.setLocalDescription();
-            socket.emit('offer', roomId, pc.localDescription);
-            console.log('[WebRTC] Initial offer sent to new peer');
-          } catch (err) {
-            console.error('[WebRTC] Error creating initial offer:', err);
-          } finally {
-            makingOfferRef.current = false;
-          }
+          await createAndSendOffer('user-connected');
         }
+
+        // Safety retry: if video not connected after 5 more seconds, re-offer
+        retryTimerRef.current = setTimeout(() => {
+          if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
+            console.log('[WebRTC] RETRY: No video after 6s as impolite peer — re-sending offer');
+            createAndSendOffer('impolite-retry');
+          }
+        }, 5000);
       });
 
       socket.on('user-disconnected', () => {
         console.log('[Socket] Peer left');
         setSocketPeerPresent(false);
+        peerReadyRef.current = false;
         setVideoConnected(false);
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+        clearTimeout(retryTimerRef.current);
       });
 
-      // ── Perfect Negotiation: Offer handler ──────────────────────────
+      // ── Offer handler ───────────────────────────────────────────────
       socket.on('offer', async (offer) => {
         if (!pc || pc.signalingState === 'closed') return;
         console.log('[WebRTC] Got offer, signalingState:', pc.signalingState, 'polite:', politeRef.current);
@@ -329,15 +366,14 @@ export default function DualAgentInterviewRoom() {
 
         if (offerCollision) {
           if (!politeRef.current) {
-            // Impolite peer ignores incoming offer during collision
             console.log('[WebRTC] Impolite peer ignoring colliding offer');
             return;
           }
-          // Polite peer rolls back and accepts the incoming offer
           console.log('[WebRTC] Polite peer rolling back for incoming offer');
         }
 
         try {
+          // Rollback any existing local offer
           if (pc.signalingState !== 'stable') {
             await pc.setLocalDescription({ type: 'rollback' });
           }
@@ -353,7 +389,7 @@ export default function DualAgentInterviewRoom() {
         }
       });
 
-      // ── Perfect Negotiation: Answer handler ─────────────────────────
+      // ── Answer handler ──────────────────────────────────────────────
       socket.on('answer', async (ans) => {
         if (!pc || pc.signalingState === 'closed') return;
         console.log('[WebRTC] Got answer, signalingState:', pc.signalingState);
@@ -362,7 +398,7 @@ export default function DualAgentInterviewRoom() {
             await pc.setRemoteDescription(new RTCSessionDescription(ans));
             await flushIceBuf();
           } else {
-            console.warn('[WebRTC] Got answer but not in have-local-offer state, ignoring');
+            console.warn('[WebRTC] Got answer but signalingState is', pc.signalingState, '- ignoring');
           }
         } catch (err) { console.error('[WebRTC] answer handler:', err); }
       });
@@ -402,7 +438,6 @@ export default function DualAgentInterviewRoom() {
       // Chat — only add messages from OTHER users (we add our own locally in sendChat)
       socket.on('chat_message', (msg) => {
         setChatMessages(p => [...p, msg]);
-        // Increment unread if not viewing chat panel
         if (sidePanelRef.current !== 'chat') {
           setUnreadChat(c => c + 1);
         }
@@ -435,6 +470,8 @@ export default function DualAgentInterviewRoom() {
       pc?.close();
       pcRef.current = null;
       iceBuf.current = [];
+      peerReadyRef.current = false;
+      clearTimeout(retryTimerRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       clearInterval(timerRef.current);
