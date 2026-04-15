@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
@@ -516,7 +516,7 @@ export default function AlumniDashboard() {
             createdAt:     r.created_at,
             studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
           }));
-          const local = JSON.parse(localStorage.getItem('alumniconnect_interview_requests') || '[]');
+          const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
           mapped.forEach(dbReq => {
             const idx = local.findIndex(l => l.id === dbReq.id);
             if (idx === -1) local.push(dbReq);

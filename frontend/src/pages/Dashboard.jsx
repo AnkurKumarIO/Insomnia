@@ -158,7 +158,39 @@ export default function Dashboard() {
   // Poll student notifications every 3s + auto-fire "meeting live" notification
   useEffect(() => {
     const NOTIF_KEY = 'alumniconnect_student_notifications';
-    const load = () => {
+    const load = async () => {
+      // Sync from Supabase first
+      if (user?.id) {
+        try {
+          const { syncStudentRequests } = await import('../interviewRequests');
+          await syncStudentRequests(user.id);
+          
+          const { getNotificationsForUser } = await import('../lib/db');
+          const dbNotifs = await getNotificationsForUser(user.id);
+          if (dbNotifs && dbNotifs.length > 0) {
+            const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+            let changed = false;
+            dbNotifs.forEach(dn => {
+               if (!currentLocal.some(cn => cn.id === dn.id || cn.id === `dbnotif-${dn.id}`)) {
+                 currentLocal.unshift({
+                   id: `dbnotif-${dn.id}`,
+                   studentName: user.name,
+                   type: dn.type?.toLowerCase() || 'default',
+                   title: dn.title,
+                   message: dn.message,
+                   requestId: dn.request_id,
+                   read: dn.read,
+                   createdAt: dn.created_at,
+                   roomId: null,
+                 });
+                 changed = true;
+               }
+            });
+            if (changed) localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
+          }
+        } catch { /* fallback to local */ }
+      }
+
       setStudentNotifs(getStudentNotifications(user.name));
       // Auto-fire "meeting is live" notification when scheduled time arrives
       const requests = getRequestsByStudent(user.name);
@@ -182,7 +214,7 @@ export default function Dashboard() {
     load();
     const interval = setInterval(load, 3000);
     return () => clearInterval(interval);
-  }, [user.name]);
+  }, [user.name, user.id]);
 
   // Fetch recommended mentor + profile data
   useEffect(() => {
