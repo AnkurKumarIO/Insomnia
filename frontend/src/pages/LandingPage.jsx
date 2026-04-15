@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 import AlumNexLogo from '../AlumNexLogo';
+import RoleCards from '../components/RoleCards';
 
 export default function LandingPage() {
   return (
@@ -30,74 +31,7 @@ export default function LandingPage() {
         </section>
 
         {/* Portal Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '2rem', width: '100%' }}>
-          {/* Student */}
-          <div style={card}>
-            <div style={{ position: 'absolute', top: 0, right: 0, padding: '1.5rem', opacity: 0.1, fontSize: '5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '5rem' }}>school</span>
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={iconBox('#c3c0ff')}>
-                <span className="material-symbols-outlined" style={{ color: '#c3c0ff' }}>rocket_launch</span>
-              </div>
-              <h3 style={cardTitle}>I am a Student</h3>
-              <p style={cardDesc}>Accelerate your career with AI-matched mentors, personalized internship insights, and real-world alumni journeys.</p>
-              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {['AI Mentor Matching','Resume Intelligence'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#c7c4d8' }}>
-                    <span className="material-symbols-outlined" style={{ color: '#4edea3', fontSize: 16 }}>check_circle</span>{f}
-                  </li>
-                ))}
-              </ul>
-              <Link to="/auth/student/register" style={btnCard}>Create Student Account</Link>
-            </div>
-          </div>
-
-          {/* Alumni — featured */}
-          <div style={{ ...card, border: '1px solid rgba(195,192,255,0.3)', boxShadow: '0 0 50px rgba(79,70,229,0.15)' }}>
-            <div style={{ position: 'absolute', top: -48, right: -48, width: 192, height: 192, background: 'rgba(195,192,255,0.08)', borderRadius: '50%', filter: 'blur(60px)' }} />
-            <div style={{ position: 'absolute', top: 0, right: 0, padding: '1.5rem', opacity: 0.1, fontSize: '5rem' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '5rem' }}>psychology</span>
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ width: 48, height: 48, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', boxShadow: '0 8px 20px rgba(79,70,229,0.3)' }}>
-                <span className="material-symbols-outlined" style={{ color: '#1d00a5' }}>volunteer_activism</span>
-              </div>
-              <h3 style={cardTitle}>I am an Alumnus</h3>
-              <p style={cardDesc}>Re-engage with your alma mater, mentor the next generation, and tap into an exclusive high-tier professional network.</p>
-              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {['Giving & Mentorship','Executive Network'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#c7c4d8' }}>
-                    <span className="material-symbols-outlined" style={{ color: '#4edea3', fontSize: 16 }}>check_circle</span>{f}
-                  </li>
-                ))}
-              </ul>
-              <Link to="/auth/alumni/register" style={{ ...btnCard, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', boxShadow: '0 8px 24px rgba(79,70,229,0.3)' }}>Create Alumni Account</Link>
-            </div>
-          </div>
-
-          {/* TNP */}
-          <div style={card}>
-            <div style={{ position: 'absolute', top: 0, right: 0, padding: '1.5rem', opacity: 0.1 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '5rem' }}>query_stats</span>
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={iconBox('#4edea3')}>
-                <span className="material-symbols-outlined" style={{ color: '#4edea3' }}>admin_panel_settings</span>
-              </div>
-              <h3 style={cardTitle}>I am a TNP Coordinator</h3>
-              <p style={cardDesc}>Streamline campus placements with predictive analytics, alumni verified referrals, and automated outreach.</p>
-              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {['Placement Intelligence','Verified Referrals'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#c7c4d8' }}>
-                    <span className="material-symbols-outlined" style={{ color: '#4edea3', fontSize: 16 }}>check_circle</span>{f}
-                  </li>
-                ))}
-              </ul>
-              <Link to="/login" style={btnCard}>Launch Dashboard</Link>
-            </div>
-          </div>
-        </div>
+        <RoleCards />
 
         {/* Network Intelligence */}
         <section style={{ marginTop: '8rem', width: '100%' }}>
