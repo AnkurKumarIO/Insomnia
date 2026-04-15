@@ -415,7 +415,7 @@ export default function TNPDashboard() {
                     {/* Menu items */}
                     <div style={{ padding: '0.5rem' }}>
                       {[
-                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); } },
+                        { icon: 'person', label: 'Coordinator Profile', sub: 'Title: Coordinator • Senior Lead', action: () => { setShowProfile(false); setActiveTab('settings'); } },
                         { icon: 'settings', label: 'Account Settings', sub: 'Configure your preferences', action: () => { setShowProfile(false); setActiveTab('settings'); } },
                       ].map(item => (
                         <button key={item.label} onClick={item.action} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, textAlign: 'left', transition: 'background 0.15s' }}
@@ -580,7 +580,7 @@ export default function TNPDashboard() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setActiveTab('queue')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                <button onClick={() => setActiveTab('compliance')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                   View Full History
                 </button>
               </div>
