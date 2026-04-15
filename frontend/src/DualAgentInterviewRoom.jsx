@@ -5,6 +5,7 @@ import { api } from './api';
 import { AuthContext } from './context/AuthContext';
 import { upsertInterviewRecord } from './lib/db';
 import { supabase } from './lib/supabaseClient';
+import VideoStreamManager from './utils/VideoStreamManager';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
@@ -239,15 +240,27 @@ export default function DualAgentInterviewRoom() {
     // 1. Initialize PC immediately so signaling can start
     const pc = initPC();
 
-    // 2. Start Camera
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        console.log('[Media] Camera/Mic access granted');
+    // 2. Start Camera with improved error handling
+    const videoManager = new VideoStreamManager();
+    
+    videoManager.getCameraStream(true)
+      .then(async stream => {
+        console.log('[Media] Camera/Mic access granted, quality:', videoManager.qualityLevel);
         streamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
+        
+        // Check device capabilities for quality info
+        const devices = await videoManager.checkDeviceAvailability();
+        console.log('[Media] Available devices:', devices);
       })
-      .catch(err => console.error('[Media] Camera access denied:', err));
+      .catch(err => {
+        console.error('[Media] Camera access error:', err.message);
+        alert('Camera/Microphone Error:\n' + err.message + '\n\nPlease check your permissions and device.');
+        // Don't fail entirely - could use audio-only mode as fallback
+      });
 
     // 3. Socket Events
     socket.on('connect', () => {
@@ -370,7 +383,10 @@ export default function DualAgentInterviewRoom() {
       pcRef.current?.close();
       pcRef.current = null;
       streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+      videoManager.stopAllStreams(); // Use video manager cleanup
       clearInterval(timerRef.current);
       clearInterval(metricsRef.current);
       clearInterval(suggestionRef.current);
@@ -380,9 +396,11 @@ export default function DualAgentInterviewRoom() {
   // ── Screen share ─────────────────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
     const pc = pcRef.current;
+    const videoManager = new VideoStreamManager();
+    
     if (!sharing) {
       try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const screenStream = await videoManager.getScreenShare();
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
 
@@ -392,14 +410,21 @@ export default function DualAgentInterviewRoom() {
         // Replace video track in peer connection
         if (pc) {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) await sender.replaceTrack(screenTrack);
+          if (sender) {
+            await sender.replaceTrack(screenTrack);
+            console.log('[Video] Screen track replaced in WebRTC');
+          }
         }
 
         // When user stops sharing via browser UI
-        screenTrack.onended = () => stopScreenShare();
+        screenTrack.onended = () => {
+          console.log('[Video] User stopped screen share from browser UI');
+          stopScreenShare();
+        };
         setSharing(true);
       } catch (e) {
-        if (e.name !== 'NotAllowedError') console.error('Screen share error:', e);
+        console.error('[Video] Screen share initialization error:', e.message);
+        alert('Screen Sharing Error:\n' + e.message);
       }
     } else {
       stopScreenShare();
@@ -412,33 +437,49 @@ export default function DualAgentInterviewRoom() {
     screenStreamRef.current = null;
     if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
 
-    // Restore camera track
-    if (pc && streamRef.current) {
-      const camTrack = streamRef.current.getVideoTracks()[0];
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender && camTrack) await sender.replaceTrack(camTrack);
+    // Restore camera track with robust fallback
+    try {
+      if (pc && streamRef.current) {
+        const camTrack = streamRef.current.getVideoTracks()[0];
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender && camTrack) {
+          await sender.replaceTrack(camTrack);
+          console.log('[Video] Camera track restored after screen share');
+        }
+      }
+    } catch (err) {
+      console.error('[Video] Error restoring camera track:', err.message);
+      // Try to get fresh camera stream as fallback
+      try {
+        const videoManager = new VideoStreamManager();
+        const newStream = await videoManager.getCameraStream(false);
+        if (pc) {
+          const newTrack = newStream.getVideoTracks()[0];
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (sender && newTrack) {
+            await sender.replaceTrack(newTrack);
+            if (localVideoRef.current) localVideoRef.current.srcObject = newStream;
+            streamRef.current = newStream;
+          }
+        }
+      } catch (fallbackErr) {
+        console.error('[Video] Fallback camera recovery failed:', fallbackErr.message);
+      }
     }
     setSharing(false);
   }, []);
 
   // ── Face Detection ────────────────────────────────────────────────────────
-  const detectFace = useCallback(() => {
+  const detectFace = useCallback(async () => {
     if (!camOn || !localVideoRef.current || !faceCanvasRef.current) return;
-    const video = localVideoRef.current;
-    const canvas = faceCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    canvas.width = 64;
-    canvas.height = 48;
-    ctx.drawImage(video, 0, 0, 64, 48);
-    const imageData = ctx.getImageData(0, 0, 64, 48);
-    const data = imageData.data;
-    const luminances = [];
-    for (let i = 0; i < data.length; i += 4) {
-      luminances.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    try {
+      const videoManager = new VideoStreamManager();
+      const faceDetected = await videoManager.detectFace(localVideoRef.current, faceCanvasRef.current);
+      setFaceDetected(faceDetected);
+    } catch (err) {
+      console.warn('[Video] Face detection failed, allowing video:', err.message);
+      setFaceDetected(true); // Don't block on error
     }
-    const mean = luminances.reduce((a, b) => a + b, 0) / luminances.length;
-    const variance = luminances.reduce((a, b) => a + (b - mean) ** 2, 0) / luminances.length;
-    setFaceDetected(variance > 200);
   }, [camOn]);
 
   useEffect(() => {
