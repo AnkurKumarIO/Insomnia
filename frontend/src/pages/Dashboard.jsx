@@ -126,13 +126,28 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [studentNotifs, setStudentNotifs] = useState([]);
   const [showMentorBook, setShowMentorBook] = useState(false);
   const [mentorBookSent, setMentorBookSent] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [recommendedMentor, setRecommendedMentor] = useState(null);
   const [profileData, setProfileData] = useState({});
   const [aiProfileStrength, setAiProfileStrength] = useState(null);
+
+  // ── Real-time notifications using Supabase subscriptions ──────────────────
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
+
+  // Convert DB notifications to display format
+  const studentNotifs = (notifications || []).map(n => ({
+    id: n.id,
+    studentName: user?.name,
+    type: n.type?.toLowerCase() || 'default',
+    title: n.title,
+    message: n.message,
+    requestId: n.request_id,
+    read: n.read || false,
+    createdAt: n.created_at,
+    roomId: n.request_id ? `room-${String(n.request_id).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null,
+  }));
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -156,114 +171,6 @@ export default function Dashboard() {
 
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Student').split(' ')[0];
-
-  // Deterministic roomId from requestId — MUST match bookSlot formula
-  const deriveRoomId = (requestId) =>
-    requestId ? `room-${String(requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null;
-
-  // Helper: merge a DB notification into local storage and refresh state
-  const mergeDbNotif = (dn) => {
-    const NOTIF_KEY = 'alumniconnect_student_notifications';
-    const localId = `dbnotif-${dn.id}`;
-    const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-    if (!currentLocal.some(cn => cn.id === localId)) {
-      const computedRoomId = dn.request_id ? deriveRoomId(dn.request_id) : null;
-      currentLocal.unshift({
-        id: localId,
-        studentName: user.name,
-        type: dn.type?.toLowerCase() || 'default',
-        title: dn.title,
-        message: dn.message,
-        requestId: dn.request_id,
-        read: dn.read || false,
-        createdAt: dn.created_at,
-        roomId: computedRoomId,
-      });
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
-      setStudentNotifs(getStudentNotifications(user.name));
-    }
-  };
-
-  // ── Realtime subscription + initial load ──────────────────────────────────
-  useEffect(() => {
-    if (!user?.id) return;
-    const NOTIF_KEY = 'alumniconnect_student_notifications';
-    import('../lib/supabaseClient').then(({ supabase }) => {});
-
-    // 1. Initial bulk load
-    const initialLoad = async () => {
-      try {
-        // Sync interview requests from DB into localStorage
-        const { syncStudentRequests } = await import('../interviewRequests');
-        await syncStudentRequests(user.id);
-
-        // Load all notifications from DB and merge
-        const { getNotificationsForUser } = await import('../lib/db');
-        const dbNotifs = await getNotificationsForUser(user.id);
-        if (dbNotifs?.length > 0) dbNotifs.forEach(mergeDbNotif);
-      } catch {}
-      setStudentNotifs(getStudentNotifications(user.name));
-    };
-    initialLoad();
-
-    // 2. Supabase Realtime — fires instantly when a new notification row is inserted
-    let channel;
-    import('../lib/supabaseClient').then(({ supabase }) => {
-      channel = supabase
-        .channel(`notifs-${user.id}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-          (payload) => {
-            // New notification arrived in real-time — merge immediately
-            if (payload.new) mergeDbNotif(payload.new);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'interview_requests', filter: `student_id=eq.${user.id}` },
-          async () => {
-            // Status change (accepted, slot_booked) — re-sync requests
-            try {
-              const { syncStudentRequests } = await import('../interviewRequests');
-              await syncStudentRequests(user.id);
-              setStudentNotifs(getStudentNotifications(user.name));
-            } catch {}
-          }
-        )
-        .subscribe();
-    });
-
-    // 3. Lightweight 10s timer only for the scheduled "meeting is live" trigger
-    const liveCheckInterval = setInterval(() => {
-      const requests = getRequestsByStudent(user.name);
-      requests.forEach(r => {
-        if (r.status === 'slot_booked' && r.scheduledTime) {
-          const roomId = r.roomId || deriveRoomId(r.id);
-          const now = Date.now();
-          const scheduled = new Date(r.scheduledTime).getTime();
-          if (now >= scheduled - 60000 && now <= scheduled + 2 * 60 * 60 * 1000) {
-            try {
-              const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-              const alreadyLive = all.some(n => n.requestId === r.id && n.type === 'live');
-              if (!alreadyLive) {
-                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, roomId, read: false, createdAt: new Date().toISOString() });
-                localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
-                setStudentNotifs(getStudentNotifications(user.name));
-              }
-            } catch {}
-          }
-        }
-      });
-    }, 10000);
-
-    return () => {
-      clearInterval(liveCheckInterval);
-      import('../lib/supabaseClient').then(({ supabase }) => {
-        if (channel) supabase.removeChannel(channel);
-      });
-    };
-  }, [user.name, user.id]);
 
   // Fetch recommended mentor + profile data
   useEffect(() => {

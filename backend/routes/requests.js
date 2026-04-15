@@ -54,6 +54,18 @@ router.post('/', async (req, res) => {
         message: message || '',
         student_profile_snapshot: studentProfileSnapshot ? JSON.stringify(studentProfileSnapshot) : null,
         status: 'PENDING',
+      },
+      include: { student: true, alumni: true }
+    });
+
+    // Notify alumni of new request
+    await prisma.notification.create({
+      data: {
+        user_id: alumniId,
+        type: 'NEW_REQUEST',
+        title: 'New Interview Request! 📬',
+        message: `${request.student?.name || 'A student'} requested an interview for ${topic || 'Mock Interview'}.`,
+        request_id: request.request_id,
       }
     });
 
@@ -79,41 +91,56 @@ router.patch('/:id', async (req, res) => {
     const request = await prisma.interviewRequest.update({
       where: { request_id: id },
       data: updates,
-      include: { student: true }
+      include: { student: true, alumni: true }
     });
 
-    // Push notification to student
-    let notifPayload = null;
+    // Push notifications to both student and alumni
+    const notificationsToCreate = [];
+
     if (status === 'ACCEPTED') {
-      notifPayload = {
+      // Notify student that alumni accepted
+      notificationsToCreate.push({
         user_id: request.student_id,
         type: 'ACCEPTED',
         title: 'Interview Request Accepted! 🎉',
-        message: 'Your interview request has been accepted. The alumni will book a slot shortly.',
+        message: `${request.alumni?.name || 'The alumni'} has accepted your request. Waiting for slot confirmation.`,
         request_id: id,
-      };
+      });
     } else if (status === 'SLOT_BOOKED') {
       const formatted = new Date(scheduledTime).toLocaleString('en-US', {
         weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
       });
-      notifPayload = {
+      
+      // Notify student of confirmed slot
+      notificationsToCreate.push({
         user_id: request.student_id,
         type: 'SLOT_BOOKED',
         title: 'Interview Slot Confirmed! 📅',
-        message: `Your interview is scheduled for ${formatted}.`,
+        message: `Your interview with ${request.alumni?.name || 'the alumni'} is scheduled for ${formatted}.`,
         request_id: id,
-      };
+      });
+
+      // Notify alumni of confirmed slot
+      notificationsToCreate.push({
+        user_id: request.alumni_id,
+        type: 'SLOT_BOOKED_ALUMNI',
+        title: 'Interview Slot Confirmed! 📅',
+        message: `Your interview with ${request.student?.name || 'the student'} is scheduled for ${formatted}.`,
+        request_id: id,
+      });
     } else if (status === 'DECLINED') {
-      notifPayload = {
+      // Notify student of decline
+      notificationsToCreate.push({
         user_id: request.student_id,
         type: 'DECLINED',
         title: 'Interview Request Update',
-        message: 'Your request was not accepted this time. Try another mentor.',
+        message: `${request.alumni?.name || 'The alumni'} declined your request. Try another mentor.`,
         request_id: id,
-      };
+      });
     }
 
-    if (notifPayload) {
+    // Create all notifications
+    for (const notifPayload of notificationsToCreate) {
       await prisma.notification.create({
         data: notifPayload
       });

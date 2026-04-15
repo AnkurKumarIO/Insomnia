@@ -3,6 +3,8 @@ const {
   analyzeSpokenChunk,
   factCheck,
 } = require('../services/aiService');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 module.exports = (io) => {
   const ns = io.of('/interview');
@@ -14,7 +16,7 @@ module.exports = (io) => {
     console.log(`Socket connected: ${socket.id}`);
 
     // ── Room management ──────────────────────────────────────────────────
-    socket.on('join-room', (roomId, userId) => {
+    socket.on('join-room', async (roomId, userId) => {
       socket.join(roomId);
       socket.data = { roomId, userId };
 
@@ -36,6 +38,48 @@ module.exports = (io) => {
 
       // Tell existing members about the new joiner
       socket.to(roomId).emit('user-connected', userId);
+
+      // When both users are present, create a "meeting live" notification
+      if (members.size === 2) {
+        try {
+          // Extract request ID from room ID (format: room-xxxxx-timestamp)
+          const roomIdParts = roomId.match(/room-([a-z0-9]+)-(\d+)/i);
+          if (roomIdParts && roomIdParts[1]) {
+            // Get the request to find student and alumni IDs
+            const request = await prisma.interviewRequest.findUnique({
+              where: { request_id: roomIdParts[1] },
+              select: { student_id: true, alumni_id: true, student: { select: { name: true } }, alumni: { select: { name: true } } }
+            });
+
+            if (request) {
+              // Notify both student and alumni that meeting is live
+              const meetingLiveNotifs = [
+                {
+                  user_id: request.student_id,
+                  type: 'MEETING_LIVE',
+                  title: 'Interview is Live! 🎥',
+                  message: `Your interview with ${request.alumni?.name || 'the alumni'} is starting now!`,
+                  request_id: roomIdParts[1],
+                },
+                {
+                  user_id: request.alumni_id,
+                  type: 'MEETING_LIVE',
+                  title: 'Interview is Live! 🎥',
+                  message: `Your interview with ${request.student?.name || 'the student'} is starting now!`,
+                  request_id: roomIdParts[1],
+                }
+              ];
+
+              for (const notif of meetingLiveNotifs) {
+                await prisma.notification.create({ data: notif });
+              }
+              console.log(`[${roomId}] Meeting live notifications created for both parties`);
+            }
+          }
+        } catch (error) {
+          console.error(`[${roomId}] Error creating meeting live notifications:`, error);
+        }
+      }
 
       socket.on('disconnect', () => {
         socket.to(roomId).emit('user-disconnected', userId);

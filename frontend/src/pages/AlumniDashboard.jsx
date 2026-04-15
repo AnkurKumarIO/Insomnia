@@ -6,6 +6,7 @@ import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineReques
 import { api } from '../api';
 import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
 import { useInterviewRequests } from '../hooks/useInterviewRequests';
+import { useNotifications } from '../hooks/useNotifications';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
@@ -467,6 +468,9 @@ export default function AlumniDashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
 
+  // ── Real-time notifications for alumni ────────────────────────────────────
+  const { notifications, unreadCount, markAsRead } = useNotifications(user?.id);
+
   // Profile dropdown
   const [showProfile, setShowProfile] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
@@ -574,7 +578,7 @@ export default function AlumniDashboard() {
     };
   }, [user.name, user.id]);
 
-  // Build notifications list: new requests + meetings in 24h
+  // Build notifications list: combine real-time notifications from DB + upcoming meetings
   const allScheduled = [...SCHEDULE, ...extraSlots];
   const now = Date.now();
   const upcomingMeetings = allScheduled.filter(s => {
@@ -582,19 +586,31 @@ export default function AlumniDashboard() {
     const t = new Date(s.scheduledTime).getTime();
     return t > now && t - now <= 24 * 60 * 60 * 1000;
   });
-  const notifications = [
-    ...liveRequests.map(r => ({ id: r.id, type: 'request', title: 'New Interview Request', desc: `${r.studentName} wants to book a ${r.topic}`, time: r.createdAt })),
+
+  // Convert DB notifications to display format and combine with upcoming meetings
+  const dbNotifications = (notifications || []).map(n => ({
+    id: n.id,
+    type: n.type?.toLowerCase() || 'notification',
+    title: n.title,
+    desc: n.message,
+    time: n.created_at
+  }));
+
+  const allNotifications = [
+    ...dbNotifications,  // Real-time notifications from DB
     ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} — ${s.when}`, time: s.scheduledTime })),
   ];
-  const unreadCount = notifications.filter(n => !seenNotifIds.includes(n.id)).length;
 
   const openNotifs = () => {
     setShowNotifs(v => !v);
     setShowProfile(false);
-    // Mark all as seen
-    const ids = notifications.map(n => n.id);
-    setSeenNotifIds(ids);
-    localStorage.setItem('alumni_seen_notifs', JSON.stringify(ids));
+    // Mark all unread notifications as read
+    notifications.forEach(n => {
+      if (!n.read) {
+        markAsRead(n.id);
+      }
+    });
+    localStorage.setItem('alumni_seen_notifs', JSON.stringify(allNotifications.map(n => n.id)));
   };
 
   const saveProfileForm = () => {
@@ -1418,19 +1434,19 @@ export default function AlumniDashboard() {
                   <div style={{ position: 'absolute', top: 44, right: 0, width: 340, background: '#171f33', borderRadius: 16, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
                     <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Notifications</span>
-                      <span style={{ fontSize: '0.65rem', color: '#c7c4d8' }}>{notifications.length} total</span>
+                      <span style={{ fontSize: '0.65rem', color: '#c7c4d8' }}>{allNotifications.length} total</span>
                     </div>
                     <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-                      {notifications.length === 0 ? (
+                      {allNotifications.length === 0 ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: '#c7c4d8' }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 36, opacity: 0.3, display: 'block', marginBottom: 8 }}>notifications_none</span>
                           <p style={{ fontSize: '0.875rem' }}>All caught up!</p>
                         </div>
-                      ) : notifications.map((n, i) => (
+                      ) : allNotifications.map((n, i) => (
                         <div key={n.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(70,69,85,0.1)', display: 'flex', gap: 12, alignItems: 'flex-start', background: i === 0 ? 'rgba(195,192,255,0.03)' : 'transparent' }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'request' ? 'rgba(195,192,255,0.12)' : 'rgba(78,222,163,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'request' ? '#c3c0ff' : '#4edea3', fontVariationSettings: "'FILL' 1" }}>
-                              {n.type === 'request' ? 'person_add' : 'event'}
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: n.type === 'request' || n.type === 'new_request' ? 'rgba(195,192,255,0.12)' : 'rgba(78,222,163,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: n.type === 'request' || n.type === 'new_request' ? '#c3c0ff' : '#4edea3', fontVariationSettings: "'FILL' 1" }}>
+                              {n.type === 'request' || n.type === 'new_request' ? 'person_add' : 'event'}
                             </span>
                           </div>
                           <div style={{ flex: 1 }}>
@@ -1440,7 +1456,7 @@ export default function AlumniDashboard() {
                               {new Date(n.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
-                          {n.type === 'request' && (
+                          {(n.type === 'request' || n.type === 'new_request') && (
                             <button onClick={() => { setShowNotifs(false); setActiveTab('requests'); }} style={{ padding: '0.25rem 0.6rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', border: 'none', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>View</button>
                           )}
                         </div>
