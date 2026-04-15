@@ -573,14 +573,13 @@ export default function Dashboard() {
                             <div style={{ fontSize: '0.62rem', color: 'rgba(199,196,216,0.4)', marginTop: 4 }}>
                               {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
-                            {
                             {/* Join Now — instant meet */}
                             {n.type === 'live' && n.roomId && (
                               <a href={`/interview/${n.roomId}`} onClick={() => setShowNotifs(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '0.35rem 0.875rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700, textDecoration: 'none' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>videocam</span> Join Now — Live
                               </a>
                             )}
-                            /* Join Now button for slot_booked notifications */}
+                            {/* Join Now button for slot_booked notifications */}
                             {n.type === 'slot_booked' && (() => {
                               const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
                               if (!req?.roomId) return null;
