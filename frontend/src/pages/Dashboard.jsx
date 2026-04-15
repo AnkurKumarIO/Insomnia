@@ -155,36 +155,44 @@ export default function Dashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Student').split(' ')[0];
 
-  // Poll student notifications every 3s + auto-fire "meeting live" notification
+  // Deterministic roomId from requestId — MUST match bookSlot formula
+  const deriveRoomId = (requestId) =>
+    requestId ? `room-${String(requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null;
+
+  // Poll student notifications every 3s + sync from Supabase
   useEffect(() => {
     const NOTIF_KEY = 'alumniconnect_student_notifications';
     const load = async () => {
-      // Sync from Supabase first
       if (user?.id) {
         try {
+          // Sync interview requests (pulls room_id, status, scheduled_time from DB)
           const { syncStudentRequests } = await import('../interviewRequests');
           await syncStudentRequests(user.id);
-          
+
+          // Sync DB notifications
           const { getNotificationsForUser } = await import('../lib/db');
           const dbNotifs = await getNotificationsForUser(user.id);
           if (dbNotifs && dbNotifs.length > 0) {
             const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
             let changed = false;
             dbNotifs.forEach(dn => {
-               if (!currentLocal.some(cn => cn.id === dn.id || cn.id === `dbnotif-${dn.id}`)) {
-                 currentLocal.unshift({
-                   id: `dbnotif-${dn.id}`,
-                   studentName: user.name,
-                   type: dn.type?.toLowerCase() || 'default',
-                   title: dn.title,
-                   message: dn.message,
-                   requestId: dn.request_id,
-                   read: dn.read,
-                   createdAt: dn.created_at,
-                   roomId: null,
-                 });
-                 changed = true;
-               }
+              const localId = `dbnotif-${dn.id}`;
+              if (!currentLocal.some(cn => cn.id === localId)) {
+                // Derive roomId from requestId so Join works on any device
+                const computedRoomId = dn.request_id ? deriveRoomId(dn.request_id) : null;
+                currentLocal.unshift({
+                  id: localId,
+                  studentName: user.name,
+                  type: dn.type?.toLowerCase() || 'default',
+                  title: dn.title,
+                  message: dn.message,
+                  requestId: dn.request_id,
+                  read: dn.read,
+                  createdAt: dn.created_at,
+                  roomId: computedRoomId,
+                });
+                changed = true;
+              }
             });
             if (changed) localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
           }
@@ -192,10 +200,12 @@ export default function Dashboard() {
       }
 
       setStudentNotifs(getStudentNotifications(user.name));
-      // Auto-fire "meeting is live" notification when scheduled time arrives
+
+      // Auto-fire "meeting is live" notification when scheduled slot arrives
       const requests = getRequestsByStudent(user.name);
       requests.forEach(r => {
-        if (r.status === 'slot_booked' && r.scheduledTime && r.roomId) {
+        if (r.status === 'slot_booked' && r.scheduledTime) {
+          const roomId = r.roomId || deriveRoomId(r.id);
           const now = Date.now();
           const scheduled = new Date(r.scheduledTime).getTime();
           if (now >= scheduled - 60000 && now <= scheduled + 2 * 60 * 60 * 1000) {
@@ -203,7 +213,7 @@ export default function Dashboard() {
               const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
               const alreadyLive = all.some(n => n.requestId === r.id && n.type === 'live');
               if (!alreadyLive) {
-                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, roomId: r.roomId, read: false, createdAt: new Date().toISOString() });
+                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, roomId, read: false, createdAt: new Date().toISOString() });
                 localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
               }
             } catch {}
@@ -331,32 +341,45 @@ export default function Dashboard() {
                       {/* Join Now button */}
                       {(n.type === 'slot_booked' || n.type === 'live') && (
                         <div style={{ marginTop: 10 }}>
-                          {/* Use roomId from notification first (works cross-device), fallback to req.roomId */}
                           {(() => {
-                            const joinRoomId = n.roomId || req?.roomId;
-                            const isNowJoinable = req?.scheduledTime
-                              ? Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000
-                              : !!joinRoomId;
+                            // roomId: prefer stored, then derive deterministically from requestId
+                            const joinRoomId = n.roomId || req?.roomId
+                              || (n.requestId ? `room-${String(n.requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null);
+                            const scheduledTime = req?.scheduledTime;
+                            const isNowJoinable = scheduledTime
+                              ? Date.now() >= new Date(scheduledTime).getTime() - 5 * 60 * 1000
+                              : !!joinRoomId; // instant meet = always joinable
                             if (n.type === 'live' && joinRoomId) {
                               return (
-                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
                                 </a>
                               );
                             }
                             if (joinRoomId && isNowJoinable) {
                               return (
-                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
                                 </a>
                               );
                             }
-                            if (req?.scheduledTime) {
+                            if (scheduledTime) {
                               return (
                                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
-                                  {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </div>
+                              );
+                            }
+                            // slot_booked with no scheduled time = instant meet, show join
+                            if (joinRoomId) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                                </a>
                               );
                             }
                             return null;
