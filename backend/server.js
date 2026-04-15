@@ -20,6 +20,7 @@ app.use('/alumni',        require('./routes/alumni'));
 app.use('/register',      require('./routes/register'));
 app.use('/stats',         require('./routes/stats'));
 app.use('/chat',          require('./routes/chat'));
+app.use('/meet',          require('./routes/meetRoutes'));
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -61,6 +62,10 @@ app.get('/', (req, res) => {
       'PATCH /stats/verify/:id',
       'POST /chat/interview',
       'POST /chat/questions',
+      'POST /meet/create',
+      'GET  /meet/:roomId',
+      'POST /meet/custom',
+      'POST /meet/validate',
     ],
   });
 });

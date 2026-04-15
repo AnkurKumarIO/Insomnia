@@ -1,10 +1,7 @@
-import React, { useContext } from 'react';
-import { Navigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React from 'react';
 import DualAgentInterviewRoom from '../DualAgentInterviewRoom';
 
+// No auth guard — anyone with the room link can join as a guest
 export default function InterviewRoom() {
-  const { user } = useContext(AuthContext);
-  if (!user) return <Navigate to="/" replace />;
   return <DualAgentInterviewRoom />;
 }

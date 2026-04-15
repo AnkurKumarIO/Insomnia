@@ -1,40 +1,12 @@
-﻿import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState, useContext } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './context/AuthContext';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 
-// Multiple STUN + free public TURN servers for reliable NAT traversal
-const ICE = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    // Free TURN servers (open-relay) — critical for same-machine / symmetric NAT
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
-
-// AI whisperer suggestion pool — rotates automatically
+// AI whisperer suggestion pool
 const WHISPERER_POOL = [
   'Ask them how they handled state management or component lifecycles.',
   'Probe deeper: "Can you walk me through a time you debugged a production issue?"',
@@ -66,270 +38,100 @@ function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function DualAgentInterviewRoom() {
+export default function GoogleMeetInterviewRoom() {
   const { roomId } = useParams();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const myId = user?.name || user?.role || 'User';
 
-  // Identity: ?name=Alice > logged-in user > prompt
-  const myId = (() => {
-    const fromUrl = searchParams.get('name');
-    if (fromUrl) return fromUrl;
-    if (user?.name) return user.name;
-    // fallback: prompt once and store in sessionStorage per tab
-    const key = `alumnex_guest_name_${roomId}`;
-    let stored = sessionStorage.getItem(key);
-    if (!stored) {
-      stored = window.prompt('Enter your name to join the interview:') || `Guest-${Math.floor(Math.random() * 1000)}`;
-      sessionStorage.setItem(key, stored);
-    }
-    return stored;
-  })();
-
-  // ── Connection ──────────────────────────────────────────────────────────
-  // ── Connection ──────────────────────────────────────────────────────────
-  const [isConnected, setIsConnected]   = useState(false);
-  const [socketPeerPresent, setSocketPeerPresent] = useState(false); // Someone else in the socket room
-  const [videoConnected, setVideoConnected] = useState(false);     // Real WebRTC track received
-  const [peerName, setPeerName]         = useState('Peer');
+  // ── Connection & Meet ───────────────────────────────────────────────────
+  const [isConnected, setIsConnected] = useState(false);
+  const [meetLink, setMeetLink] = useState('');
+  const [meetLoading, setMeetLoading] = useState(true);
+  const [peerName, setPeerName] = useState('Peer');
+  const [peerPresent, setPeerPresent] = useState(false);
 
   // ── Controls ────────────────────────────────────────────────────────────
-  const [micOn, setMicOn]       = useState(true);
-  const [camOn, setCamOn]       = useState(true);
-  const [sharing, setSharing]   = useState(false);   // screen share active
   const [handRaised, setHandRaised] = useState(false);
-  const [sidePanel, setSidePanel]   = useState('ai'); // 'ai' | 'chat' | 'participants'
-  const [elapsed, setElapsed]   = useState(0);
+  const [sidePanel, setSidePanel] = useState('ai');
+  const [elapsed, setElapsed] = useState(0);
 
   // ── Chat ────────────────────────────────────────────────────────────────
   const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput]       = useState('');
+  const [chatInput, setChatInput] = useState('');
 
   // ── AI Whisperer ────────────────────────────────────────────────────────
-  const [hints, setHints]               = useState([]);
-  const [aiInput, setAiInput]           = useState('');
+  const [hints, setHints] = useState([]);
+  const [aiInput, setAiInput] = useState('');
   const [currentSuggestion, setCurrentSuggestion] = useState(WHISPERER_POOL[0]);
   const [suggestionIdx, setSuggestionIdx] = useState(0);
-  const [factChecks, setFactChecks]     = useState([
+  const [factChecks, setFactChecks] = useState([
     { claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' },
   ]);
-  const [factInput, setFactInput]       = useState('');
-  const [coachingTip, setCoachingTip]   = useState('');
+  const [factInput, setFactInput] = useState('');
+  const [coachingTip, setCoachingTip] = useState('');
   const [profileSummary, setProfileSummary] = useState(null);
 
   // ── Live metrics ────────────────────────────────────────────────────────
-  const [confT, setConfT]   = useState(72);
-  const [clarT, setClarT]   = useState(65);
+  const [confT, setConfT] = useState(72);
+  const [clarT, setClarT] = useState(65);
   const [energyT, setEnergyT] = useState(80);
   const confidence = useAnimatedMetric(confT);
-  const clarity    = useAnimatedMetric(clarT);
-  const energy     = useAnimatedMetric(energyT);
+  const clarity = useAnimatedMetric(clarT);
+  const energy = useAnimatedMetric(energyT);
 
   // ── Post-session ────────────────────────────────────────────────────────
-  const [ended, setEnded]       = useState(false);
+  const [ended, setEnded] = useState(false);
   const [analytics, setAnalytics] = useState(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────
-  const localVideoRef  = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const screenVideoRef = useRef(null);   // shows local screen share preview
-  const socketRef      = useRef(null);
-  const pcRef          = useRef(null);
-  const streamRef      = useRef(null);   // camera stream
-  const screenStreamRef = useRef(null);  // screen stream
-  const timerRef       = useRef(null);
-  const metricsRef     = useRef(null);
-  const suggestionRef  = useRef(null);
-  const makingOffer    = useRef(false);
-  const chatEndRef     = useRef(null);
-  const iceCandidateBuffer = useRef([]); // buffer candidates until remoteDescription is set
-  const sendOfferRef       = useRef(null);   // ref so initPC can call sendOffer without circular dep
-  const socketPeerPresentRef = useRef(false); // track peer presence across async boundaries
+  const socketRef = useRef(null);
+  const timerRef = useRef(null);
+  const metricsRef = useRef(null);
+  const suggestionRef = useRef(null);
+  const chatEndRef = useRef(null);
 
-  // ── Drain buffered ICE candidates after remoteDescription is set ─────────
-  const drainIceBuffer = useCallback(async () => {
-    const pc = pcRef.current;
-    if (!pc || !pc.remoteDescription) return;
-    const buf = iceCandidateBuffer.current.splice(0);
-    for (const c of buf) {
-      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
-    }
-  }, []);
-
-  // ── WebRTC PC Initialization ──────────────────────────────────────────
-  const initPC = useCallback(() => {
-    if (pcRef.current) return pcRef.current;
-    console.log('[WebRTC] Initializing PeerConnection');
-    const pc = new RTCPeerConnection(ICE);
-    pcRef.current = pc;
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socketRef.current?.emit('ice-candidate', roomId, e.candidate);
-    };
-
-    pc.ontrack = (e) => {
-      console.log('[WebRTC] Remote track received:', e.track.kind);
-      if (e.streams && e.streams[0]) {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = e.streams[0];
-          remoteVideoRef.current.muted = false; // MUST be unmuted for remote audio
-          remoteVideoRef.current.play().catch(() => {
-            // Autoplay blocked — user interaction needed, handled by UI
-          });
-        }
-        setVideoConnected(true);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      console.log('[WebRTC] Connection state:', state);
-      if (state === 'connected') setVideoConnected(true);
-      // Only mark disconnected on hard failure — 'disconnected' is transient
-      if (state === 'failed') {
-        setVideoConnected(false);
-        // Try ICE restart on failure
-        console.log('[WebRTC] Connection failed — attempting ICE restart');
-        sendOfferRef.current?.();
-      }
-      if (state === 'closed') setVideoConnected(false);
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC] ICE state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-        setVideoConnected(true);
-      }
-    };
-
-    // onnegotiationneeded intentionally not used — offer fires only on user-connected
-    return pc;
-  }, [roomId]);
-
-  // ── Explicit offer sender — called only when peer is confirmed present ──
-  const sendOffer = useCallback(async () => {
-    const pc = pcRef.current;
-    if (!pc) return;
-    try {
-      console.log('[WebRTC] Sending offer to peer');
-      makingOffer.current = true;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socketRef.current?.emit('offer', roomId, pc.localDescription);
-    } catch (err) {
-      console.error('[WebRTC] sendOffer error:', err);
-    } finally {
-      makingOffer.current = false;
-    }
-  }, [roomId]);
-
-  // Keep ref in sync so initPC's onconnectionstatechange can call it without stale closure
-  useEffect(() => { sendOfferRef.current = sendOffer; }, [sendOffer]);
-
-  // ── Init ────────────────────────────────────────────────────────────────
+  // ── Initialize Google Meet & Socket.io ─────────────────────────────────
   useEffect(() => {
-    console.log('[Room] Entering room:', roomId);
+    console.log('[GoogleMeet] Entering room:', roomId);
+    
+    // 1. Get or create Google Meet link
+    const initMeet = async () => {
+      try {
+        const data = await api.getMeetLink(roomId);
+        if (data.success && data.meetLink) {
+          setMeetLink(data.meetLink);
+          console.log('[GoogleMeet] Meet link:', data.meetLink);
+        }
+      } catch (error) {
+        console.error('[GoogleMeet] Error getting meet link:', error);
+      } finally {
+        setMeetLoading(false);
+      }
+    };
+    initMeet();
+
+    // 2. Initialize Socket.io for AI features
     const socket = io(`${SOCKET_URL}/interview`);
     socketRef.current = socket;
 
-    // 1. Initialize PC
-    const pc = initPC();
-
-    // 2. Start Camera — add tracks, then check if peer already waiting
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        console.log('[Media] Camera/Mic access granted');
-        streamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          localVideoRef.current.muted = true; // always mute local to avoid echo
-        }
-        stream.getTracks().forEach(t => pc.addTrack(t, stream));
-        // If peer already joined before camera was ready, send offer now
-        if (socketPeerPresentRef.current) {
-          console.log('[Media] Peer already present — sending offer after camera ready');
-          sendOffer();
-        }
-      })
-      .catch(err => console.error('[Media] Camera access denied:', err));
-
-    // 3. Socket Events
     socket.on('connect', () => {
       setIsConnected(true);
       socket.emit('join-room', roomId, myId);
     });
 
-    socket.on('user-connected', async (uid) => {
+    socket.on('user-connected', (uid) => {
       console.log('[Socket] Peer joined:', uid);
       setPeerName(uid);
-      setSocketPeerPresent(true);
-      socketPeerPresentRef.current = true;
-      // Only send offer if our camera stream is already ready (tracks added to PC)
-      // If not ready yet, the getUserMedia .then() above will send it
-      if (streamRef.current) {
-        await new Promise(r => setTimeout(r, 300));
-        await sendOffer();
-      } else {
-        console.log('[Socket] Camera not ready yet — offer will fire after getUserMedia resolves');
-      }
+      setPeerPresent(true);
     });
 
     socket.on('user-disconnected', () => {
       console.log('[Socket] Peer left');
-      setSocketPeerPresent(false);
-      socketPeerPresentRef.current = false;
-      setVideoConnected(false);
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      setPeerPresent(false);
     });
 
-    // 4. Signaling
-    socket.on('offer', async (offer) => {
-      console.log('[WebRTC] Received offer, state:', pcRef.current?.signalingState);
-      const pc = pcRef.current; if (!pc) return;
-      try {
-        if (pc.signalingState !== 'stable') {
-          await pc.setLocalDescription({ type: 'rollback' });
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        await drainIceBuffer(); // flush buffered candidates now that remote is set
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('answer', roomId, pc.localDescription);
-        console.log('[WebRTC] Answer sent');
-      } catch (err) {
-        console.error('[WebRTC] Offer handling error:', err);
-      }
-    });
-
-    socket.on('answer', async (ans) => {
-      console.log('[WebRTC] Received answer');
-      const pc = pcRef.current; if (!pc) return;
-      try {
-        if (pc.signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(ans));
-          await drainIceBuffer(); // flush buffered candidates now that remote is set
-        }
-      } catch (err) {
-        console.error('[WebRTC] Answer handling error:', err);
-      }
-    });
-
-    socket.on('ice-candidate', async (c) => {
-      try {
-        const pc = pcRef.current;
-        if (!pc) return;
-        if (pc.remoteDescription && pc.remoteDescription.type) {
-          await pc.addIceCandidate(new RTCIceCandidate(c));
-        } else {
-          // Buffer it — remoteDescription not set yet
-          console.log('[WebRTC] Buffering ICE candidate');
-          iceCandidateBuffer.current.push(c);
-        }
-      } catch (_) {}
-    });
-
-    // Agents feed ... existing logic
+    // AI Agents - Socket events
     socket.on('whisperer_feed', (data) => {
       const hint = typeof data === 'string' ? data : data.hint;
       const category = typeof data === 'object' ? data.category : 'general';
@@ -339,8 +141,8 @@ export default function DualAgentInterviewRoom() {
     socket.on('speech_coaching', (result) => {
       setCoachingTip(result.coaching_tip || '');
       if (result.confidence) setConfT(result.confidence);
-      if (result.clarity)    setClarT(result.clarity);
-      if (result.energy)     setEnergyT(result.energy);
+      if (result.clarity) setClarT(result.clarity);
+      if (result.energy) setEnergyT(result.energy);
     });
 
     socket.on('fact_check_result', ({ claim, result }) => {
@@ -358,8 +160,8 @@ export default function DualAgentInterviewRoom() {
 
     socket.on('coach_metrics_update', (m) => {
       if (m.confidence !== undefined) setConfT(m.confidence);
-      if (m.clarity    !== undefined) setClarT(m.clarity);
-      if (m.energy     !== undefined) setEnergyT(m.energy);
+      if (m.clarity !== undefined) setClarT(m.clarity);
+      if (m.energy !== undefined) setEnergyT(m.energy);
     });
 
     socket.on('chat_message', (msg) => {
@@ -386,106 +188,50 @@ export default function DualAgentInterviewRoom() {
     }, 12000);
 
     return () => {
-      console.log('[Room] Cleaning up');
+      console.log('[GoogleMeet] Cleaning up');
       socket.disconnect();
-      pcRef.current?.close();
-      pcRef.current = null;
-      iceCandidateBuffer.current = [];
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      screenStreamRef.current?.getTracks().forEach(t => t.stop());
       clearInterval(timerRef.current);
       clearInterval(metricsRef.current);
       clearInterval(suggestionRef.current);
     };
-  }, [roomId, initPC, sendOffer, drainIceBuffer, myId]);
+  }, [roomId, myId]);
 
-  // ── Screen share ─────────────────────────────────────────────────────────
-  const toggleScreenShare = useCallback(async () => {
-    const pc = pcRef.current;
-    if (!sharing) {
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        screenStreamRef.current = screenStream;
-        const screenTrack = screenStream.getVideoTracks()[0];
-
-        // Show local preview
-        if (screenVideoRef.current) screenVideoRef.current.srcObject = screenStream;
-
-        // Replace video track in peer connection
-        if (pc) {
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) await sender.replaceTrack(screenTrack);
-        }
-
-        // When user stops sharing via browser UI
-        screenTrack.onended = () => stopScreenShare();
-        setSharing(true);
-      } catch (e) {
-        if (e.name !== 'NotAllowedError') console.error('Screen share error:', e);
-      }
-    } else {
-      stopScreenShare();
-    }
-  }, [sharing, roomId]);
-
-  const stopScreenShare = useCallback(async () => {
-    const pc = pcRef.current;
-    screenStreamRef.current?.getTracks().forEach(t => t.stop());
-    screenStreamRef.current = null;
-    if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
-
-    // Restore camera track
-    if (pc && streamRef.current) {
-      const camTrack = streamRef.current.getVideoTracks()[0];
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender && camTrack) await sender.replaceTrack(camTrack);
-    }
-    setSharing(false);
-  }, []);
-
-  // ── Controls ─────────────────────────────────────────────────────────────
-  const toggleMic = () => {
-    streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
-    setMicOn(m => !m);
-  };
-  const toggleCam = () => {
-    streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
-    setCamOn(c => !c);
-  };
-  const toggleHand = () => {
-    const next = !handRaised;
-    setHandRaised(next);
-    if (next) socketRef.current?.emit('hand_raised', roomId, myId);
-  };
-
-  // ── AI Whisperer ──────────────────────────────────────────────────────────
+  // ── AI Functions ────────────────────────────────────────────────────────
   const sendTranscript = (text) => {
     if (!text.trim()) return;
     socketRef.current?.emit('transcript_chunk', roomId, text);
   };
+
   const triggerHint = () => sendTranscript(currentSuggestion);
+
   const nextSuggestion = () => {
     const next = (suggestionIdx + 1) % WHISPERER_POOL.length;
     setSuggestionIdx(next);
     setCurrentSuggestion(WHISPERER_POOL[next]);
   };
 
-  // ── Agent 7: Fact check trigger ───────────────────────────────────────────
   const triggerFactCheck = (claim) => {
     if (!claim.trim()) return;
     socketRef.current?.emit('fact_check_request', roomId, claim);
     setFactInput('');
   };
 
-  // ── Agent 5: Load peer profile summary ────────────────────────────────────
   const loadProfileSummary = async () => {
     try {
       const data = await api.summarizeProfile({ name: peerName, role: 'STUDENT' });
       setProfileSummary(data.summary);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
+  const toggleHand = () => {
+    const next = !handRaised;
+    setHandRaised(next);
+    if (next) socketRef.current?.emit('hand_raised', roomId, myId);
+  };
+
+  // ── Chat ────────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!chatInput.trim()) return;
     const msg = { from: myId, text: chatInput, time: new Date().toLocaleTimeString() };
@@ -494,12 +240,13 @@ export default function DualAgentInterviewRoom() {
     setChatInput('');
   };
 
-  // ── End session ───────────────────────────────────────────────────────────
+  // ── End session ─────────────────────────────────────────────────────────
   const endSession = async () => {
     clearInterval(timerRef.current);
     clearInterval(metricsRef.current);
     clearInterval(suggestionRef.current);
     setEnded(true);
+    
     try {
       const data = await api.interviewAnalytics({
         interviewId: roomId,
@@ -508,7 +255,7 @@ export default function DualAgentInterviewRoom() {
       });
       setAnalytics(data.analytics);
 
-      // ── Save report to localStorage for ProgressAnalytics ──────────────
+      // Save to localStorage for ProgressAnalytics
       try {
         const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
         const HISTORY_KEY = 'alumnex_interview_history';
@@ -526,16 +273,19 @@ export default function DualAgentInterviewRoom() {
           analytics: data.analytics,
           checklist: (data.analytics?.actionable_insights || []).map(t => ({ done: false, text: t })),
         };
-        existing.unshift(report); // newest first
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50))); // keep last 50
-      } catch (saveErr) { console.warn('Could not save interview report:', saveErr); }
-
-    } catch (e) { console.error(e); }
+        existing.unshift(report);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+      } catch (saveErr) {
+        console.warn('Could not save interview report:', saveErr);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const remaining = Math.max(0, 3600 - elapsed);
 
-  // ── Analytics screen ──────────────────────────────────────────────────────
+  // ── Analytics screen ────────────────────────────────────────────────────
   if (ended && analytics) {
     return (
       <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
@@ -545,6 +295,7 @@ export default function DualAgentInterviewRoom() {
             <h2 style={{ fontSize:'2rem', fontWeight:900, letterSpacing:'-0.03em' }}>Post-Interview Analytics</h2>
             <p style={{ color:'#c7c4d8', marginTop:8 }}>Session complete — here's your performance breakdown</p>
           </div>
+          
           {/* Live metric snapshot */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem', marginBottom:'1.5rem' }}>
             {[{l:'Confidence',v:`${confidence}%`,c:'#c3c0ff'},{l:'Clarity',v:`${clarity}%`,c:'#4edea3'},{l:'Energy',v:`${energy}%`,c:'#ffb95f'}].map(m=>(
@@ -554,6 +305,7 @@ export default function DualAgentInterviewRoom() {
               </div>
             ))}
           </div>
+          
           {/* AI analytics */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem', marginBottom:'1.5rem' }}>
             {[{l:'AI Confidence',v:analytics.overall_confidence,c:'#c3c0ff'},{l:'Clarity',v:analytics.communication_clarity,c:'#4edea3'},{l:'Tech Depth',v:analytics.technical_depth,c:'#ffb95f'}].map(m=>(
@@ -563,6 +315,7 @@ export default function DualAgentInterviewRoom() {
               </div>
             ))}
           </div>
+          
           <div style={{ background:'#131b2e', borderRadius:16, padding:'1.5rem', marginBottom:'1rem' }}>
             <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'1rem' }}>Actionable Insights</div>
             {analytics.actionable_insights?.map((ins,i)=>(
@@ -572,6 +325,7 @@ export default function DualAgentInterviewRoom() {
               </div>
             ))}
           </div>
+          
           {analytics.suggested_readings?.length > 0 && (
             <div style={{ background:'#131b2e', borderRadius:16, padding:'1.25rem', marginBottom:'1.5rem' }}>
               <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'0.75rem' }}>Suggested Readings</div>
@@ -582,6 +336,7 @@ export default function DualAgentInterviewRoom() {
               ))}
             </div>
           )}
+          
           <button onClick={()=>navigate('/dashboard')} style={{ width:'100%', padding:'1rem', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', color:'#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.1em' }}>
             Back to Dashboard
           </button>
@@ -589,23 +344,21 @@ export default function DualAgentInterviewRoom() {
       </div>
     );
   }
-
-  // ── Main UI ───────────────────────────────────────────────────────────────
+  // ── Main UI ─────────────────────────────────────────────────────────────
   return (
     <div style={{ height:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
       {/* ── Top bar ── */}
       <nav style={{ height:60, background:'rgba(11,19,38,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(195,192,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 1.5rem', flexShrink:0, zIndex:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:'1.25rem' }}>
-          <span style={{ fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#c3c0ff' }}>AlumNEX AI</span>
+          <span style={{ fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#c3c0ff' }}>AlumNEX AI + Google Meet</span>
           <div style={{ display:'flex', alignItems:'center', gap:7, background:'#222a3d', padding:'0.25rem 0.65rem', borderRadius:999, border:'1px solid rgba(70,69,85,0.3)' }}>
             <div style={{ width:7, height:7, borderRadius:'50%', background: isConnected ? '#4edea3' : '#ffb4ab', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
             <span style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: isConnected ? '#4edea3' : '#ffb4ab' }}>
-              {isConnected ? (videoConnected ? 'LIVE' : (socketPeerPresent ? 'PEER DETECTED · CONNECTING...' : 'WAITING FOR PEER')) : 'CONNECTING...'}
+              {isConnected ? (peerPresent ? 'PEER CONNECTED' : 'WAITING FOR PEER') : 'CONNECTING...'}
             </span>
           </div>
           <span style={{ fontSize:'0.72rem', color:'#c7c4d8' }}>Room: <strong style={{ color:'#c3c0ff' }}>{roomId}</strong></span>
-          {sharing && <span style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#ffb95f', background:'rgba(255,185,95,0.1)', border:'1px solid rgba(255,185,95,0.3)', padding:'0.2rem 0.6rem', borderRadius:999 }}>● SHARING SCREEN</span>}
           {handRaised && <span style={{ fontSize:'0.6rem', fontWeight:700, color:'#4edea3' }}>✋ Hand Raised</span>}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -617,23 +370,59 @@ export default function DualAgentInterviewRoom() {
       {/* ── Canvas ── */}
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
 
-        {/* Video area */}
+        {/* Google Meet area */}
         <div style={{ flex:1, padding:'1rem', display:'flex', flexDirection:'column', gap:'0.75rem', overflow:'hidden' }}>
-          <div style={{ flex:1, display:'grid', gridTemplateColumns: sharing ? '2fr 1fr' : '1fr 1fr', gap:'0.75rem', transition:'grid-template-columns 0.3s' }}>
-
-            {/* Local / Screen share */}
-            <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:'1px solid rgba(70,69,85,0.2)' }}>
-              {/* Camera (hidden when sharing) */}
-              <video ref={localVideoRef} autoPlay muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover', display: sharing ? 'none' : 'block' }} />
-              {/* Screen share */}
-              <video ref={screenVideoRef} autoPlay muted playsInline style={{ width:'100%', height:'100%', objectFit:'contain', background:'#060e20', display: sharing ? 'block' : 'none' }} />
-              {!camOn && !sharing && (
-                <div style={{ position:'absolute', inset:0, background:'#131b2e', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:48, color:'#464555' }}>videocam_off</span>
+          {meetLoading ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', background:'#131b2e', borderRadius:14, border:'1px solid rgba(70,69,85,0.2)' }}>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:'2rem', marginBottom:'1rem' }}>🔄</div>
+                <div style={{ fontSize:'0.9rem', fontWeight:600, color:'#c7c4d8' }}>Loading Google Meet...</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex:1, position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:'1px solid rgba(70,69,85,0.2)' }}>
+              {/* Google Meet Instructions */}
+              <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'2rem', textAlign:'center' }}>
+                <div style={{ fontSize:'3rem', marginBottom:'1rem' }}>📹</div>
+                <h3 style={{ fontSize:'1.5rem', fontWeight:700, marginBottom:'1rem', color:'#c3c0ff' }}>Join Google Meet</h3>
+                <p style={{ fontSize:'0.9rem', color:'#c7c4d8', marginBottom:'1.5rem', maxWidth:500, lineHeight:1.6 }}>
+                  Click the button below to open Google Meet in a new tab. All AI features will continue working in this window.
+                </p>
+                
+                <div style={{ background:'#222a3d', borderRadius:12, padding:'1rem', marginBottom:'1.5rem', maxWidth:600, width:'100%' }}>
+                  <div style={{ fontSize:'0.65rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', marginBottom:'0.5rem' }}>Meeting Link</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                    <input 
+                      value={meetLink} 
+                      readOnly 
+                      style={{ flex:1, background:'#131b2e', border:'1px solid rgba(70,69,85,0.3)', borderRadius:8, padding:'0.6rem', color:'#dae2fd', fontSize:'0.8rem', fontFamily:'monospace' }}
+                    />
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(meetLink)}
+                      style={{ padding:'0.6rem 1rem', background:'rgba(195,192,255,0.15)', color:'#c3c0ff', border:'1px solid rgba(195,192,255,0.2)', borderRadius:8, fontWeight:700, fontSize:'0.75rem', cursor:'pointer', whiteSpace:'nowrap' }}
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
                 </div>
-              )}
-              {/* Live metrics overlay ... existing */}
-              <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)' }}>
+
+                <a 
+                  href={meetLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ display:'inline-flex', alignItems:'center', gap:'0.5rem', padding:'1rem 2rem', background:'linear-gradient(135deg,#4f46e5,#c3c0ff)', color:'#1d00a5', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.9rem', cursor:'pointer', textDecoration:'none', textTransform:'uppercase', letterSpacing:'0.1em' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize:20 }}>video_call</span>
+                  Open Google Meet
+                </a>
+
+                <p style={{ fontSize:'0.75rem', color:'#c7c4d8', marginTop:'1.5rem', opacity:0.6 }}>
+                  💡 Tip: Keep this tab open to use AI features during your interview
+                </p>
+              </div>
+
+              {/* Live metrics overlay */}
+              <div style={{ position:'absolute', top:10, right:10, background:'rgba(11,19,38,0.88)', backdropFilter:'blur(12px)', borderRadius:10, padding:'0.65rem', width:168, border:'1px solid rgba(195,192,255,0.1)', zIndex:5 }}>
                 {[{l:'Confidence',v:confidence,c:'#4edea3'},{l:'Clarity',v:clarity,c:'#c3c0ff'},{l:'Energy',v:energy,c:'#ffb95f'}].map(m=>(
                   <div key={m.l} style={{ marginBottom:7 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.58rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'#c7c4d8', marginBottom:3 }}>
@@ -649,48 +438,9 @@ export default function DualAgentInterviewRoom() {
                   <span style={{ fontSize:'0.58rem', color:'#c7c4d8' }}>AI coaching live</span>
                 </div>
               </div>
-              <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>
-                {myId} {sharing ? '(Screen)' : '(You)'}
-              </div>
             </div>
-
-            {/* Remote */}
-            <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#131b2e', border:`1px solid ${videoConnected ? 'rgba(78,222,163,0.35)' : 'rgba(70,69,85,0.2)'}`, transition:'border-color 0.5s' }}>
-              {/* Remote video — NOT muted so audio comes through */}
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                onClick={e => e.target.play()}
-                style={{ width:'100%', height:'100%', objectFit:'cover', display: videoConnected ? 'block' : 'none' }}
-              />
-              {!videoConnected && (
-                <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'rgba(11,19,38,0.9)', padding:'1rem' }}>
-                  <div style={{ width:56, height:56, borderRadius:'50%', background: socketPeerPresent ? 'linear-gradient(135deg,#00a572,#4edea3)' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.25rem', fontWeight:700, color: socketPeerPresent ? '#003d29' : '#1d00a5', marginBottom:10 }}>{socketPeerPresent ? peerName[0]?.toUpperCase() : '?'}</div>
-                  <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#c7c4d8', marginBottom:6 }}>{socketPeerPresent ? 'Connecting to video...' : 'Waiting for peer...'}</div>
-                  <div style={{ fontSize:'0.68rem', color:'#c7c4d8', opacity:0.55, textAlign:'center', maxWidth:200, lineHeight:1.5 }}>{socketPeerPresent ? 'WebRTC handshake in progress...' : 'Share this link with the other participant:'}</div>
-                  {!socketPeerPresent && (
-                    <div
-                      onClick={() => navigator.clipboard.writeText(window.location.href)}
-                      style={{ marginTop:10, padding:'0.35rem 0.7rem', background:'#222a3d', borderRadius:7, fontSize:'0.65rem', color:'#c3c0ff', fontFamily:'monospace', wordBreak:'break-all', maxWidth:240, textAlign:'center', cursor:'pointer' }}
-                      title="Click to copy"
-                    >
-                      {window.location.href}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div style={{ position:'absolute', top:10, left:10, display:'flex', alignItems:'center', gap:5, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', padding:'0.2rem 0.55rem', borderRadius:999 }}>
-                <div style={{ display:'flex', alignItems:'flex-end', gap:1, height:10 }}>
-                  {[5,9,11,7].map((h,i)=><div key={i} style={{ width:2, height:h, background: videoConnected && i<3 ? '#4edea3' : 'rgba(70,69,85,0.5)', borderRadius:1, transition:'background 0.5s' }} />)}
-                </div>
-                <span style={{ fontSize:'0.58rem', fontWeight:700, color:'#c7c4d8' }}>{videoConnected ? 'HD · Live' : 'No signal'}</span>
-              </div>
-              {socketPeerPresent && <div style={{ position:'absolute', bottom:10, left:10, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', padding:'0.25rem 0.65rem', borderRadius:7, fontSize:'0.68rem', fontWeight:700 }}>{peerName}</div>}
-            </div>
-          </div>
+          )}
         </div>
-
         {/* ── Side panel ── */}
         <div style={{ width:340, background:'#131b2e', borderLeft:'1px solid rgba(70,69,85,0.2)', display:'flex', flexDirection:'column', flexShrink:0 }}>
           {/* Panel tabs */}
@@ -702,7 +452,7 @@ export default function DualAgentInterviewRoom() {
             ))}
           </div>
 
-          {/* AI Whisperer panel — all 7 agents */}
+          {/* AI Whisperer panel */}
           {sidePanel === 'ai' && (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
               <div style={{ padding:'0.875rem', borderBottom:'1px solid rgba(70,69,85,0.15)', flexShrink:0, display:'flex', flexDirection:'column', gap:'0.65rem', overflowY:'auto', maxHeight:340 }}>
@@ -776,7 +526,7 @@ export default function DualAgentInterviewRoom() {
                 )}
               </div>
 
-              {/* Live hints feed with category badges */}
+              {/* Live hints feed */}
               <div style={{ flex:1, overflowY:'auto', padding:'0.875rem', display:'flex', flexDirection:'column', gap:'0.55rem' }}>
                 <div style={{ fontSize:'0.55rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(199,196,216,0.3)', marginBottom:2 }}>Live AI Feed</div>
                 {hints.length === 0 ? (
@@ -800,7 +550,7 @@ export default function DualAgentInterviewRoom() {
                 })}
               </div>
 
-              {/* Transcript input → Agent 2 */}
+              {/* Transcript input */}
               <div style={{ padding:'0.7rem', borderTop:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
                 <div style={{ position:'relative' }}>
                   <input value={aiInput} onChange={e=>setAiInput(e.target.value)}
@@ -814,7 +564,6 @@ export default function DualAgentInterviewRoom() {
               </div>
             </div>
           )}
-
           {/* Chat panel */}
           {sidePanel === 'chat' && (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -850,7 +599,7 @@ export default function DualAgentInterviewRoom() {
           {sidePanel === 'participants' && (
             <div style={{ flex:1, padding:'1rem', overflowY:'auto' }}>
               <div style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(199,196,216,0.4)', marginBottom:'1rem' }}>In this room</div>
-              {[{name:myId,role:'You',color:'#c3c0ff',online:true},{name:peerName,role:'Peer',color:'#4edea3',online:peerConnected},{name:'AI Whisperer',role:'AI Agent',color:'#ffb95f',online:true}].map((p,i)=>(
+              {[{name:myId,role:'You',color:'#c3c0ff',online:true},{name:peerName,role:'Peer',color:'#4edea3',online:peerPresent},{name:'AI Whisperer',role:'AI Agent',color:'#ffb95f',online:true}].map((p,i)=>(
                 <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'0.75rem', background:'#171f33', borderRadius:10, marginBottom:8, border:'1px solid rgba(70,69,85,0.15)', opacity: p.online ? 1 : 0.45 }}>
                   <div style={{ width:36, height:36, borderRadius:'50%', background:`linear-gradient(135deg,${p.color}40,${p.color}20)`, border:`1px solid ${p.color}40`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem', fontWeight:700, color:p.color, flexShrink:0 }}>{p.name[0]?.toUpperCase()}</div>
                   <div style={{ flex:1 }}>
@@ -882,16 +631,9 @@ export default function DualAgentInterviewRoom() {
 
         {/* Controls */}
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          {[
-            { icon: micOn ? 'mic' : 'mic_off',                   action: toggleMic,         on: micOn,    title: micOn ? 'Mute' : 'Unmute' },
-            { icon: camOn ? 'videocam' : 'videocam_off',          action: toggleCam,         on: camOn,    title: camOn ? 'Stop Video' : 'Start Video' },
-            { icon: sharing ? 'stop_screen_share' : 'present_to_all', action: toggleScreenShare, on: !sharing, title: sharing ? 'Stop Sharing' : 'Share Screen', active: sharing },
-            { icon: handRaised ? 'back_hand' : 'pan_tool',        action: toggleHand,        on: !handRaised, title: handRaised ? 'Lower Hand' : 'Raise Hand', active: handRaised },
-          ].map((c,i)=>(
-            <button key={i} onClick={c.action} title={c.title} style={{ width:40, height:40, borderRadius:'50%', background: c.active ? 'rgba(195,192,255,0.15)' : c.on ? '#222a3d' : 'rgba(255,107,107,0.12)', border:`1px solid ${c.active ? 'rgba(195,192,255,0.4)' : c.on ? 'rgba(255,255,255,0.06)' : 'rgba(255,107,107,0.25)'}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color: c.active ? '#c3c0ff' : c.on ? '#dae2fd' : '#ffb4ab', transition:'all 0.2s' }}>
-              <span className="material-symbols-outlined" style={{ fontSize:18 }}>{c.icon}</span>
-            </button>
-          ))}
+          <button onClick={toggleHand} title={handRaised ? 'Lower Hand' : 'Raise Hand'} style={{ width:40, height:40, borderRadius:'50%', background: handRaised ? 'rgba(195,192,255,0.15)' : '#222a3d', border:`1px solid ${handRaised ? 'rgba(195,192,255,0.4)' : 'rgba(255,255,255,0.06)'}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color: handRaised ? '#c3c0ff' : '#dae2fd', transition:'all 0.2s' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18 }}>{handRaised ? 'back_hand' : 'pan_tool'}</span>
+          </button>
           <div style={{ width:10 }} />
           <button onClick={endSession} style={{ display:'flex', alignItems:'center', gap:6, padding:'0 1.1rem', height:40, borderRadius:999, background:'#ffb4ab', color:'#690005', border:'none', fontWeight:700, fontSize:'0.82rem', cursor:'pointer', boxShadow:'0 4px 14px rgba(255,107,107,0.22)' }}>
             <span className="material-symbols-outlined" style={{ fontSize:16 }}>call_end</span>End Session
@@ -902,10 +644,10 @@ export default function DualAgentInterviewRoom() {
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <div style={{ display:'flex' }}>
             {[myId[0]||'Y', peerName[0]||'?', 'AI'].map((l,i)=>(
-              <div key={i} style={{ width:32, height:32, borderRadius:'50%', background: i===2 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : i===1&&videoConnected ? 'linear-gradient(135deg,#00a572,#4edea3)' : (i===1&&socketPeerPresent ? '#222a3d' : '#222a3d'), border:'2px solid #0b1326', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:700, color: i===2 ? '#1d00a5' : '#c3c0ff', marginLeft: i>0 ? -7 : 0, opacity: i===1&&!socketPeerPresent ? 0.35 : 1, transition:'all 0.3s' }}>{l.toUpperCase()}</div>
+              <div key={i} style={{ width:32, height:32, borderRadius:'50%', background: i===2 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : i===1&&peerPresent ? 'linear-gradient(135deg,#00a572,#4edea3)' : '#222a3d', border:'2px solid #0b1326', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:700, color: i===2 ? '#1d00a5' : '#c3c0ff', marginLeft: i>0 ? -7 : 0, opacity: i===1&&!peerPresent ? 0.35 : 1, transition:'all 0.3s' }}>{l.toUpperCase()}</div>
             ))}
           </div>
-          <span style={{ fontSize:'0.7rem', color:'#c7c4d8' }}>{videoConnected ? '3 active' : (socketPeerPresent ? 'Connecting...' : 'Peer offline')}</span>
+          <span style={{ fontSize:'0.7rem', color:'#c7c4d8' }}>{peerPresent ? '3 active' : 'Peer offline'}</span>
         </div>
       </div>
 
@@ -916,4 +658,3 @@ export default function DualAgentInterviewRoom() {
     </div>
   );
 }
-
