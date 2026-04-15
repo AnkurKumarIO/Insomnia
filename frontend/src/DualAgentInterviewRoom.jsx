@@ -312,14 +312,14 @@ export default function DualAgentInterviewRoom() {
           politeRef.current = true;
           console.log('[WebRTC] I am the POLITE peer (joined late) — waiting for offer from', users[0]);
 
-          // Safety: if no video in 6 seconds, the impolite peer's offer may have been lost → send our own
+          // Safety: if no video in 5 seconds, the impolite peer's offer may have been lost
+          // Stay polite so if both retry simultaneously, we yield to the other's offer
           retryTimerRef.current = setTimeout(() => {
             if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
-              console.log('[WebRTC] RETRY: No video after 6s as polite peer — sending offer anyway');
-              politeRef.current = false; // become impolite to break deadlock
+              console.log('[WebRTC] RETRY: No video after 5s as polite peer — sending offer (staying polite)');
               createAndSendOffer('polite-retry');
             }
-          }, 6000);
+          }, 5000);
         }
       });
 
@@ -339,13 +339,14 @@ export default function DualAgentInterviewRoom() {
           await createAndSendOffer('user-connected');
         }
 
-        // Safety retry: if video not connected after 5 more seconds, re-offer
+        // Safety retry: if video not connected after 8 seconds, re-offer
+        // Staggered at 8s (vs polite peer's 5s) to avoid simultaneous retries 
         retryTimerRef.current = setTimeout(() => {
           if (!videoConnRef.current && peerReadyRef.current && pc && pc.signalingState !== 'closed') {
-            console.log('[WebRTC] RETRY: No video after 6s as impolite peer — re-sending offer');
+            console.log('[WebRTC] RETRY: No video after 8s as impolite peer — re-sending offer');
             createAndSendOffer('impolite-retry');
           }
-        }, 5000);
+        }, 8000);
       });
 
       socket.on('user-disconnected', () => {
