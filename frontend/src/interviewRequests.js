@@ -255,13 +255,16 @@ export async function bookSlot(requestId, scheduledTime) {
     }
   } catch {}
 
+  const isInstant = Math.abs(new Date(scheduledTime).getTime() - Date.now()) < 60000;
   pushLocalNotif({
     studentName: requests[idx].studentName,
-    type:        'slot_booked',
-    title:       'Interview Slot Confirmed! 📅',
-    message:     `Your interview is scheduled for ${formatted}.`,
+    type:        isInstant ? 'live' : 'slot_booked',
+    title:       isInstant ? '🔴 Interview is Live Now!' : 'Interview Slot Confirmed! 📅',
+    message:     isInstant
+      ? 'Your mock interview is starting now. Click Join to enter the room.'
+      : `Your interview is scheduled for ${formatted}.`,
     requestId,
-    roomId,      // ← include roomId so student can join from any device
+    roomId,
   });
   return requests[idx];
 }

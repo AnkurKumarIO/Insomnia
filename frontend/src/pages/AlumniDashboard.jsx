@@ -636,10 +636,11 @@ export default function AlumniDashboard() {
   };
 
   const handleSlotBooked = (requestId, scheduledTime) => {
-    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId: `room-${requestId.slice(-8)}-${Date.now()}` } : r));
+    // roomId MUST match bookSlot formula exactly
+    const roomId = `room-${requestId.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
+    setLiveRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'slot_booked', scheduledTime, roomId } : r));
     const formatted = formatScheduledTime(scheduledTime);
     const req = liveRequests.find(r => r.id === requestId);
-    const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
     setExtraSlots(s => [...s, {
       when: formatted,
       title: `Mock Interview: ${req?.studentName || 'Student'}`,
@@ -653,29 +654,32 @@ export default function AlumniDashboard() {
   // ── Instant Meet — start right now, notify student ────────────────────────
   const handleInstantMeet = (req) => {
     const now = new Date().toISOString();
-    // Deterministic roomId from requestId — same on every device
-    const roomId = `room-instant-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
-    // Update request to slot_booked with current time
+    // roomId MUST match bookSlot formula exactly — no 'instant-' prefix
+    const roomId = `room-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
+    // bookSlot updates DB (status, roomId, scheduledTime) and creates Supabase notification
     bookSlot(req.id, now);
     setLiveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'slot_booked', scheduledTime: now, roomId } : r));
-    // Push instant notification to student
+    // Also push local notification so it works even without Supabase Realtime
     try {
       const NOTIF_KEY = 'alumniconnect_student_notifications';
       const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-      all.unshift({
-        id: `instant-${req.id}-${Date.now()}`,
-        studentName: req.studentName,
-        type: 'live',
-        title: '🔴 Instant Meeting Started!',
-        message: `${user.name} has started an instant mock interview session. Join now!`,
-        requestId: req.id,
-        roomId,
-        read: false,
-        createdAt: now,
-      });
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+      const alreadyExists = all.some(n => n.requestId === req.id && n.type === 'live');
+      if (!alreadyExists) {
+        all.unshift({
+          id: `live-${req.id}`,
+          studentName: req.studentName,
+          type: 'live',
+          title: '🔴 Interview is Live Now!',
+          message: `${user.name} has started a mock interview session. Join now!`,
+          requestId: req.id,
+          roomId,
+          read: false,
+          createdAt: now,
+        });
+        localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+      }
     } catch {}
-    // Navigate alumni to the room with their name
+    // Navigate alumni to the room
     navigate(`/interview/${roomId}?name=${encodeURIComponent(user?.name || 'Alumni')}`);
   };
 
