@@ -1092,7 +1092,7 @@ export default function AlumniDashboard() {
             <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#c7c4d8', marginBottom: 16 }}>Average Rating</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
               <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>4.9</span>
-              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>â˜…â˜…â˜…â˜…â˜…</span>
+              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>★★★★★</span>
             </div>
           </div>
         </div>
