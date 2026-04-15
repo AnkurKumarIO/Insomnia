@@ -159,49 +159,81 @@ export default function Dashboard() {
   const deriveRoomId = (requestId) =>
     requestId ? `room-${String(requestId).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null;
 
-  // Poll student notifications every 3s + sync from Supabase
-  useEffect(() => {
+  // Helper: merge a DB notification into local storage and refresh state
+  const mergeDbNotif = (dn) => {
     const NOTIF_KEY = 'alumniconnect_student_notifications';
-    const load = async () => {
-      if (user?.id) {
-        try {
-          // Sync interview requests (pulls room_id, status, scheduled_time from DB)
-          const { syncStudentRequests } = await import('../interviewRequests');
-          await syncStudentRequests(user.id);
-
-          // Sync DB notifications
-          const { getNotificationsForUser } = await import('../lib/db');
-          const dbNotifs = await getNotificationsForUser(user.id);
-          if (dbNotifs && dbNotifs.length > 0) {
-            const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-            let changed = false;
-            dbNotifs.forEach(dn => {
-              const localId = `dbnotif-${dn.id}`;
-              if (!currentLocal.some(cn => cn.id === localId)) {
-                // Derive roomId from requestId so Join works on any device
-                const computedRoomId = dn.request_id ? deriveRoomId(dn.request_id) : null;
-                currentLocal.unshift({
-                  id: localId,
-                  studentName: user.name,
-                  type: dn.type?.toLowerCase() || 'default',
-                  title: dn.title,
-                  message: dn.message,
-                  requestId: dn.request_id,
-                  read: dn.read,
-                  createdAt: dn.created_at,
-                  roomId: computedRoomId,
-                });
-                changed = true;
-              }
-            });
-            if (changed) localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
-          }
-        } catch { /* fallback to local */ }
-      }
-
+    const localId = `dbnotif-${dn.id}`;
+    const currentLocal = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
+    if (!currentLocal.some(cn => cn.id === localId)) {
+      const computedRoomId = dn.request_id ? deriveRoomId(dn.request_id) : null;
+      currentLocal.unshift({
+        id: localId,
+        studentName: user.name,
+        type: dn.type?.toLowerCase() || 'default',
+        title: dn.title,
+        message: dn.message,
+        requestId: dn.request_id,
+        read: dn.read || false,
+        createdAt: dn.created_at,
+        roomId: computedRoomId,
+      });
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(currentLocal));
       setStudentNotifs(getStudentNotifications(user.name));
+    }
+  };
 
-      // Auto-fire "meeting is live" notification when scheduled slot arrives
+  // ── Realtime subscription + initial load ──────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const NOTIF_KEY = 'alumniconnect_student_notifications';
+    import('../lib/supabaseClient').then(({ supabase }) => {});
+
+    // 1. Initial bulk load
+    const initialLoad = async () => {
+      try {
+        // Sync interview requests from DB into localStorage
+        const { syncStudentRequests } = await import('../interviewRequests');
+        await syncStudentRequests(user.id);
+
+        // Load all notifications from DB and merge
+        const { getNotificationsForUser } = await import('../lib/db');
+        const dbNotifs = await getNotificationsForUser(user.id);
+        if (dbNotifs?.length > 0) dbNotifs.forEach(mergeDbNotif);
+      } catch {}
+      setStudentNotifs(getStudentNotifications(user.name));
+    };
+    initialLoad();
+
+    // 2. Supabase Realtime — fires instantly when a new notification row is inserted
+    let channel;
+    import('../lib/supabaseClient').then(({ supabase }) => {
+      channel = supabase
+        .channel(`notifs-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            // New notification arrived in real-time — merge immediately
+            if (payload.new) mergeDbNotif(payload.new);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'interview_requests', filter: `student_id=eq.${user.id}` },
+          async () => {
+            // Status change (accepted, slot_booked) — re-sync requests
+            try {
+              const { syncStudentRequests } = await import('../interviewRequests');
+              await syncStudentRequests(user.id);
+              setStudentNotifs(getStudentNotifications(user.name));
+            } catch {}
+          }
+        )
+        .subscribe();
+    });
+
+    // 3. Lightweight 10s timer only for the scheduled "meeting is live" trigger
+    const liveCheckInterval = setInterval(() => {
       const requests = getRequestsByStudent(user.name);
       requests.forEach(r => {
         if (r.status === 'slot_booked' && r.scheduledTime) {
@@ -215,15 +247,20 @@ export default function Dashboard() {
               if (!alreadyLive) {
                 all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, roomId, read: false, createdAt: new Date().toISOString() });
                 localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+                setStudentNotifs(getStudentNotifications(user.name));
               }
             } catch {}
           }
         }
       });
+    }, 10000);
+
+    return () => {
+      clearInterval(liveCheckInterval);
+      import('../lib/supabaseClient').then(({ supabase }) => {
+        if (channel) supabase.removeChannel(channel);
+      });
     };
-    load();
-    const interval = setInterval(load, 3000);
-    return () => clearInterval(interval);
   }, [user.name, user.id]);
 
   // Fetch recommended mentor + profile data

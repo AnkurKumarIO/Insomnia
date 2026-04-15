@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useRef } from 'react';
+﻿import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
@@ -8,7 +8,7 @@ import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
 import SettingsPage from './SettingsPage';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
-// â”€â”€ Student Detail + Accept Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Student Detail + Accept Modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function StudentDetailModal({ request, onClose, onAccept }) {
   const p = request.studentProfile || {};
   const [accepting, setAccepting] = useState(false);
@@ -41,7 +41,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
 
         {done ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>âœ…</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Request Accepted!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified. Click "Book Slot" to schedule the interview.</p>
           </div>
@@ -56,7 +56,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
                   {p.college && <div style={{ fontSize: '0.78rem', color: '#c7c4d8', marginTop: 2 }}>{p.college}</div>}
                   {(p.department || p.year) && (
                     <div style={{ fontSize: '0.72rem', color: '#c3c0ff', marginTop: 2 }}>
-                      {[p.department, p.year].filter(Boolean).join(' • ')}
+                      {[p.department, p.year].filter(Boolean).join(' â€¢ ')}
                     </div>
                   )}
                 </div>
@@ -157,7 +157,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
   );
 }
 
-// â”€â”€ Book Slot Calendar Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Book Slot Calendar Modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function BookSlotModal({ request, onClose, onBooked }) {
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -219,7 +219,7 @@ function BookSlotModal({ request, onClose, onBooked }) {
       <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {step === 'done' ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>📅</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ“…</div>
             <h3 style={{ fontWeight: 700, color: '#4edea3', marginBottom: 8 }}>Slot Booked!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8', lineHeight: 1.6 }}>{request.studentName} has been notified with the interview date and time.</p>
           </div>
@@ -264,7 +264,7 @@ function BookSlotModal({ request, onClose, onBooked }) {
               {selectedDate && (
                 <>
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: '0.75rem' }}>
-                    Select Time — {formattedSelected}
+                    Select Time â€” {formattedSelected}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: timeError ? 6 : '1.25rem' }}>
                     <div style={{ flex: 1 }}>
@@ -288,7 +288,7 @@ function BookSlotModal({ request, onClose, onBooked }) {
                       ))}
                     </div>
                   </div>
-                  {timeError && <div style={{ fontSize: '0.7rem', color: '#ffb4ab', marginBottom: '1rem' }}>⚠ {timeError}</div>}
+                  {timeError && <div style={{ fontSize: '0.7rem', color: '#ffb4ab', marginBottom: '1rem' }}>âš  {timeError}</div>}
                   <div style={{ background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4edea3', marginBottom: 4 }}>Scheduled Slot</div>
                     <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {displayTime()}</div>
@@ -308,7 +308,7 @@ function BookSlotModal({ request, onClose, onBooked }) {
     </div>
   );
 }
-// â”€â”€ Reschedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Reschedule Modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function RescheduleModal({ request, onClose, onRescheduled }) {
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -341,7 +341,7 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
       <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 520, border: '1px solid rgba(255,185,95,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
         {done ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔄</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ”„</div>
             <h3 style={{ fontWeight: 700, color: '#ffb95f', marginBottom: 8 }}>Slot Rescheduled!</h3>
             <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>{request.studentName} has been notified of the new time.</p>
           </div>
@@ -375,7 +375,7 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
               </div>
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time — {formattedSelected}</div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time â€” {formattedSelected}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
                     {TIME_SLOTS.map(t => <button key={t} onClick={() => setSelectedTime(t)} style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, background: selectedTime === t ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: selectedTime === t ? '#1d00a5' : '#c7c4d8' }}>{t}</button>)}
                   </div>
@@ -440,9 +440,9 @@ function AddSlotModal({ onClose, onAdd }) {
 }
 
 const SCHEDULE = [
-  { when: 'Today • 2:00 PM',     title: 'Mock Interview: David Chen',  sub: 'Backend Infrastructure Focus', active: true },
-  { when: 'Tomorrow • 10:30 AM', title: 'Career Path Guidance',         sub: 'Group Session • 4 Students',   active: false },
-  { when: 'Fri • 4:00 PM',       title: 'Resume Deep Dive',             sub: 'One-on-One • Marcus Aurelius', active: false },
+  { when: 'Today â€¢ 2:00 PM',     title: 'Mock Interview: David Chen',  sub: 'Backend Infrastructure Focus', active: true },
+  { when: 'Tomorrow â€¢ 10:30 AM', title: 'Career Path Guidance',         sub: 'Group Session â€¢ 4 Students',   active: false },
+  { when: 'Fri â€¢ 4:00 PM',       title: 'Resume Deep Dive',             sub: 'One-on-One â€¢ Marcus Aurelius', active: false },
 ];
 const NAV_ITEMS = [
   { icon: 'dashboard',     label: 'Dashboard',  tab: 'home' },
@@ -486,58 +486,82 @@ export default function AlumniDashboard() {
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Alumni').split(' ')[0];
 
-  // Load requests for this alumni from Supabase directly
+  // Load requests for this alumni from Supabase directly (Realtime — no polling)
   useEffect(() => {
-    const load = async () => {
-      let usedSupabase = false;
+    let channel = null;
+    let supabaseRef = null;
+
+    const fetchAndSet = async (alumniId) => {
       try {
-        let alumniId = user.id;
-        const isMockId = !alumniId || String(alumniId).startsWith('alm-') || String(alumniId).startsWith('stu-');
-        if (isMockId) {
+        const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
+        const data = await dbGetRequests(alumniId);
+        const mapped = data.map(r => ({
+          id:            r.request_id,
+          studentName:   r.student_name || r.student?.name || '',
+          studentId:     r.student_id,
+          alumniName:    user.name,
+          alumniRole:    '',
+          topic:         r.topic,
+          message:       r.message || '',
+          status:        (r.status || 'PENDING').toLowerCase(),
+          scheduledTime: r.scheduled_time || null,
+          roomId:        r.room_id || null,
+          createdAt:     r.created_at,
+          studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
+        }));
+        const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
+        mapped.forEach(dbReq => {
+          const idx = local.findIndex(l => l.id === dbReq.id);
+          if (idx === -1) local.push(dbReq);
+          else local[idx] = { ...local[idx], ...dbReq };
+        });
+        localStorage.setItem('alumnex_interview_requests', JSON.stringify(local));
+        setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
+        return true;
+      } catch (err) {
+        console.warn('AlumniDashboard fetch failed:', err.message);
+        return false;
+      }
+    };
+
+    const init = async () => {
+      let alumniId = user.id;
+      const isMockId = !alumniId || String(alumniId).startsWith('alm-') || String(alumniId).startsWith('stu-');
+      if (isMockId) {
+        try {
           const { getAllAlumni } = await import('../lib/db');
           const alumniList = await getAllAlumni();
           const match = alumniList.find(a => a.name === user.name);
           if (match) alumniId = match.id;
-        }
-        if (alumniId && !String(alumniId).startsWith('alm-') && !String(alumniId).startsWith('stu-')) {
-          const { getRequestsForAlumni: dbGetRequests } = await import('../lib/db');
-          const data = await dbGetRequests(alumniId);
-          const mapped = data.map(r => ({
-            id:            r.request_id,
-            studentName:   r.student_name || r.student?.name || '',
-            studentId:     r.student_id,
-            alumniName:    user.name,
-            alumniRole:    '',
-            topic:         r.topic,
-            message:       r.message || '',
-            status:        (r.status || 'PENDING').toLowerCase(),
-            scheduledTime: r.scheduled_time || null,
-            roomId:        r.room_id || null,
-            createdAt:     r.created_at,
-            studentProfile: r.student_profile_snapshot || r.student?.profile_data || null,
-          }));
-          const local = JSON.parse(localStorage.getItem('alumnex_interview_requests') || '[]');
-          mapped.forEach(dbReq => {
-            const idx = local.findIndex(l => l.id === dbReq.id);
-            if (idx === -1) local.push(dbReq);
-            else local[idx] = { ...local[idx], ...dbReq };
-          });
-          localStorage.setItem('alumnex_interview_requests', JSON.stringify(local));
-          setLiveRequests(mapped.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
-          usedSupabase = true;
-        }
-      } catch (err) {
-        console.warn('AlumniDashboard: Supabase failed, using localStorage', err.message);
+        } catch {}
       }
-      if (!usedSupabase) {
+
+      if (alumniId && !String(alumniId).startsWith('alm-') && !String(alumniId).startsWith('stu-')) {
+        await fetchAndSet(alumniId);
+
+        // Realtime: fire instantly on new/updated requests for this alumni
+        const { supabase } = await import('../lib/supabaseClient');
+        supabaseRef = supabase;
+        channel = supabase
+          .channel(`alumni-reqs-${alumniId}`)
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'interview_requests', filter: `alumni_id=eq.${alumniId}` },
+            () => fetchAndSet(alumniId)
+          )
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'interview_requests', filter: `alumni_id=eq.${alumniId}` },
+            () => fetchAndSet(alumniId)
+          )
+          .subscribe();
+      } else {
         const all = getRequests();
         const mine = all.filter(r => r.alumniName === user.name || r.alumniId === user.id);
         setLiveRequests(mine.filter(r => ['pending','accepted','slot_booked'].includes(r.status)));
       }
     };
-    load();
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
+
+    init();
+    return () => { try { if (channel && supabaseRef) supabaseRef.removeChannel(channel); } catch {} };
   }, [user.name, user.id]);
 
   // Build notifications list: new requests + meetings in 24h
@@ -550,7 +574,7 @@ export default function AlumniDashboard() {
   });
   const notifications = [
     ...liveRequests.map(r => ({ id: r.id, type: 'request', title: 'New Interview Request', desc: `${r.studentName} wants to book a ${r.topic}`, time: r.createdAt })),
-    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} — ${s.when}`, time: s.scheduledTime })),
+    ...upcomingMeetings.map(s => ({ id: `meet-${s.title}`, type: 'meeting', title: 'Meeting in 24h', desc: `${s.title} â€” ${s.when}`, time: s.scheduledTime })),
   ];
   const unreadCount = notifications.filter(n => !seenNotifIds.includes(n.id)).length;
 
@@ -617,10 +641,10 @@ export default function AlumniDashboard() {
     }]);
   };
 
-  // ── Instant Meet — start right now, notify student ────────────────────────
+  // â”€â”€ Instant Meet â€” start right now, notify student â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleInstantMeet = (req) => {
     const now = new Date().toISOString();
-    // Deterministic roomId from requestId — MUST match bookSlot exactly
+    // Deterministic roomId from requestId â€” MUST match bookSlot exactly
     const roomId = `room-${req.id.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
     // Update request to slot_booked with current time
     bookSlot(req.id, now);
@@ -641,7 +665,7 @@ export default function AlumniDashboard() {
     }));
   };
 
-  // â”€â”€ Highlight matching text (like PDF search) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Highlight matching text (like PDF search) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const highlight = (text, query) => {
     if (!text || !query) return text;
     const str = String(text);
@@ -659,7 +683,7 @@ export default function AlumniDashboard() {
   const renderSearchResults = (q) => {
     const ql = q.toLowerCase();
 
-    // Search requests — include all statuses for this alumni
+    // Search requests â€” include all statuses for this alumni
     const allRequests = (() => {
       try {
         return getRequests().filter(r => r.alumniName === user.name);
@@ -728,7 +752,7 @@ export default function AlumniDashboard() {
                     <span style={{ padding: '0.2rem 0.6rem', borderRadius: 999, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
                       background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
                       color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
-                    }}>{r.status === 'slot_booked' ? '✓ Booked' : r.status === 'accepted' ? 'Accepted' : 'Pending'}</span>
+                    }}>{r.status === 'slot_booked' ? 'âœ“ Booked' : r.status === 'accepted' ? 'Accepted' : 'Pending'}</span>
                     {r.status === 'pending' && (
                       <button onClick={() => { setViewingRequest(r); setGlobalSearch(''); }} style={{ padding: '0.3rem 0.7rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 7, fontSize: '0.6rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>View</button>
                     )}
@@ -783,7 +807,7 @@ export default function AlumniDashboard() {
     if (activeTab === 'schedule') {
       const now = new Date();
 
-      // Build Mon–Sun week
+      // Build Monâ€“Sun week
       const dayOfWeek = now.getDay();
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
@@ -862,7 +886,7 @@ export default function AlumniDashboard() {
             ))}
           </div>
 
-          {/* Calendar grid — only rows with events */}
+          {/* Calendar grid â€” only rows with events */}
           <div style={{ background: '#131b2e', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(70,69,85,0.15)' }}>
             {/* Day headers */}
             <div style={{ display: 'grid', gridTemplateColumns: '64px repeat(7,1fr)', borderBottom: '1px solid rgba(70,69,85,0.2)' }}>
@@ -933,7 +957,7 @@ export default function AlumniDashboard() {
           {/* Sorted session list */}
           <div style={{ background: '#171f33', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(70,69,85,0.1)' }}>
             <div style={{ background: '#222a3d', padding: '0.875rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>All Sessions — Sorted by Time</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#dad7ff' }}>All Sessions â€” Sorted by Time</span>
               <span style={{ fontSize: '0.6rem', color: '#c7c4d8' }}>{allEvents.length} total</span>
             </div>
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
@@ -947,8 +971,8 @@ export default function AlumniDashboard() {
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1rem', background: '#131b2e', borderRadius: 12, borderLeft: `3px solid ${accentColor}`, opacity: ended ? 0.65 : 1, gap: 12 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.6rem', fontWeight: 700, color: ended ? '#6b7280' : e.isFreeSlot ? '#4edea3' : '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
-                        {fmtDate(e.scheduledTime)} • {fmtTime(e.scheduledTime)}
-                        {ended && <span style={{ marginLeft: 8, color: '#6b7280', fontWeight: 600 }}>— Ended</span>}
+                        {fmtDate(e.scheduledTime)} â€¢ {fmtTime(e.scheduledTime)}
+                        {ended && <span style={{ marginLeft: 8, color: '#6b7280', fontWeight: 600 }}>â€” Ended</span>}
                       </div>
                       <div style={{ fontWeight: 700, fontSize: '0.875rem', color: ended ? '#6b7280' : '#dae2fd' }}>{e.title}</div>
                       <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{e.sub}</div>
@@ -1021,11 +1045,11 @@ export default function AlumniDashboard() {
                     background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
                     color: r.status === 'accepted' ? '#ffb95f' : r.status === 'slot_booked' ? '#4edea3' : '#c3c0ff',
                   }}>
-                    {r.status === 'slot_booked' ? '📅 Booked' : r.status === 'accepted' ? '✓ Accepted' : 'â³ Pending'}
+                    {r.status === 'slot_booked' ? 'ðŸ“… Booked' : r.status === 'accepted' ? 'âœ“ Accepted' : 'Ã¢ÂÂ³ Pending'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
-                {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `• ${r.studentProfile.department}` : ''}</div>}
+                {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `â€¢ ${r.studentProfile.department}` : ''}</div>}
               </div>
 
               {/* Actions */}
@@ -1059,7 +1083,7 @@ export default function AlumniDashboard() {
                         </a>
                       ) : (
                         <div style={{ padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textAlign: 'right' }}>
-                          📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          ðŸ“… {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       )}
                       <button onClick={() => setReschedulingRequest(r)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, color: '#ffb95f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1114,7 +1138,7 @@ export default function AlumniDashboard() {
             <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#c7c4d8', marginBottom: 16 }}>Average Rating</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
               <span style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>4.9</span>
-              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>★★★★★</span>
+              <span style={{ color: '#ffb95f', fontSize: '1rem', marginBottom: 6 }}>â˜…â˜…â˜…â˜…â˜…</span>
             </div>
           </div>
         </div>
@@ -1161,7 +1185,7 @@ export default function AlumniDashboard() {
                     )}
                     {(r.status === 'accepted' || r.status === 'slot_booked') && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {/* ✓ Accepted badge */}
+                        {/* âœ“ Accepted badge */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.75rem', background: 'rgba(78,222,163,0.12)', border: '1px solid rgba(78,222,163,0.25)', borderRadius: 8 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#4edea3', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -1189,7 +1213,7 @@ export default function AlumniDashboard() {
                             </a>
                           ) : (
                             <div style={{ fontSize: '0.65rem', color: '#4edea3', fontWeight: 600 }}>
-                              📅 {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              ðŸ“… {new Date(r.scheduledTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
                           );
                         })()}
@@ -1299,7 +1323,7 @@ export default function AlumniDashboard() {
         />
       )}
 
-      {/* â”€â”€ SIDEBAR â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ SIDEBAR Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
           <AlumNexLogo size={32} />
@@ -1318,7 +1342,7 @@ export default function AlumniDashboard() {
             );
           })}
         </nav>
-        {/* Only Sign Out at bottom — no "New Mentorship" button */}
+        {/* Only Sign Out at bottom â€” no "New Mentorship" button */}
         <div style={{ marginTop: 'auto' }}>
           <button onClick={() => setShowLogoutConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 1rem', color: '#ffb4ab', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span> Sign Out
@@ -1326,7 +1350,7 @@ export default function AlumniDashboard() {
         </div>
       </aside>
 
-      {/* â”€â”€ MAIN â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ MAIN Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <main style={{ marginLeft: 256, flex: 1 }}>
         <header style={{ position: 'fixed', top: 0, left: 256, right: 0, height: 64, zIndex: 40, background: 'rgba(11,19,38,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(195,192,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem' }}>
           {/* Search bar */}
@@ -1335,7 +1359,7 @@ export default function AlumniDashboard() {
             <input
               value={globalSearch}
               onChange={e => setGlobalSearch(e.target.value)}
-              placeholder="Search anything — names, sessions, topics..."
+              placeholder="Search anything â€” names, sessions, topics..."
               style={{ background: 'transparent', border: 'none', outline: 'none', color: '#dae2fd', fontSize: '0.75rem', width: '100%' }}
             />
             {globalSearch && (
@@ -1347,7 +1371,7 @@ export default function AlumniDashboard() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
 
-            {/* â”€â”€ NOTIFICATIONS â”€â”€ */}
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬ NOTIFICATIONS Ã¢â€â‚¬Ã¢â€â‚¬ */}
             <div style={{ position: 'relative' }}>
               <button onClick={openNotifs} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-symbols-outlined" style={{ color: showNotifs ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifs ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
@@ -1398,7 +1422,7 @@ export default function AlumniDashboard() {
 
             <div style={{ width: 1, height: 32, background: 'rgba(70,69,85,0.3)' }} />
 
-            {/* â”€â”€ PROFILE BUTTON â”€â”€ */}
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬ PROFILE BUTTON Ã¢â€â‚¬Ã¢â€â‚¬ */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowProfile(p => !p); setShowNotifs(false); }} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 <div style={{ textAlign: 'right' }}>
@@ -1428,10 +1452,10 @@ export default function AlumniDashboard() {
                         </div>
                         <div style={{ padding: '0.75rem 1rem' }}>
                           {[
-                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || '—' },
-                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || '—' },
-                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || '—' },
-                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || '—' },
+                            { icon: 'alternate_email', label: 'Username', val: savedProfile.username || user.name || 'â€”' },
+                            { icon: 'mail',            label: 'Email',    val: savedProfile.email    || 'â€”' },
+                            { icon: 'work',            label: 'Domain',   val: savedProfile.domain   || savedProfile.department || 'â€”' },
+                            { icon: 'history_edu',     label: 'Experience', val: savedProfile.experience || 'â€”' },
                           ].map(item => (
                             <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.45rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#c3c0ff' }}>{item.icon}</span>
