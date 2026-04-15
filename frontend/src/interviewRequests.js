@@ -13,10 +13,10 @@ function loadLocal() {
 function saveLocal(requests) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
 }
-function pushLocalNotif({ studentName, type, title, message, requestId }) {
+function pushLocalNotif({ studentName, type, title, message, requestId, roomId }) {
   try {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-    all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, read: false, createdAt: new Date().toISOString() });
+    all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, roomId: roomId || null, read: false, createdAt: new Date().toISOString() });
     localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
   } catch {}
 }
@@ -215,7 +215,8 @@ export async function acceptRequestOnly(requestId) {
 // ── Book slot (alumni) ────────────────────────────────────────────────────────
 
 export async function bookSlot(requestId, scheduledTime) {
-  const roomId = `room-${requestId.slice(-8)}-${Date.now()}`;
+  // roomId derived ONLY from requestId — same on every device, no Date.now()
+  const roomId = `room-${requestId.replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}`;
   try {
     await dbUpdateRequest(requestId, { status: 'SLOT_BOOKED', scheduledTime, roomId });
   } catch (e) { console.warn('bookSlot DB error:', e.message); }
@@ -249,6 +250,7 @@ export async function bookSlot(requestId, scheduledTime) {
     title:       'Interview Slot Confirmed! 📅',
     message:     `Your interview is scheduled for ${formatted}.`,
     requestId,
+    roomId,      // ← include roomId so student can join from any device
   });
   return requests[idx];
 }

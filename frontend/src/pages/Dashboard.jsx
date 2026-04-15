@@ -299,21 +299,36 @@ export default function Dashboard() {
                       {/* Join Now button */}
                       {(n.type === 'slot_booked' || n.type === 'live') && (
                         <div style={{ marginTop: 10 }}>
-                          {/* Instant meet — roomId stored directly on notification */}
-                          {n.type === 'live' && n.roomId ? (
-                            <a href={`/interview/${n.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
-                            </a>
-                          ) : canJoin && req ? (
-                            <a href={`/interview/${req.roomId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
-                            </a>
-                          ) : req?.scheduledTime ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
-                              {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          ) : null}
+                          {/* Use roomId from notification first (works cross-device), fallback to req.roomId */}
+                          {(() => {
+                            const joinRoomId = n.roomId || req?.roomId;
+                            const isNowJoinable = req?.scheduledTime
+                              ? Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000
+                              : !!joinRoomId;
+                            if (n.type === 'live' && joinRoomId) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#ff4444,#ff6b6b)', color: '#fff', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now — Live
+                                </a>
+                              );
+                            }
+                            if (joinRoomId && isNowJoinable) {
+                              return (
+                                <a href={`/interview/${joinRoomId}?name=${encodeURIComponent(user?.name || 'Student')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.5rem 1.25rem', background: 'linear-gradient(135deg,#00a572,#4edea3)', color: '#003d29', borderRadius: 10, fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span> Join Now
+                                </a>
+                              );
+                            }
+                            if (req?.scheduledTime) {
+                              return (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, fontSize: '0.75rem', color: '#4edea3', fontWeight: 600 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>schedule</span>
+                                  {new Date(req.scheduledTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       )}
                     </div>
