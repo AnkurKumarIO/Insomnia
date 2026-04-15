@@ -7,8 +7,21 @@ const dotenv  = require('dotenv');
 dotenv.config();
 
 const app = express();
+
+// Allow both production frontend and localhost dev
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'https://insomnia-roan.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: (origin, cb) => {
+    // Allow requests with no origin (curl, mobile apps, Postman)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS blocked: ${origin}`));
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -29,7 +42,7 @@ app.use('/meet',          require('./routes/meetRoutes'));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
