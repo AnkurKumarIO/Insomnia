@@ -30,11 +30,22 @@ export function getStudentNotifications(studentName) {
   } catch { return []; }
 }
 
-export function markStudentNotifsRead(studentName) {
+export async function markStudentNotifsRead(studentName, studentId) {
   try {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
     const updated = all.map(n => n.studentName === studentName ? { ...n, read: true } : n);
     localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+    
+    // Also sync to DB if we have the ID
+    let realStudentId = studentId;
+    if (!realStudentId) {
+      const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
+      if (authUser.id && authUser.name === studentName) realStudentId = authUser.id;
+    }
+    if (realStudentId && !String(realStudentId).startsWith('stu-')) {
+      const { markNotificationsRead } = await import('./lib/db');
+      await markNotificationsRead(realStudentId);
+    }
   } catch {}
 }
 

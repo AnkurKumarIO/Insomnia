@@ -625,23 +625,6 @@ export default function AlumniDashboard() {
     // Update request to slot_booked with current time
     bookSlot(req.id, now);
     setLiveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'slot_booked', scheduledTime: now, roomId } : r));
-    // Push instant notification to student
-    try {
-      const NOTIF_KEY = 'alumniconnect_student_notifications';
-      const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
-      all.unshift({
-        id: `instant-${req.id}-${Date.now()}`,
-        studentName: req.studentName,
-        type: 'live',
-        title: '🔴 Instant Meeting Started!',
-        message: `${user.name} has started an instant mock interview session. Join now!`,
-        requestId: req.id,
-        roomId,
-        read: false,
-        createdAt: now,
-      });
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
-    } catch {}
     // Navigate alumni to the room with their name
     navigate(`/interview/${roomId}?name=${encodeURIComponent(user?.name || 'Alumni')}`);
   };
