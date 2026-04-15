@@ -4,7 +4,7 @@
 import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
 
 const STORAGE_KEY = 'alumnex_interview_requests';
-const NOTIF_KEY   = 'alumnex_student_notifications';
+const NOTIF_KEY   = 'alumniconnect_student_notifications';
 
 // ── localStorage helpers (fallback) ──────────────────────────────────────────
 function loadLocal() {
