@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from 'react';
+import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
@@ -77,6 +77,7 @@ export default function DualAgentInterviewRoom() {
   const [elapsed,           setElapsed]           = useState(0);
   const [chatMessages,      setChatMessages]      = useState([]);
   const [chatInput,         setChatInput]         = useState('');
+  const [unreadChat,        setUnreadChat]        = useState(0);
   const [hints,             setHints]             = useState([]);
   const [aiInput,           setAiInput]           = useState('');
   const [currentSuggestion, setCurrentSuggestion] = useState(WHISPERER_POOL[0]);
@@ -90,9 +91,11 @@ export default function DualAgentInterviewRoom() {
   const [energyT,           setEnergyT]           = useState(80);
   const [ended,             setEnded]             = useState(false);
   const [analytics,         setAnalytics]         = useState(null);
+  const [analyticsLoading,  setAnalyticsLoading]  = useState(false);
   const [rating,            setRating]            = useState(0);
   const [ratingFeedback,    setRatingFeedback]    = useState('');
   const [ratingSubmitted,   setRatingSubmitted]   = useState(false);
+  const [ratingSubmitting,  setRatingSubmitting]  = useState(false);
 
   const confidence = useAnimatedMetric(confT);
   const clarity    = useAnimatedMetric(clarT);
@@ -111,24 +114,23 @@ export default function DualAgentInterviewRoom() {
   const suggestionRef   = useRef(null);
   const chatEndRef      = useRef(null);
   const iceBuf          = useRef([]);
-  const peerReadyRef    = useRef(false);
+  const makingOfferRef  = useRef(false);
+  const politeRef       = useRef(true); // This peer is polite until we know otherwise
+  const sidePanelRef    = useRef(sidePanel);
 
-  // Single effect — runs ONCE on mount, empty deps []
+  // Keep ref in sync with state for use inside socket callbacks
+  useEffect(() => { sidePanelRef.current = sidePanel; }, [sidePanel]);
+
+  // Clear unread when switching to chat panel
+  useEffect(() => {
+    if (sidePanel === 'chat') setUnreadChat(0);
+  }, [sidePanel]);
+
+  // Single effect — runs ONCE on mount
   useEffect(() => {
     let pc = null;
     let socket = null;
     let destroyed = false;
-
-    async function doOffer() {
-      if (!pc || pc.signalingState === 'closed') return;
-      try {
-        console.log('[WebRTC] Creating offer, state:', pc.signalingState);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket?.emit('offer', roomId, pc.localDescription);
-        console.log('[WebRTC] Offer sent');
-      } catch (err) { console.error('[WebRTC] doOffer error:', err); }
-    }
 
     async function flushIceBuf() {
       if (!pc?.remoteDescription?.type) return;
@@ -161,7 +163,7 @@ export default function DualAgentInterviewRoom() {
       };
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout
+        const timeout = setTimeout(() => controller.abort(), 4000);
         const r = await fetch(`${API_URL}/meet/ice-config`, { signal: controller.signal });
         clearTimeout(timeout);
         if (r.ok) { iceConfig = await r.json(); console.log('[ICE] Loaded', iceConfig.iceServers.length, 'servers from backend'); }
@@ -177,20 +179,47 @@ export default function DualAgentInterviewRoom() {
         if (e.candidate) socket?.emit('ice-candidate', roomId, e.candidate);
       };
 
+      // Perfect Negotiation: Handle onnegotiationneeded
+      pc.onnegotiationneeded = async () => {
+        try {
+          makingOfferRef.current = true;
+          console.log('[WebRTC] negotiationneeded → creating offer');
+          await pc.setLocalDescription();
+          socket?.emit('offer', roomId, pc.localDescription);
+          console.log('[WebRTC] Offer sent via negotiationneeded');
+        } catch (err) {
+          console.error('[WebRTC] negotiationneeded error:', err);
+        } finally {
+          makingOfferRef.current = false;
+        }
+      };
+
       pc.ontrack = (e) => {
         console.log('[WebRTC] ontrack:', e.track.kind, 'streams:', e.streams.length);
-        if (e.streams?.[0] && remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = e.streams[0];
-          remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.play().catch(() => {});
-          setVideoConnected(true);
+        const remoteVideo = remoteVideoRef.current;
+        if (!remoteVideo) return;
+
+        if (e.streams?.[0]) {
+          // Use the stream directly
+          if (remoteVideo.srcObject !== e.streams[0]) {
+            remoteVideo.srcObject = e.streams[0];
+          }
+        } else {
+          // No stream — create one manually from tracks
+          if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = new MediaStream();
+          }
+          remoteVideo.srcObject.addTrack(e.track);
         }
+        remoteVideo.muted = false;
+        remoteVideo.play().catch(() => {});
+        setVideoConnected(true);
       };
 
       pc.onconnectionstatechange = () => {
         console.log('[WebRTC] connectionState:', pc.connectionState);
         if (pc.connectionState === 'connected') setVideoConnected(true);
-        if (pc.connectionState === 'failed')    { setVideoConnected(false); doOffer(); }
+        if (pc.connectionState === 'failed')    setVideoConnected(false);
         if (pc.connectionState === 'closed')    setVideoConnected(false);
       };
 
@@ -198,6 +227,11 @@ export default function DualAgentInterviewRoom() {
         console.log('[WebRTC] iceState:', pc.iceConnectionState);
         if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
           setVideoConnected(true);
+        }
+        // Restart ICE on failure
+        if (pc.iceConnectionState === 'failed') {
+          console.log('[WebRTC] ICE failed — restarting');
+          pc.restartIce();
         }
       };
 
@@ -209,10 +243,9 @@ export default function DualAgentInterviewRoom() {
         if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.muted = true; }
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         console.log('[Media] Tracks added to PC');
-        if (peerReadyRef.current) { await doOffer(); }
       } catch (err) { console.error('[Media] getUserMedia failed:', err); }
 
-      // 4. Connect socket — allow polling fallback for restrictive hosts (Render, Railway etc.)
+      // 4. Connect socket
       socket = io(`${SOCKET_URL}/interview`, {
         transports: ['websocket', 'polling'],
         upgrade: true,
@@ -227,7 +260,7 @@ export default function DualAgentInterviewRoom() {
       socket.on('connect_error', (err) => {
         console.error('[Socket] Connection error:', err.message);
         setHints(p => [{
-          text: `⚠ Cannot reach backend at ${SOCKET_URL}. Make sure the backend server is running and VITE_SOCKET_URL is set to the deployed backend URL.`,
+          text: `⚠ Cannot reach backend at ${SOCKET_URL}. Make sure the backend server is running.`,
           category: 'system', time: new Date().toLocaleTimeString(), type: 'system'
         }, ...p]);
       });
@@ -241,48 +274,95 @@ export default function DualAgentInterviewRoom() {
       socket.on('disconnect', (reason) => {
         console.log('[Socket] Disconnected:', reason);
         setIsConnected(false);
-        // Auto-reconnect on transport close
         if (reason === 'io server disconnect') socket.connect();
       });
 
+      // Room users already present — we are the late joiner (polite peer)
+      socket.on('room-users', (users) => {
+        console.log('[Socket] Room already has users:', users);
+        if (users.length > 0) {
+          setPeerName(users[0]);
+          setSocketPeerPresent(true);
+          // We arrived late. We are the polite peer — we wait for their offer
+          politeRef.current = true;
+          console.log('[WebRTC] I am the POLITE peer (joined late)');
+        }
+      });
+
+      // A new peer joined after us — we are the impolite peer → create offer
       socket.on('user-connected', async (uid) => {
         console.log('[Socket] Peer joined:', uid);
         setPeerName(uid);
         setSocketPeerPresent(true);
-        peerReadyRef.current = true;
-        if (streamRef.current) {
-          await new Promise(r => setTimeout(r, 300));
-          await doOffer();
+        // We were here first. We are the impolite peer — we create the offer
+        politeRef.current = false;
+        console.log('[WebRTC] I am the IMPOLITE peer (was here first) → sending offer');
+
+        if (streamRef.current && pc && pc.signalingState !== 'closed') {
+          await new Promise(r => setTimeout(r, 500));
+          try {
+            makingOfferRef.current = true;
+            await pc.setLocalDescription();
+            socket.emit('offer', roomId, pc.localDescription);
+            console.log('[WebRTC] Initial offer sent to new peer');
+          } catch (err) {
+            console.error('[WebRTC] Error creating initial offer:', err);
+          } finally {
+            makingOfferRef.current = false;
+          }
         }
       });
 
       socket.on('user-disconnected', () => {
         console.log('[Socket] Peer left');
         setSocketPeerPresent(false);
-        peerReadyRef.current = false;
         setVideoConnected(false);
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       });
 
+      // ── Perfect Negotiation: Offer handler ──────────────────────────
       socket.on('offer', async (offer) => {
-        console.log('[WebRTC] Got offer, signalingState:', pc.signalingState);
+        if (!pc || pc.signalingState === 'closed') return;
+        console.log('[WebRTC] Got offer, signalingState:', pc.signalingState, 'polite:', politeRef.current);
+
+        const offerCollision = makingOfferRef.current || pc.signalingState !== 'stable';
+
+        if (offerCollision) {
+          if (!politeRef.current) {
+            // Impolite peer ignores incoming offer during collision
+            console.log('[WebRTC] Impolite peer ignoring colliding offer');
+            return;
+          }
+          // Polite peer rolls back and accepts the incoming offer
+          console.log('[WebRTC] Polite peer rolling back for incoming offer');
+        }
+
         try {
-          if (pc.signalingState !== 'stable') await pc.setLocalDescription({ type: 'rollback' });
+          if (pc.signalingState !== 'stable') {
+            await pc.setLocalDescription({ type: 'rollback' });
+          }
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await flushIceBuf();
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit('answer', roomId, pc.localDescription);
           console.log('[WebRTC] Answer sent');
-        } catch (err) { console.error('[WebRTC] offer handler:', err); }
+        } catch (err) {
+          console.error('[WebRTC] offer handler error:', err);
+        }
       });
 
+      // ── Perfect Negotiation: Answer handler ─────────────────────────
       socket.on('answer', async (ans) => {
+        if (!pc || pc.signalingState === 'closed') return;
         console.log('[WebRTC] Got answer, signalingState:', pc.signalingState);
         try {
           if (pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(new RTCSessionDescription(ans));
             await flushIceBuf();
+          } else {
+            console.warn('[WebRTC] Got answer but not in have-local-offer state, ignoring');
           }
         } catch (err) { console.error('[WebRTC] answer handler:', err); }
       });
@@ -318,14 +398,29 @@ export default function DualAgentInterviewRoom() {
         if (m.clarity    !== undefined) setClarT(m.clarity);
         if (m.energy     !== undefined) setEnergyT(m.energy);
       });
-      socket.on('chat_message', (msg) => setChatMessages(p => [...p, msg]));
+
+      // Chat — only add messages from OTHER users (we add our own locally in sendChat)
+      socket.on('chat_message', (msg) => {
+        setChatMessages(p => [...p, msg]);
+        // Increment unread if not viewing chat panel
+        if (sidePanelRef.current !== 'chat') {
+          setUnreadChat(c => c + 1);
+        }
+      });
+
       socket.on('hand_raised',  (uid) => setHints(p => [{ text: `${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]));
 
       // Timers
       timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-      metricsRef.current = setInterval(() => {
-        socket.emit('speech_metrics', roomId, { wordsPerMinute: Math.floor(Math.random() * 80 + 100), fillerCount: Math.floor(Math.random() * 5), pauseCount: 2 });
-      }, 3000);
+
+      // Speech metrics — only send from candidate side (not interviewer)
+      const isInterviewerUser = (user?.role === 'ALUMNI') || (searchParams.get('role') === 'alumni');
+      if (!isInterviewerUser) {
+        metricsRef.current = setInterval(() => {
+          socket.emit('speech_metrics', roomId, { wordsPerMinute: Math.floor(Math.random() * 80 + 100), fillerCount: Math.floor(Math.random() * 5), pauseCount: 2 });
+        }, 3000);
+      }
+
       suggestionRef.current = setInterval(() => {
         setSuggestionIdx(i => { const next = (i + 1) % WHISPERER_POOL.length; setCurrentSuggestion(WHISPERER_POOL[next]); return next; });
       }, 12000);
@@ -446,6 +541,8 @@ export default function DualAgentInterviewRoom() {
     setEnded(true);
     // Interviewer goes straight to rating screen — no analytics needed
     if (isInterviewer) return;
+    // Candidate gets analytics
+    setAnalyticsLoading(true);
     try {
       const data = await api.interviewAnalytics({
         interviewId: roomId,
@@ -469,15 +566,18 @@ export default function DualAgentInterviewRoom() {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
       } catch (saveErr) { console.warn('Could not save report:', saveErr); }
     } catch (e) { console.error(e); }
+    setAnalyticsLoading(false);
   };
 
   const remaining = Math.max(0, 3600 - elapsed);
 
   // ── Post-session: Interviewer rating screen ─────────────────────────────────
   if (ended && isInterviewer) {
-    const submitRating = () => {
+    const submitRating = async () => {
       if (rating === 0) return;
-      // Store rating in localStorage keyed by roomId + peerName
+      setRatingSubmitting(true);
+
+      // Store locally
       const key = 'alumnex_interview_ratings';
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
       existing.unshift({
@@ -490,12 +590,33 @@ export default function DualAgentInterviewRoom() {
         interviewerName: myId,
       });
       localStorage.setItem(key, JSON.stringify(existing.slice(0, 100)));
-      // Also update candidate's profile rating
+
+      // Also update candidate's profile rating locally
       const profileKey = 'alumnex_candidate_ratings';
       const profileRatings = JSON.parse(localStorage.getItem(profileKey) || '{}');
       if (!profileRatings[peerName]) profileRatings[peerName] = [];
       profileRatings[peerName].unshift({ rating, feedback: ratingFeedback, by: myId, date: new Date().toISOString(), roomId });
       localStorage.setItem(profileKey, JSON.stringify(profileRatings));
+
+      // POST to backend API
+      try {
+        await fetch(`${API_URL}/users/${encodeURIComponent(peerName)}/rating`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rating,
+            feedback: ratingFeedback,
+            interviewerName: myId,
+            interviewerId: user?.id || null,
+            roomId,
+          }),
+        });
+        console.log('[Rating] Saved to backend');
+      } catch (err) {
+        console.warn('[Rating] Could not save to backend:', err);
+      }
+
+      setRatingSubmitting(false);
       setRatingSubmitted(true);
     };
 
@@ -557,12 +678,34 @@ export default function DualAgentInterviewRoom() {
                   style={{ width:'100%', background:'#222a3d', border:'1px solid rgba(70,69,85,0.4)', borderRadius:10, padding:'0.75rem', color:'#dae2fd', fontSize:'0.85rem', outline:'none', resize:'vertical', boxSizing:'border-box', fontFamily:'Inter,sans-serif' }}
                 />
               </div>
-              <button onClick={submitRating} disabled={rating === 0} style={{ width:'100%', padding:'1rem', background: rating > 0 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#2d3449', color: rating > 0 ? '#1d00a5' : '#c7c4d8', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor: rating > 0 ? 'pointer' : 'not-allowed', textTransform:'uppercase', letterSpacing:'0.1em' }}>
-                Submit Rating
+              <button onClick={submitRating} disabled={rating === 0 || ratingSubmitting} style={{ width:'100%', padding:'1rem', background: rating > 0 ? 'linear-gradient(135deg,#4f46e5,#c3c0ff)' : '#2d3449', color: rating > 0 ? '#1d00a5' : '#c7c4d8', border:'none', borderRadius:12, fontWeight:700, fontSize:'0.875rem', cursor: rating > 0 ? 'pointer' : 'not-allowed', textTransform:'uppercase', letterSpacing:'0.1em', opacity: ratingSubmitting ? 0.6 : 1 }}>
+                {ratingSubmitting ? 'Submitting...' : 'Submit Rating'}
               </button>
             </>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // ── Analytics loading screen (candidate) ─────────────────────────────────────
+  if (ended && !isInterviewer && !analytics) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#0b1326', color:'#dae2fd', fontFamily:'Inter,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:'3rem', marginBottom:'1rem', animation:'pulse 2s infinite' }}>📊</div>
+          <h2 style={{ fontSize:'1.75rem', fontWeight:900, letterSpacing:'-0.03em', marginBottom:8 }}>Generating Your Report...</h2>
+          <p style={{ color:'#c7c4d8', maxWidth:400, lineHeight:1.6 }}>Our AI is analyzing your interview performance. This will take just a moment.</p>
+          <div style={{ marginTop:'2rem', display:'flex', justifyContent:'center', gap:8 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width:10, height:10, borderRadius:'50%', background:'#c3c0ff', animation:`bounce 1.2s ${i*0.2}s infinite ease-in-out` }} />
+            ))}
+          </div>
+        </div>
+        <style>{`
+          @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+          @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        `}</style>
       </div>
     );
   }
@@ -727,11 +870,16 @@ export default function DualAgentInterviewRoom() {
 
         {/* ── Side panel ── */}
         <div style={{ width:340, background:'#131b2e', borderLeft:'1px solid rgba(70,69,85,0.2)', display:'flex', flexDirection:'column', flexShrink:0 }}>
-          {/* Panel tabs */}
+          {/* Panel tabs — AI and Chat only (no People tab) */}
           <div style={{ display:'flex', borderBottom:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
             {[['ai','auto_awesome','AI'],['chat','chat_bubble','Chat']].map(([tab,icon,label])=>(
-              <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>{label}
+              <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s', position:'relative' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>
+                <span>{label}</span>
+                {/* Unread badge on Chat tab */}
+                {tab === 'chat' && unreadChat > 0 && (
+                  <span style={{ position:'absolute', top:6, right:'calc(50% - 20px)', minWidth:16, height:16, borderRadius:999, background:'#ef4444', color:'#fff', fontSize:'0.5rem', fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', animation:'pulse 2s infinite' }}>{unreadChat > 9 ? '9+' : unreadChat}</span>
+                )}
               </button>
             ))}
           </div>
@@ -880,7 +1028,6 @@ export default function DualAgentInterviewRoom() {
             </div>
           )}
 
-
         </div>
       </div>
 
@@ -931,8 +1078,8 @@ export default function DualAgentInterviewRoom() {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(78,222,163,0.4)} 50%{opacity:0.7;box-shadow:0 0 0 6px rgba(78,222,163,0)} }
         @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
       `}</style>
     </div>
   );
 }
-
