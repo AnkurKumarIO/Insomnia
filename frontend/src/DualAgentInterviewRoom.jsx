@@ -73,7 +73,7 @@ export default function DualAgentInterviewRoom() {
   const [camOn,             setCamOn]             = useState(true);
   const [sharing,           setSharing]           = useState(false);
   const [handRaised,        setHandRaised]        = useState(false);
-  const [sidePanel,         setSidePanel]         = useState('ai');
+  const [sidePanel,         setSidePanel]         = useState(isInterviewer ? 'ai' : 'chat');
   const [elapsed,           setElapsed]           = useState(0);
   const [chatMessages,      setChatMessages]      = useState([]);
   const [chatInput,         setChatInput]         = useState('');
@@ -908,9 +908,9 @@ export default function DualAgentInterviewRoom() {
 
         {/* ── Side panel ── */}
         <div style={{ width:340, background:'#131b2e', borderLeft:'1px solid rgba(70,69,85,0.2)', display:'flex', flexDirection:'column', flexShrink:0 }}>
-          {/* Panel tabs — AI and Chat only (no People tab) */}
+          {/* Panel tabs — AI (interviewer only) and Chat */}
           <div style={{ display:'flex', borderBottom:'1px solid rgba(70,69,85,0.2)', flexShrink:0 }}>
-            {[['ai','auto_awesome','AI'],['chat','chat_bubble','Chat']].map(([tab,icon,label])=>(
+            {(isInterviewer ? [['ai','auto_awesome','AI'], ['chat','chat_bubble','Chat']] : [['chat','chat_bubble','Chat']]).map(([tab,icon,label])=>(
               <button key={tab} onClick={()=>setSidePanel(tab)} style={{ flex:1, padding:'0.75rem 0.5rem', background: sidePanel===tab ? '#222a3d' : 'transparent', color: sidePanel===tab ? '#c3c0ff' : '#c7c4d8', border:'none', borderBottom: sidePanel===tab ? '2px solid #4f46e5' : '2px solid transparent', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', transition:'all 0.2s', position:'relative' }}>
                 <span className="material-symbols-outlined" style={{ fontSize:18 }}>{icon}</span>
                 <span>{label}</span>
