@@ -19,6 +19,88 @@ const FEED = [
   { icon: 'event_available', color: '#ffb95f', title: '12 Interviews Completed', desc: 'Mock interview session for "Fintech Role" concluded successfully.', time: '4 hours ago' },
 ];
 
+const FULL_FEED = [
+  { icon: 'person_add',        color: '#4edea3', title: 'New Alumni Verified',          desc: 'David K. (Senior UI Designer at Airbnb) has joined the mentor pool.',                    time: '2 minutes ago',  category: 'Alumni' },
+  { icon: 'campaign',          color: '#c3c0ff', title: 'Placement Drive Scheduled',    desc: 'Microsoft Recruitment Drive for Batch 2024 set for Oct 15th.',                          time: '1 hour ago',     category: 'Placement' },
+  { icon: 'event_available',   color: '#ffb95f', title: '12 Interviews Completed',      desc: 'Mock interview session for "Fintech Role" concluded successfully.',                      time: '4 hours ago',    category: 'Interview' },
+  { icon: 'verified_user',     color: '#4edea3', title: 'Student Profile Approved',     desc: 'Priya Sharma (CS, 2024) has been verified and granted portal access.',                  time: '5 hours ago',    category: 'Student' },
+  { icon: 'school',            color: '#c3c0ff', title: 'New Student Registration',     desc: 'Arjun Malhotra submitted documents for B.Tech CS verification.',                        time: '6 hours ago',    category: 'Student' },
+  { icon: 'handshake',         color: '#4edea3', title: 'Mentorship Match Created',     desc: 'Rohan Verma (Student) matched with Neha Gupta (Alumni, Google).',                      time: '8 hours ago',    category: 'Mentorship' },
+  { icon: 'business_center',   color: '#ffb95f', title: 'New Recruiter Onboarded',      desc: 'Infosys Ltd. added as a verified recruiter for Batch 2024 placements.',                 time: '10 hours ago',   category: 'Placement' },
+  { icon: 'psychology',        color: '#c3c0ff', title: 'Alumni Mentor Application',    desc: 'Dr. Elena Rodriguez (PhD AI Ethics, Batch 2015) applied for mentor verification.',      time: '12 hours ago',   category: 'Alumni' },
+  { icon: 'workspace_premium', color: '#ffb95f', title: 'Placement Record Achieved',    desc: 'CS Department hit 94% placement rate — highest in 5 years.',                           time: '1 day ago',      category: 'Placement' },
+  { icon: 'event_repeat',      color: '#4edea3', title: 'Interview Rescheduled',        desc: 'Mock interview for Kavya Nair rescheduled to Oct 18th at 3:00 PM.',                     time: '1 day ago',      category: 'Interview' },
+  { icon: 'group_add',         color: '#c3c0ff', title: 'Batch 2025 Onboarding',        desc: '47 new students from Batch 2025 completed profile setup.',                              time: '2 days ago',     category: 'Student' },
+  { icon: 'star',              color: '#ffb95f', title: 'Top Mentor Recognised',        desc: 'Amit Joshi (Alumni, Microsoft) rated 4.9/5 across 32 mentorship sessions.',             time: '2 days ago',     category: 'Mentorship' },
+  { icon: 'notifications_active', color: '#4edea3', title: 'Drive Reminder Sent',       desc: 'Automated reminder sent to 120 eligible students for Google Drive on Oct 20th.',        time: '3 days ago',     category: 'Placement' },
+  { icon: 'cancel',            color: '#ffb4ab', title: 'Application Rejected',         desc: 'Alumni application from unverified account flagged and rejected by system.',             time: '3 days ago',     category: 'Alumni' },
+  { icon: 'analytics',         color: '#c3c0ff', title: 'Weekly Report Generated',      desc: 'Placement analytics report for Week 41 auto-generated and archived.',                   time: '4 days ago',     category: 'System' },
+];
+
+const CATEGORY_COLORS = {
+  Alumni:     '#4edea3',
+  Placement:  '#c3c0ff',
+  Interview:  '#ffb95f',
+  Student:    '#60a5fa',
+  Mentorship: '#f472b6',
+  System:     '#94a3b8',
+};
+
+function ActivityFeedTab() {
+  const [filter, setFilter] = React.useState('All');
+  const categories = ['All', 'Alumni', 'Student', 'Placement', 'Interview', 'Mentorship', 'System'];
+  const filtered = filter === 'All' ? FULL_FEED : FULL_FEED.filter(f => f.category === filter);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Activity Feed</h2>
+          <p style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 4 }}>All portal events — verifications, placements, interviews and more.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setFilter(cat)} style={{
+              padding: '0.3rem 0.75rem', borderRadius: 20, fontSize: '0.65rem', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer', border: 'none',
+              background: filter === cat ? (CATEGORY_COLORS[cat] || '#c3c0ff') : 'rgba(70,69,85,0.2)',
+              color: filter === cat ? '#0b1326' : '#c7c4d8',
+              transition: 'all 0.2s',
+            }}>{cat}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Feed list */}
+      <div style={{ background: '#131b2e', borderRadius: 20, padding: '1.5rem', position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 35, top: 24, bottom: 24, width: 1, background: 'rgba(70,69,85,0.25)' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {filtered.map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, position: 'relative' }}>
+              {/* Icon dot */}
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${f.color}20`, border: `1px solid ${f.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1, marginTop: 2 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 12, color: f.color, fontVariationSettings: "'FILL' 1" }}>{f.icon}</span>
+              </div>
+              {/* Content */}
+              <div style={{ flex: 1, background: '#171f33', borderRadius: 12, padding: '0.875rem 1rem', borderLeft: `3px solid ${f.color}40` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#dae2fd' }}>{f.title}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: `${CATEGORY_COLORS[f.category]}18`, color: CATEGORY_COLORS[f.category], padding: '0.15rem 0.5rem', borderRadius: 6, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{f.category}</span>
+                    <span style={{ fontSize: '0.6rem', color: 'rgba(199,196,216,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{f.time}</span>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#c7c4d8', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const HEATMAP = [
   { dept: 'CS Dept',  vals: [92,84,95,62,48] },
   { dept: 'IT Dept',  vals: [78,88,42,81,24] },
@@ -180,6 +262,7 @@ export default function TNPDashboard() {
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
     { icon: 'rule',            label: 'Verification Queue', tab: 'queue' },
+    { icon: 'dynamic_feed',    label: 'Activity Feed',      tab: 'activity' },
     { icon: 'analytics',       label: 'Analytics',          tab: 'analytics' },
     { icon: 'policy',          label: 'Compliance & Log',   tab: 'compliance' },
     { icon: 'settings_suggest',label: 'System Settings',    tab: 'settings' },
@@ -254,6 +337,7 @@ export default function TNPDashboard() {
       );
     }
     if (activeTab === 'analytics') return <AnalyticsTab />;
+    if (activeTab === 'activity') return <ActivityFeedTab />;
     if (activeTab === 'compliance') return <ComplianceTab logRole={logRole} setLogRole={setLogRole} logAction={logAction} setLogAction={setLogAction} logDate={logDate} setLogDate={setLogDate} />;
     if (activeTab === 'settings') return <SystemSettingsTab commSettings={commSettings} setCommSettings={setCommSettings} roles={roles} setRoles={setRoles} />;
     return null; // home rendered below
@@ -580,7 +664,7 @@ export default function TNPDashboard() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setActiveTab('compliance')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                <button onClick={() => setActiveTab('activity')} style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', background: 'transparent', border: '1px solid rgba(70,69,85,0.2)', borderRadius: 12, color: '#c7c4d8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
                   View Full History
                 </button>
               </div>
