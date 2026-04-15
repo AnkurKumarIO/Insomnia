@@ -7,7 +7,10 @@ const dotenv  = require('dotenv');
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+}));
 app.use(express.json());
 
 // ── Routes (mounted at root, no /api prefix) ──────────────────────────────────
@@ -25,7 +28,12 @@ app.use('/meet',          require('./routes/meetRoutes'));
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: {
+    origin: process.env.FRONTEND_URL || '*',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
 });
 require('./socket/interviewRoom')(io);
 

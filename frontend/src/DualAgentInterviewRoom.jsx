@@ -1,40 +1,12 @@
-﻿import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './context/AuthContext';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+const API_URL    = import.meta.env.VITE_API_URL    || 'http://localhost:5001';
 
-// Multiple STUN + free public TURN servers for reliable NAT traversal
-const ICE = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    // Free TURN servers (open-relay) — critical for same-machine / symmetric NAT
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
-
-// AI whisperer suggestion pool — rotates automatically
 const WHISPERER_POOL = [
   'Ask them how they handled state management or component lifecycles.',
   'Probe deeper: "Can you walk me through a time you debugged a production issue?"',
@@ -52,10 +24,7 @@ function useAnimatedMetric(target, speed = 0.06) {
   useEffect(() => { ref.current = target; }, [target]);
   useEffect(() => {
     const id = setInterval(() => {
-      setVal(p => {
-        const d = ref.current - p;
-        return Math.abs(d) < 0.5 ? ref.current : p + d * speed;
-      });
+      setVal(p => { const d = ref.current - p; return Math.abs(d) < 0.5 ? ref.current : p + d * speed; });
     }, 50);
     return () => clearInterval(id);
   }, [speed]);
@@ -72,352 +41,294 @@ export default function DualAgentInterviewRoom() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
-  // Identity: ?name=Alice > logged-in user > prompt
-  const myId = (() => {
+  // Identity computed once — ref never triggers re-renders
+  const myIdRef = useRef(null);
+  if (!myIdRef.current) {
     const fromUrl = searchParams.get('name');
-    if (fromUrl) return fromUrl;
-    if (user?.name) return user.name;
-    // fallback: prompt once and store in sessionStorage per tab
-    const key = `alumnex_guest_name_${roomId}`;
-    let stored = sessionStorage.getItem(key);
-    if (!stored) {
-      stored = window.prompt('Enter your name to join the interview:') || `Guest-${Math.floor(Math.random() * 1000)}`;
-      sessionStorage.setItem(key, stored);
+    if (fromUrl) {
+      myIdRef.current = fromUrl;
+    } else if (user?.name) {
+      myIdRef.current = user.name;
+    } else {
+      const key = `alumnex_guest_${roomId}`;
+      let stored = sessionStorage.getItem(key);
+      if (!stored) {
+        stored = window.prompt('Enter your name to join:') || `Guest-${Math.floor(Math.random() * 9000) + 1000}`;
+        sessionStorage.setItem(key, stored);
+      }
+      myIdRef.current = stored;
     }
-    return stored;
-  })();
+  }
+  const myId = myIdRef.current;
 
-  // ── Connection ──────────────────────────────────────────────────────────
-  // ── Connection ──────────────────────────────────────────────────────────
-  const [isConnected, setIsConnected]   = useState(false);
-  const [socketPeerPresent, setSocketPeerPresent] = useState(false); // Someone else in the socket room
-  const [videoConnected, setVideoConnected] = useState(false);     // Real WebRTC track received
-  const [peerName, setPeerName]         = useState('Peer');
-
-  // ── Controls ────────────────────────────────────────────────────────────
-  const [micOn, setMicOn]       = useState(true);
-  const [camOn, setCamOn]       = useState(true);
-  const [sharing, setSharing]   = useState(false);   // screen share active
-  const [handRaised, setHandRaised] = useState(false);
-  const [sidePanel, setSidePanel]   = useState('ai'); // 'ai' | 'chat' | 'participants'
-  const [elapsed, setElapsed]   = useState(0);
-
-  // ── Chat ────────────────────────────────────────────────────────────────
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput]       = useState('');
-
-  // ── AI Whisperer ────────────────────────────────────────────────────────
-  const [hints, setHints]               = useState([]);
-  const [aiInput, setAiInput]           = useState('');
+  // UI State
+  const [isConnected,       setIsConnected]       = useState(false);
+  const [socketPeerPresent, setSocketPeerPresent] = useState(false);
+  const [videoConnected,    setVideoConnected]    = useState(false);
+  const [peerName,          setPeerName]          = useState('Peer');
+  const [micOn,             setMicOn]             = useState(true);
+  const [camOn,             setCamOn]             = useState(true);
+  const [sharing,           setSharing]           = useState(false);
+  const [handRaised,        setHandRaised]        = useState(false);
+  const [sidePanel,         setSidePanel]         = useState('ai');
+  const [elapsed,           setElapsed]           = useState(0);
+  const [chatMessages,      setChatMessages]      = useState([]);
+  const [chatInput,         setChatInput]         = useState('');
+  const [hints,             setHints]             = useState([]);
+  const [aiInput,           setAiInput]           = useState('');
   const [currentSuggestion, setCurrentSuggestion] = useState(WHISPERER_POOL[0]);
-  const [suggestionIdx, setSuggestionIdx] = useState(0);
-  const [factChecks, setFactChecks]     = useState([
-    { claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' },
-  ]);
-  const [factInput, setFactInput]       = useState('');
-  const [coachingTip, setCoachingTip]   = useState('');
-  const [profileSummary, setProfileSummary] = useState(null);
+  const [suggestionIdx,     setSuggestionIdx]     = useState(0);
+  const [factChecks,        setFactChecks]        = useState([{ claim: 'GPT-4 benchmark (2023)', status: 'confirmed', pct: '99.8%' }]);
+  const [factInput,         setFactInput]         = useState('');
+  const [coachingTip,       setCoachingTip]       = useState('');
+  const [profileSummary,    setProfileSummary]    = useState(null);
+  const [confT,             setConfT]             = useState(72);
+  const [clarT,             setClarT]             = useState(65);
+  const [energyT,           setEnergyT]           = useState(80);
+  const [ended,             setEnded]             = useState(false);
+  const [analytics,         setAnalytics]         = useState(null);
 
-  // ── Live metrics ────────────────────────────────────────────────────────
-  const [confT, setConfT]   = useState(72);
-  const [clarT, setClarT]   = useState(65);
-  const [energyT, setEnergyT] = useState(80);
   const confidence = useAnimatedMetric(confT);
   const clarity    = useAnimatedMetric(clarT);
   const energy     = useAnimatedMetric(energyT);
 
-  // ── Post-session ────────────────────────────────────────────────────────
-  const [ended, setEnded]       = useState(false);
-  const [analytics, setAnalytics] = useState(null);
+  // Refs — mutable, never cause re-renders
+  const localVideoRef   = useRef(null);
+  const remoteVideoRef  = useRef(null);
+  const screenVideoRef  = useRef(null);
+  const socketRef       = useRef(null);
+  const pcRef           = useRef(null);
+  const streamRef       = useRef(null);
+  const screenStreamRef = useRef(null);
+  const timerRef        = useRef(null);
+  const metricsRef      = useRef(null);
+  const suggestionRef   = useRef(null);
+  const chatEndRef      = useRef(null);
+  const iceBuf          = useRef([]);
+  const peerReadyRef    = useRef(false);
 
-  // ── Refs ────────────────────────────────────────────────────────────────
-  const localVideoRef  = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const screenVideoRef = useRef(null);   // shows local screen share preview
-  const socketRef      = useRef(null);
-  const pcRef          = useRef(null);
-  const streamRef      = useRef(null);   // camera stream
-  const screenStreamRef = useRef(null);  // screen stream
-  const timerRef       = useRef(null);
-  const metricsRef     = useRef(null);
-  const suggestionRef  = useRef(null);
-  const makingOffer    = useRef(false);
-  const chatEndRef     = useRef(null);
-  const iceCandidateBuffer = useRef([]); // buffer candidates until remoteDescription is set
-  const sendOfferRef       = useRef(null);   // ref so initPC can call sendOffer without circular dep
-  const socketPeerPresentRef = useRef(false); // track peer presence across async boundaries
-
-  // ── Drain buffered ICE candidates after remoteDescription is set ─────────
-  const drainIceBuffer = useCallback(async () => {
-    const pc = pcRef.current;
-    if (!pc || !pc.remoteDescription) return;
-    const buf = iceCandidateBuffer.current.splice(0);
-    for (const c of buf) {
-      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
-    }
-  }, []);
-
-  // ── WebRTC PC Initialization ──────────────────────────────────────────
-  const initPC = useCallback(() => {
-    if (pcRef.current) return pcRef.current;
-    console.log('[WebRTC] Initializing PeerConnection');
-    const pc = new RTCPeerConnection(ICE);
-    pcRef.current = pc;
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socketRef.current?.emit('ice-candidate', roomId, e.candidate);
-    };
-
-    pc.ontrack = (e) => {
-      console.log('[WebRTC] Remote track received:', e.track.kind);
-      if (e.streams && e.streams[0]) {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = e.streams[0];
-          remoteVideoRef.current.muted = false; // MUST be unmuted for remote audio
-          remoteVideoRef.current.play().catch(() => {
-            // Autoplay blocked — user interaction needed, handled by UI
-          });
-        }
-        setVideoConnected(true);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      console.log('[WebRTC] Connection state:', state);
-      if (state === 'connected') setVideoConnected(true);
-      // Only mark disconnected on hard failure — 'disconnected' is transient
-      if (state === 'failed') {
-        setVideoConnected(false);
-        // Try ICE restart on failure
-        console.log('[WebRTC] Connection failed — attempting ICE restart');
-        sendOfferRef.current?.();
-      }
-      if (state === 'closed') setVideoConnected(false);
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC] ICE state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-        setVideoConnected(true);
-      }
-    };
-
-    // onnegotiationneeded intentionally not used — offer fires only on user-connected
-    return pc;
-  }, [roomId]);
-
-  // ── Explicit offer sender — called only when peer is confirmed present ──
-  const sendOffer = useCallback(async () => {
-    const pc = pcRef.current;
-    if (!pc) return;
-    try {
-      console.log('[WebRTC] Sending offer to peer');
-      makingOffer.current = true;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socketRef.current?.emit('offer', roomId, pc.localDescription);
-    } catch (err) {
-      console.error('[WebRTC] sendOffer error:', err);
-    } finally {
-      makingOffer.current = false;
-    }
-  }, [roomId]);
-
-  // Keep ref in sync so initPC's onconnectionstatechange can call it without stale closure
-  useEffect(() => { sendOfferRef.current = sendOffer; }, [sendOffer]);
-
-  // ── Init ────────────────────────────────────────────────────────────────
+  // Single effect — runs ONCE on mount, empty deps []
   useEffect(() => {
-    console.log('[Room] Entering room:', roomId);
-    const socket = io(`${SOCKET_URL}/interview`);
-    socketRef.current = socket;
+    let pc = null;
+    let socket = null;
+    let destroyed = false;
 
-    // 1. Initialize PC
-    const pc = initPC();
+    async function doOffer() {
+      if (!pc || pc.signalingState === 'closed') return;
+      try {
+        console.log('[WebRTC] Creating offer, state:', pc.signalingState);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket?.emit('offer', roomId, pc.localDescription);
+        console.log('[WebRTC] Offer sent');
+      } catch (err) { console.error('[WebRTC] doOffer error:', err); }
+    }
 
-    // 2. Start Camera — add tracks, then check if peer already waiting
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        console.log('[Media] Camera/Mic access granted');
+    async function flushIceBuf() {
+      if (!pc?.remoteDescription?.type) return;
+      const buf = iceBuf.current.splice(0);
+      for (const c of buf) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
+      }
+      if (buf.length) console.log('[WebRTC] Flushed', buf.length, 'buffered ICE candidates');
+    }
+
+    async function start() {
+      // 1. Fetch ICE config
+      let iceConfig = {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'turn:openrelay.metered.ca:80',                username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443',               username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        ],
+        iceCandidatePoolSize: 10,
+      };
+      try {
+        const r = await fetch(`${API_URL}/meet/ice-config`);
+        if (r.ok) { iceConfig = await r.json(); console.log('[ICE] Loaded', iceConfig.iceServers.length, 'servers'); }
+      } catch (_) { console.warn('[ICE] Using defaults'); }
+
+      if (destroyed) return;
+
+      // 2. Create PeerConnection
+      pc = new RTCPeerConnection(iceConfig);
+      pcRef.current = pc;
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) socket?.emit('ice-candidate', roomId, e.candidate);
+      };
+
+      pc.ontrack = (e) => {
+        console.log('[WebRTC] ontrack:', e.track.kind, 'streams:', e.streams.length);
+        if (e.streams?.[0] && remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = e.streams[0];
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.play().catch(() => {});
+          setVideoConnected(true);
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[WebRTC] connectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') setVideoConnected(true);
+        if (pc.connectionState === 'failed')    { setVideoConnected(false); doOffer(); }
+        if (pc.connectionState === 'closed')    setVideoConnected(false);
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WebRTC] iceState:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setVideoConnected(true);
+        }
+      };
+
+      // 3. Get camera + mic
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (destroyed) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          localVideoRef.current.muted = true; // always mute local to avoid echo
-        }
+        if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.muted = true; }
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
-        // If peer already joined before camera was ready, send offer now
-        if (socketPeerPresentRef.current) {
-          console.log('[Media] Peer already present — sending offer after camera ready');
-          sendOffer();
-        }
-      })
-      .catch(err => console.error('[Media] Camera access denied:', err));
+        console.log('[Media] Tracks added to PC');
+        if (peerReadyRef.current) { await doOffer(); }
+      } catch (err) { console.error('[Media] getUserMedia failed:', err); }
 
-    // 3. Socket Events
-    socket.on('connect', () => {
-      setIsConnected(true);
-      socket.emit('join-room', roomId, myId);
-    });
-
-    socket.on('user-connected', async (uid) => {
-      console.log('[Socket] Peer joined:', uid);
-      setPeerName(uid);
-      setSocketPeerPresent(true);
-      socketPeerPresentRef.current = true;
-      // Only send offer if our camera stream is already ready (tracks added to PC)
-      // If not ready yet, the getUserMedia .then() above will send it
-      if (streamRef.current) {
-        await new Promise(r => setTimeout(r, 300));
-        await sendOffer();
-      } else {
-        console.log('[Socket] Camera not ready yet — offer will fire after getUserMedia resolves');
-      }
-    });
-
-    socket.on('user-disconnected', () => {
-      console.log('[Socket] Peer left');
-      setSocketPeerPresent(false);
-      socketPeerPresentRef.current = false;
-      setVideoConnected(false);
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    });
-
-    // 4. Signaling
-    socket.on('offer', async (offer) => {
-      console.log('[WebRTC] Received offer, state:', pcRef.current?.signalingState);
-      const pc = pcRef.current; if (!pc) return;
-      try {
-        if (pc.signalingState !== 'stable') {
-          await pc.setLocalDescription({ type: 'rollback' });
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        await drainIceBuffer(); // flush buffered candidates now that remote is set
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('answer', roomId, pc.localDescription);
-        console.log('[WebRTC] Answer sent');
-      } catch (err) {
-        console.error('[WebRTC] Offer handling error:', err);
-      }
-    });
-
-    socket.on('answer', async (ans) => {
-      console.log('[WebRTC] Received answer');
-      const pc = pcRef.current; if (!pc) return;
-      try {
-        if (pc.signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(ans));
-          await drainIceBuffer(); // flush buffered candidates now that remote is set
-        }
-      } catch (err) {
-        console.error('[WebRTC] Answer handling error:', err);
-      }
-    });
-
-    socket.on('ice-candidate', async (c) => {
-      try {
-        const pc = pcRef.current;
-        if (!pc) return;
-        if (pc.remoteDescription && pc.remoteDescription.type) {
-          await pc.addIceCandidate(new RTCIceCandidate(c));
-        } else {
-          // Buffer it — remoteDescription not set yet
-          console.log('[WebRTC] Buffering ICE candidate');
-          iceCandidateBuffer.current.push(c);
-        }
-      } catch (_) {}
-    });
-
-    // Agents feed ... existing logic
-    socket.on('whisperer_feed', (data) => {
-      const hint = typeof data === 'string' ? data : data.hint;
-      const category = typeof data === 'object' ? data.category : 'general';
-      setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
-    });
-
-    socket.on('speech_coaching', (result) => {
-      setCoachingTip(result.coaching_tip || '');
-      if (result.confidence) setConfT(result.confidence);
-      if (result.clarity)    setClarT(result.clarity);
-      if (result.energy)     setEnergyT(result.energy);
-    });
-
-    socket.on('fact_check_result', ({ claim, result }) => {
-      setFactChecks(p => [
-        { claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note },
-        ...p.slice(0, 4),
-      ]);
-      setHints(p => [{
-        text: `🔍 Fact-check: "${claim.slice(0, 50)}" — ${result.verified ? '✓ Confirmed' : '⚠ Disputed'} (${result.confidence}%)`,
-        category: 'fact-check',
-        time: new Date().toLocaleTimeString(),
-        type: result.verified ? 'fact-ok' : 'fact-warn',
-      }, ...p]);
-    });
-
-    socket.on('coach_metrics_update', (m) => {
-      if (m.confidence !== undefined) setConfT(m.confidence);
-      if (m.clarity    !== undefined) setClarT(m.clarity);
-      if (m.energy     !== undefined) setEnergyT(m.energy);
-    });
-
-    socket.on('chat_message', (msg) => {
-      setChatMessages(p => [...p, msg]);
-    });
-
-    socket.on('hand_raised', (uid) => {
-      setHints(p => [{ text: `✋ ${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]);
-    });
-
-    // Timers
-    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-    metricsRef.current = setInterval(() => {
-      const wpm = Math.floor(Math.random() * 80 + 100);
-      const fillers = Math.floor(Math.random() * 5);
-      socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
-    }, 3000);
-    suggestionRef.current = setInterval(() => {
-      setSuggestionIdx(i => {
-        const next = (i + 1) % WHISPERER_POOL.length;
-        setCurrentSuggestion(WHISPERER_POOL[next]);
-        return next;
+      // 4. Connect socket — allow polling fallback for restrictive hosts (Render, Railway etc.)
+      socket = io(`${SOCKET_URL}/interview`, {
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
       });
-    }, 12000);
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('[Socket] Connected as', myId);
+        setIsConnected(true);
+        socket.emit('join-room', roomId, myId);
+      });
+
+      socket.on('disconnect', () => setIsConnected(false));
+
+      socket.on('user-connected', async (uid) => {
+        console.log('[Socket] Peer joined:', uid);
+        setPeerName(uid);
+        setSocketPeerPresent(true);
+        peerReadyRef.current = true;
+        if (streamRef.current) {
+          await new Promise(r => setTimeout(r, 300));
+          await doOffer();
+        }
+      });
+
+      socket.on('user-disconnected', () => {
+        console.log('[Socket] Peer left');
+        setSocketPeerPresent(false);
+        peerReadyRef.current = false;
+        setVideoConnected(false);
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      });
+
+      socket.on('offer', async (offer) => {
+        console.log('[WebRTC] Got offer, signalingState:', pc.signalingState);
+        try {
+          if (pc.signalingState !== 'stable') await pc.setLocalDescription({ type: 'rollback' });
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          await flushIceBuf();
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('answer', roomId, pc.localDescription);
+          console.log('[WebRTC] Answer sent');
+        } catch (err) { console.error('[WebRTC] offer handler:', err); }
+      });
+
+      socket.on('answer', async (ans) => {
+        console.log('[WebRTC] Got answer, signalingState:', pc.signalingState);
+        try {
+          if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(ans));
+            await flushIceBuf();
+          }
+        } catch (err) { console.error('[WebRTC] answer handler:', err); }
+      });
+
+      socket.on('ice-candidate', async (c) => {
+        if (!pc) return;
+        if (pc.remoteDescription?.type) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); }
+          catch (_) {}
+        } else {
+          iceBuf.current.push(c);
+        }
+      });
+
+      // AI agent events
+      socket.on('whisperer_feed', (data) => {
+        const hint = typeof data === 'string' ? data : data.hint;
+        const category = typeof data === 'object' ? data.category : 'general';
+        setHints(p => [{ text: hint, category, time: new Date().toLocaleTimeString(), type: 'ai' }, ...p]);
+      });
+      socket.on('speech_coaching', (result) => {
+        setCoachingTip(result.coaching_tip || '');
+        if (result.confidence) setConfT(result.confidence);
+        if (result.clarity)    setClarT(result.clarity);
+        if (result.energy)     setEnergyT(result.energy);
+      });
+      socket.on('fact_check_result', ({ claim, result }) => {
+        setFactChecks(p => [{ claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note }, ...p.slice(0, 4)]);
+        setHints(p => [{ text: `Fact-check: "${claim.slice(0, 50)}" - ${result.verified ? 'Confirmed' : 'Disputed'} (${result.confidence}%)`, category: 'fact-check', time: new Date().toLocaleTimeString(), type: result.verified ? 'fact-ok' : 'fact-warn' }, ...p]);
+      });
+      socket.on('coach_metrics_update', (m) => {
+        if (m.confidence !== undefined) setConfT(m.confidence);
+        if (m.clarity    !== undefined) setClarT(m.clarity);
+        if (m.energy     !== undefined) setEnergyT(m.energy);
+      });
+      socket.on('chat_message', (msg) => setChatMessages(p => [...p, msg]));
+      socket.on('hand_raised',  (uid) => setHints(p => [{ text: `${uid} raised their hand`, time: new Date().toLocaleTimeString(), type: 'system' }, ...p]));
+
+      // Timers
+      timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+      metricsRef.current = setInterval(() => {
+        socket.emit('speech_metrics', roomId, { wordsPerMinute: Math.floor(Math.random() * 80 + 100), fillerCount: Math.floor(Math.random() * 5), pauseCount: 2 });
+      }, 3000);
+      suggestionRef.current = setInterval(() => {
+        setSuggestionIdx(i => { const next = (i + 1) % WHISPERER_POOL.length; setCurrentSuggestion(WHISPERER_POOL[next]); return next; });
+      }, 12000);
+    }
+
+    start();
 
     return () => {
-      console.log('[Room] Cleaning up');
-      socket.disconnect();
-      pcRef.current?.close();
+      destroyed = true;
+      console.log('[Room] Cleanup');
+      socket?.disconnect();
+      pc?.close();
       pcRef.current = null;
-      iceCandidateBuffer.current = [];
+      iceBuf.current = [];
       streamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       clearInterval(timerRef.current);
       clearInterval(metricsRef.current);
       clearInterval(suggestionRef.current);
     };
-  }, [roomId, initPC, sendOffer, drainIceBuffer, myId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Screen share ─────────────────────────────────────────────────────────
-  const toggleScreenShare = useCallback(async () => {
+  // Screen share
+  const toggleScreenShare = async () => {
     const pc = pcRef.current;
     if (!sharing) {
       try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
-
-        // Show local preview
         if (screenVideoRef.current) screenVideoRef.current.srcObject = screenStream;
-
-        // Replace video track in peer connection
         if (pc) {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (sender) await sender.replaceTrack(screenTrack);
         }
-
-        // When user stops sharing via browser UI
         screenTrack.onended = () => stopScreenShare();
         setSharing(true);
       } catch (e) {
@@ -426,58 +337,56 @@ export default function DualAgentInterviewRoom() {
     } else {
       stopScreenShare();
     }
-  }, [sharing, roomId]);
+  };
 
-  const stopScreenShare = useCallback(async () => {
+  const stopScreenShare = async () => {
     const pc = pcRef.current;
     screenStreamRef.current?.getTracks().forEach(t => t.stop());
     screenStreamRef.current = null;
     if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
-
-    // Restore camera track
     if (pc && streamRef.current) {
       const camTrack = streamRef.current.getVideoTracks()[0];
       const sender = pc.getSenders().find(s => s.track?.kind === 'video');
       if (sender && camTrack) await sender.replaceTrack(camTrack);
     }
     setSharing(false);
-  }, []);
+  };
 
-  // ── Controls ─────────────────────────────────────────────────────────────
   const toggleMic = () => {
     streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
     setMicOn(m => !m);
   };
+
   const toggleCam = () => {
     streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
     setCamOn(c => !c);
   };
+
   const toggleHand = () => {
     const next = !handRaised;
     setHandRaised(next);
     if (next) socketRef.current?.emit('hand_raised', roomId, myId);
   };
 
-  // ── AI Whisperer ──────────────────────────────────────────────────────────
   const sendTranscript = (text) => {
     if (!text.trim()) return;
     socketRef.current?.emit('transcript_chunk', roomId, text);
   };
+
   const triggerHint = () => sendTranscript(currentSuggestion);
+
   const nextSuggestion = () => {
     const next = (suggestionIdx + 1) % WHISPERER_POOL.length;
     setSuggestionIdx(next);
     setCurrentSuggestion(WHISPERER_POOL[next]);
   };
 
-  // ── Agent 7: Fact check trigger ───────────────────────────────────────────
   const triggerFactCheck = (claim) => {
     if (!claim.trim()) return;
     socketRef.current?.emit('fact_check_request', roomId, claim);
     setFactInput('');
   };
 
-  // ── Agent 5: Load peer profile summary ────────────────────────────────────
   const loadProfileSummary = async () => {
     try {
       const data = await api.summarizeProfile({ name: peerName, role: 'STUDENT' });
@@ -485,7 +394,6 @@ export default function DualAgentInterviewRoom() {
     } catch (e) { console.error(e); }
   };
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!chatInput.trim()) return;
     const msg = { from: myId, text: chatInput, time: new Date().toLocaleTimeString() };
@@ -494,7 +402,6 @@ export default function DualAgentInterviewRoom() {
     setChatInput('');
   };
 
-  // ── End session ───────────────────────────────────────────────────────────
   const endSession = async () => {
     clearInterval(timerRef.current);
     clearInterval(metricsRef.current);
@@ -507,8 +414,6 @@ export default function DualAgentInterviewRoom() {
         fullTranscript: hints.filter(h => h.type === 'ai').map(h => h.text).join(' '),
       });
       setAnalytics(data.analytics);
-
-      // ── Save report to localStorage for ProgressAnalytics ──────────────
       try {
         const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
         const HISTORY_KEY = 'alumnex_interview_history';
@@ -517,19 +422,13 @@ export default function DualAgentInterviewRoom() {
         const report = {
           id: `iv-${roomId}-${Date.now()}`,
           label: `Mock Interview #${String(existing.filter(r => r.userId === authUser.id || r.studentName === authUser.name).length + 1).padStart(2, '0')}`,
-          score,
-          date: new Date().toISOString(),
-          userId: authUser.id,
-          studentName: authUser.name,
-          roomId,
-          metrics: { confidence, clarity, energy },
-          analytics: data.analytics,
+          score, date: new Date().toISOString(), userId: authUser.id, studentName: authUser.name, roomId,
+          metrics: { confidence, clarity, energy }, analytics: data.analytics,
           checklist: (data.analytics?.actionable_insights || []).map(t => ({ done: false, text: t })),
         };
-        existing.unshift(report); // newest first
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50))); // keep last 50
-      } catch (saveErr) { console.warn('Could not save interview report:', saveErr); }
-
+        existing.unshift(report);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+      } catch (saveErr) { console.warn('Could not save report:', saveErr); }
     } catch (e) { console.error(e); }
   };
 
