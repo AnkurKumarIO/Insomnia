@@ -13,8 +13,8 @@ import { getAllAlumni, getUserById } from '../lib/db';
 
 // â”€â”€ Inline BookModal for Recommended Mentor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOPICS = [
-  'Mock Interview â€“ General', 'Mock Interview â€“ System Design',
-  'Mock Interview â€“ Frontend', 'Mock Interview â€“ Backend',
+  'Mock Interview — General', 'Mock Interview — System Design',
+  'Mock Interview — Frontend', 'Mock Interview — Backend',
   'Career Guidance', 'Resume Review',
 ];
 
@@ -171,7 +171,7 @@ export default function Dashboard() {
               const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
               const alreadyLive = all.some(n => n.requestId === r.id && n.type === 'live');
               if (!alreadyLive) {
-                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: 'ðŸ”´ Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, read: false, createdAt: new Date().toISOString() });
+                all.unshift({ id: `live-${r.id}`, studentName: user.name, type: 'live', title: '🔴 Interview is Live Now!', message: 'Your mock interview is starting now. Click Join to enter the room.', requestId: r.id, read: false, createdAt: new Date().toISOString() });
                 localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
               }
             } catch {}
@@ -219,7 +219,7 @@ export default function Dashboard() {
 
   const unreadNotifCount = studentNotifs.filter(n => !n.read).length;
 
-  // Profile completion â€” use Gemini result if available, else calculate locally
+  // Profile completion — use Gemini result if available, else calculate locally
   const profileCompletion = aiProfileStrength?.score ?? (() => {
     const checks = [
       !!profileData.bio, !!profileData.linkedin, !!profileData.github,
@@ -371,7 +371,7 @@ export default function Dashboard() {
               <div key={skill} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
                   <span style={{ fontWeight: 500 }}>{skill}</span>
-                  <span style={{ color: '#c7c4d8' }}>â€”</span>
+                  <span style={{ color: '#c7c4d8' }}>—</span>
                 </div>
                 <div style={{ height: 6, background: '#2d3449', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: '70%', background: SKILL_COLORS[idx % SKILL_COLORS.length], borderRadius: 999 }} />
@@ -404,7 +404,7 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-          {/* Resume CTA â€” full width */}
+          {/* Resume CTA — full width */}
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#131b2e' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right,rgba(79,70,229,0.15),transparent)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
@@ -435,7 +435,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recommended Mentor CTA â€” clean button, no profile preview */}
+          {/* Recommended Mentor CTA — clean button, no profile preview */}
           <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.12),rgba(11,19,38,0.9))', borderRadius: 16, padding: '1.5rem 2rem', border: '1px solid rgba(195,192,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -530,7 +530,7 @@ export default function Dashboard() {
             ))}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {/* Search â€” only visible in Directory tab */}
+            {/* Search — only visible in Directory tab */}
             {activeTab === 'directory' && (
               <div style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#c7c4d8' }}>search</span>
@@ -631,9 +631,9 @@ export default function Dashboard() {
                   {/* Profile details */}
                   <div style={{ padding: '1rem' }}>
                     {[
-                      { icon: 'school', label: 'Year', val: savedProfile.year || 'â€”' },
-                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || 'â€”' },
-                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : 'â€”' },
+                      { icon: 'school', label: 'Year', val: savedProfile.year || '—' },
+                      { icon: 'grade', label: 'CGPA', val: savedProfile.cgpa || '—' },
+                      { icon: 'code', label: 'Skills', val: savedProfile.skills?.length ? savedProfile.skills.slice(0,3).join(', ') + (savedProfile.skills.length > 3 ? '...' : '') : '—' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c3c0ff' }}>{item.icon}</span>
