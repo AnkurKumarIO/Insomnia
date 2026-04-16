@@ -161,16 +161,17 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
 
     const cleanedText = normalizeText(extractedText);
     const cleanedWords = wordCount(cleanedText);
-    if (!cleanedText || cleanedWords < 5) {
+    
+    // If we have text, but it's very short, check if we should still try analysis
+    if (!cleanedText || (cleanedWords < 5 && !extractedText.includes('via OCR'))) {
       return res.status(422).json({
         error: 'text_extraction_failed',
-        message: 'Please provide more text content. If this is a scanned resume, upload a clearer PDF or paste the text directly.',
+        message: 'Could not extract enough text from this document. If this is a scanned resume, please ensure the file is clear or paste the text directly.',
       });
     }
     extractedText = cleanedText;
 
-    console.log('Extracted text length:', extractedText.length);
-    console.log('Extracted text preview:', extractedText.substring(0, 200));
+    console.log(`[Resume Analyzer] Proceeding with ${extractedText.length} characters of text.`);
 
     // Send for analysis (analyzeResume will provide analysis)
     let analysis = await analyzeResume(extractedText);

@@ -51,7 +51,10 @@ const extractTextViaOpenAI = async (fileBuffer, mimeType = 'image/jpeg') => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Transcribe all the text from this resume image. Do not include any commentary." },
+            { 
+              type: "text", 
+              text: "Act as a highly accurate OCR engine. Transcribe ALL text from this resume image exactly. Include all contact details, headers, dates, and bullet points. Do not summarize. Do not add any conversational filler like 'Here is the transcript'." 
+            },
             {
               type: "image_url",
               image_url: {
@@ -61,8 +64,8 @@ const extractTextViaOpenAI = async (fileBuffer, mimeType = 'image/jpeg') => {
           ],
         },
       ],
-      max_tokens: 1500,
-      temperature: 0.1,
+      max_tokens: 2500,
+      temperature: 0,
     });
 
     return { text: response.choices[0].message.content };

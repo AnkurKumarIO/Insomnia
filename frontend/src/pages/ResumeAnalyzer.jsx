@@ -377,8 +377,8 @@ export default function ResumeAnalyzer() {
       const data = await api.resumeAnalyze(input, user?.id);
       console.log('API Response:', data);
       if (data.error === 'not_a_resume') {
-        setNotResume({ message: data.message });
-      } else if (data.error === 'scanned_pdf_detected' || data.error === 'text_extraction_failed') {
+        setNotResume({ message: data.message || 'The content provided does not appear to be a resume.' });
+      } else if (data.error === 'scanned_pdf_detected' || data.error === 'text_extraction_failed' || data.error === 'image_ocr_failed') {
         setError(data.message || 'This appears to be a scanned document. Please upload a clear text-based PDF or paste the text directly.');
       } else if (data.error === 'image_resume_unsupported' || data.error === 'image_analysis_unavailable') {
         setError(data.message || 'Image resume analysis is currently disabled. Please paste your resume text instead.');
