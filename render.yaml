@@ -6,8 +6,6 @@ services:
     buildCommand: npm install
     startCommand: node server.js
     envVars:
-      - key: PORT
-        value: 5001
       - key: FRONTEND_URL
         value: https://insomnia-roan.vercel.app
       - key: NODE_ENV

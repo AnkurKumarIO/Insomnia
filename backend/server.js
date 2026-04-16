@@ -102,8 +102,18 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !process.env.PORT) {
+  throw new Error('Missing required PORT environment variable in production');
+}
+
+server.on('error', err => {
+  console.error('Server failed to start:', err);
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
-  const isProduction = process.env.NODE_ENV === 'production';
   const baseUrl = isProduction ? `https://alumnex-backend.onrender.com` : `http://localhost:${PORT}`;
   console.log(`\n🚀 AlumNEX Backend running on ${baseUrl}`);
   console.log(`📡 Socket.io ready on ${baseUrl.replace('http', 'ws')}/interview`);
