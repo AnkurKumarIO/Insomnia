@@ -145,6 +145,29 @@ router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
 
     if (isPdf) {
       extractedText = await extractPdfText(req.file.path);
+      
+      // Fallback for scanned/image-based PDFs: Convert first page to image and run OCR
+      if (!extractedText || extractedText.length < 30) {
+        console.log('PDF text extraction yielded too little text. Falling back to Image OCR via sips...');
+        const imagePath = `${req.file.path}.jpg`;
+        try {
+          await execFileAsync('sips', ['-s', 'format', 'jpeg', req.file.path, '--out', imagePath]);
+          if (fs.existsSync(imagePath)) {
+            let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
+            if (imageResult.unavailable) {
+              imageResult = await extractImageTextLocally(imagePath);
+            }
+            if (!imageResult.unavailable && imageResult.text.length > 30) {
+              extractedText = imageResult.text;
+            }
+          }
+        } catch (fallbackError) {
+          console.error('PDF to Image fallback error:', fallbackError.message);
+        } finally {
+          if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        }
+      }
+      
     } else if (isImage) {
       let imageResult = await extractImageTextViaGroq(req.file.path, mimeType);
       if (imageResult.unavailable) {
