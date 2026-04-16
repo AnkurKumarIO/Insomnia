@@ -145,31 +145,19 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
         const extractedWords = wordCount(extractedText);
         console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native PDF parse.`);
         
-        // Fallback for scanned/image-based PDFs based on actual word count rather than raw char length
-        if (!extractedText || extractedWords < 20) {
-          console.log('[PDF] native text extraction returned too little usable text. Falling back to Gemini OCR.');
-          const geminiResult = await extractTextViaGemini(file.path, 'application/pdf');
-          if (!geminiResult.unavailable) {
-            extractedText = normalizeText(geminiResult.text);
-            const ocrWords = wordCount(extractedText);
-            console.log(`[PDF->Gemini] Extracted ${extractedText.length} chars and ${ocrWords} words via Gemini OCR.`);
-          } else {
-            console.warn('[PDF->Gemini] OCR failed:', geminiResult.reason);
-            return res.status(503).json({
-              error: 'ocr_failed',
-              message: geminiResult.reason || 'OCR processing failed for this PDF.',
-            });
-          }
-        }
-      } else if (isImage) {
-        const geminiResult = await extractTextViaGemini(file.path, mimeType);
-        if (geminiResult.unavailable) {
-          return res.status(503).json({
-            error: 'image_analysis_unavailable',
-            message: geminiResult.reason || 'Image resume analysis failed.',
+        // No longer using Gemini fallout. If native extract fails, it's likely a scanned PDF.
+        if (!extractedText || extractedWords < 15) {
+          return res.status(422).json({
+            error: 'scanned_pdf_detected',
+            message: 'This appears to be a scanned PDF or contains too little text. Please upload a text-based resume or paste the text directly.',
           });
         }
-        extractedText = geminiResult.text;
+      } else if (isImage) {
+        // As per request, Gemini is no longer used for resumes.
+        return res.status(422).json({
+          error: 'image_resume_unsupported',
+          message: 'Resume analysis currently supports text-based PDFs and direct text paste. Please paste your resume text instead of uploading an image.',
+        });
       } else {
         // Try to read as plain text
         try { 

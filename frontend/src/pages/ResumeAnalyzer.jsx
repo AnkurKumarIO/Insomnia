@@ -378,10 +378,10 @@ export default function ResumeAnalyzer() {
       console.log('API Response:', data);
       if (data.error === 'not_a_resume') {
         setNotResume({ message: data.message });
-      } else if (data.error === 'text_extraction_failed') {
-        setError(data.message || 'Could not read text from this file. Please try a clearer resume PDF or image.');
-      } else if (data.error === 'image_analysis_unavailable') {
-        setError(data.message || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.');
+      } else if (data.error === 'scanned_pdf_detected' || data.error === 'text_extraction_failed') {
+        setError(data.message || 'This appears to be a scanned document. Please upload a clear text-based PDF or paste the text directly.');
+      } else if (data.error === 'image_resume_unsupported' || data.error === 'image_analysis_unavailable') {
+        setError(data.message || 'Image resume analysis is currently disabled. Please paste your resume text instead.');
       } else if (data.error === 'file_too_large') {
         setError(data.message || 'File too large. Maximum size is 10 MB.');
       } else if (data.analysis) {
