@@ -7,6 +7,120 @@ import AnalyticsTab from './TNPAnalytics';
 import SystemSettingsTab from './TNPSettings';
 import ComplianceTab from './TNPCompliance';
 
+// ── Review Modal Component ────────────────────────────────────────────────────
+function ReviewModal({ item, onClose, onApprove, onDeny }) {
+  const [approving, setApproving] = useState(false);
+  const [denying, setDenying] = useState(false);
+
+  const isAlumni = item.sub?.toLowerCase().includes('alumni') || item.sub?.toLowerCase().includes('batch');
+
+  const handleApprove = () => {
+    setApproving(true);
+    setTimeout(() => { onApprove(item); onClose(); }, 800);
+  };
+
+  const handleDeny = () => {
+    setDenying(true);
+    setTimeout(() => { onDeny(item); onClose(); }, 800);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#171f33', borderRadius: 20, width: '100%', maxWidth: 560, border: '1px solid rgba(195,192,255,0.15)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '1.5rem 1.5rem 1rem', borderBottom: '1px solid rgba(70,69,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#c3c0ff', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Review {isAlumni ? 'Alumni' : 'Student'} Registration</div>
+            <h3 style={{ fontWeight: 700, fontSize: '1.2rem', color: '#dae2fd', marginBottom: 2 }}>{item.name}</h3>
+            <div style={{ fontSize: '0.75rem', color: '#c7c4d8' }}>{item.sub}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7c4d8', padding: 4 }}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '1.5rem' }}>
+          {/* Status info */}
+          <div style={{ background: '#131b2e', borderRadius: 10, padding: '1rem', marginBottom: '1rem', border: '1px solid rgba(70,69,85,0.15)' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Current Status</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: '#ffb95f', fontSize: 20 }}>info</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffb95f' }}>Pending Review</div>
+                <div style={{ fontSize: '0.75rem', color: '#c7c4d8', marginTop: 2 }}>{item.status}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div style={{ background: '#131b2e', borderRadius: 10, padding: '1rem', marginBottom: '1rem', border: '1px solid rgba(70,69,85,0.15)' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Details</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(199,196,216,0.6)', marginBottom: 3 }}>Name</div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#dae2fd' }}>{item.name}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(199,196,216,0.6)', marginBottom: 3 }}>Registration Info</div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#dae2fd' }}>{item.sub}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(199,196,216,0.6)', marginBottom: 3 }}>Verification Step</div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ffb95f' }}>{item.status}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Checklist */}
+          <div style={{ background: '#131b2e', borderRadius: 10, padding: '1rem', border: '1px solid rgba(70,69,85,0.15)' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 10 }}>Verification Checklist</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { label: 'Email Verified', status: 'success' },
+                { label: 'Identity Confirmed', status: 'success' },
+                { label: `${item.status}`, status: 'pending' },
+              ].map((check, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: check.status === 'success' ? '#4edea3' : '#ffb95f' }}>
+                    {check.status === 'success' ? 'check_circle' : 'schedule'}
+                  </span>
+                  <div style={{ fontSize: '0.8rem', color: check.status === 'success' ? '#4edea3' : '#ffb95f', fontWeight: 600 }}>{check.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(70,69,85,0.2)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button 
+            onClick={handleDeny} 
+            disabled={denying || approving}
+            style={{ flex: 1, padding: '0.75rem', background: denying ? '#2d3449' : '#222a3d', color: denying ? '#c7c4d8' : '#ffb4ab', border: '1px solid rgba(255,107,107,0.2)', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: denying || approving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {denying ? (
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #ffb4ab', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Denying...</>
+            ) : (
+              <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>block</span> Deny</>
+            )}
+          </button>
+          <button 
+            onClick={handleApprove} 
+            disabled={approving || denying}
+            style={{ flex: 2, padding: '0.75rem', background: approving ? '#2d3449' : 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: approving ? '#c7c4d8' : '#1d00a5', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: approving || denying ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {approving ? (
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(199,196,216,0.3)', borderTop: '2px solid #1d00a5', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Approving...</>
+            ) : (
+              <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified_user</span> Approve</>
+            )}
+          </button>
+        </div>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 const STATIC_QUEUE = [
   { name: 'Arjun Malhotra', sub: 'B.Tech Computer Science • Year 2024', status: 'Document Pending', color: '#c3c0ff', icon: 'school' },
   { name: 'Sarah Jenkins', sub: 'Alumni • Senior Dev at Google • Batch 2018', status: 'ID Verification', color: '#ffb95f', icon: 'history_edu' },
@@ -118,6 +232,7 @@ export default function TNPDashboard() {
   const [queueSearch, setQueueSearch] = useState('');
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [tnpNotifs, setTnpNotifs] = useState([]);
+  const [reviewingItem, setReviewingItem] = useState(null);
   const [seenNotifIds, setSeenNotifIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem('tnp_seen_notifs') || '[]'); } catch { return []; }
   });
@@ -257,7 +372,15 @@ export default function TNPDashboard() {
     setQueueStatus(s => ({ ...s, [q.name]: 'approved' }));
   };
 
-  const handleReview = (name) => setQueueStatus(s => ({ ...s, [name]: 'review' }));
+  const handleReview = (item) => setReviewingItem(item);
+
+  const handleReviewApprove = (item) => {
+    setQueueStatus(s => ({ ...s, [item.name]: 'approved' }));
+  };
+
+  const handleReviewDeny = (item) => {
+    setQueueStatus(s => ({ ...s, [item.name]: 'denied' }));
+  };
 
   const TNP_NAV = [
     { icon: 'dashboard',       label: 'Dashboard',          tab: 'home' },
@@ -327,7 +450,7 @@ export default function TNPDashboard() {
                   </span>
                   {!st && <>
                     <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                    <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                    <button onClick={() => handleReview(item)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                   </>}
                 </div>
               </div>
@@ -352,6 +475,16 @@ export default function TNPDashboard() {
           onCancel={() => setShowLogoutConfirm(false)}
         />
       )}
+
+      {reviewingItem && (
+        <ReviewModal
+          item={reviewingItem}
+          onClose={() => setReviewingItem(null)}
+          onApprove={handleReviewApprove}
+          onDeny={handleReviewDeny}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{ width: 256, minHeight: '100vh', position: 'fixed', left: 0, top: 0, background: '#131b2e', display: 'flex', flexDirection: 'column', padding: '1.5rem', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>

@@ -1128,12 +1128,22 @@ export default function AlumniDashboard() {
             onMouseLeave={e => { e.currentTarget.style.borderColor = r.status === 'accepted' ? 'rgba(255,185,95,0.2)' : 'rgba(70,69,85,0.2)'; }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               {/* Avatar */}
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0 }}>{r.studentName[0]}</div>
+              <div 
+                onClick={() => setViewingRequest(r)}
+                style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg,#222a3d,#2d3449)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 700, color: '#c3c0ff', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s', border: '2px solid transparent' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#c3c0ff'; e.currentTarget.style.background = 'linear-gradient(135deg,#2d3449,#3d4559)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'linear-gradient(135deg,#222a3d,#2d3449)'; }}
+              >{r.studentName[0]}</div>
 
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.studentName}</span>
+                  <span 
+                    onClick={() => setViewingRequest(r)}
+                    style={{ fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', color: '#dae2fd', transition: 'all 0.2s', paddingBottom: 2, borderBottom: '2px solid transparent' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#c3c0ff'; e.currentTarget.style.borderColor = '#c3c0ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#dae2fd'; e.currentTarget.style.borderColor = 'transparent'; }}
+                  >{r.studentName}</span>
                   {/* Status badge */}
                   <span style={{ padding: '0.15rem 0.5rem', borderRadius: 999, fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
                     background: r.status === 'accepted' ? 'rgba(255,185,95,0.15)' : r.status === 'slot_booked' ? 'rgba(78,222,163,0.15)' : 'rgba(195,192,255,0.1)',
