@@ -79,6 +79,7 @@ function wordCount(text) {
 router.post('/resume-analyze', upload.any(), async (req, res) => {
   try {
     let extractedText = '';
+    let isOcr = false; // Flag to skip strict word-count checks if OCR was used
 
     if (req.body.text) {
       extractedText = req.body.text.trim();
@@ -92,31 +93,34 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
       if (isPdf) {
         extractedText = normalizeText(await extractPdfText(file.path));
         const extractedWords = wordCount(extractedText);
-        console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native PDF parse.`);
+        console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native parse.`);
         
-        // If native extract fails (likely a scanned PDF), fallback to OpenAI OCR
-        if (!extractedText || extractedWords < 15) {
-          console.log('[PDF] native text extraction returned too little usable text. Falling back to OpenAI OCR.');
+        // If native extract fails or is very sparse (likely a scanned PDF), fallback to OpenAI OCR
+        if (!extractedText || extractedWords < 40) {
+          console.log('[PDF] Triggering OpenAI OCR fallback (sparse native text)...');
           try {
-            // Convert first page to image buffer for OCR
             const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
             if (pdfImages && pdfImages.length > 0) {
               const ocrResult = await extractTextViaOpenAI(pdfImages[0], 'image/png');
               if (!ocrResult.unavailable) {
                 extractedText = normalizeText(ocrResult.text);
-                console.log(`[PDF->OpenAI] Extracted ${extractedText.length} chars via OCR.`);
+                isOcr = true;
+                console.log(`[PDF->OpenAI] OCR Success: ${extractedText.length} chars.`);
               } else {
                 throw new Error(ocrResult.reason);
               }
             } else {
-              throw new Error('Could not convert PDF to image for OCR.');
+              throw new Error('PDF to image conversion failed.');
             }
           } catch (ocrErr) {
-            console.error('[PDF->OpenAI] OCR failed:', ocrErr.message);
-            return res.status(422).json({
-              error: 'scanned_pdf_detected',
-              message: 'This appears to be a scanned PDF and OCR processing failed. Please upload a text-based resume or paste the text directly.',
-            });
+            console.error('[PDF->OpenAI] OCR Error:', ocrErr.message);
+            // If OCR fails, we still have the native text (even if sparse)
+            if (!extractedText) {
+              return res.status(422).json({
+                error: 'scanned_pdf_detected',
+                message: 'This appears to be a scanned PDF and OCR failed. Please upload a text-based resume or paste text directly.',
+              });
+            }
           }
         }
       } else if (isImage) {
@@ -126,29 +130,25 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
           const ocrResult = await extractTextViaOpenAI(fileBuffer, mimeType);
           if (!ocrResult.unavailable) {
             extractedText = normalizeText(ocrResult.text);
-            console.log(`[Image->OpenAI] Extracted ${extractedText.length} chars via OCR.`);
+            isOcr = true;
+            console.log(`[Image->OpenAI] OCR Success: ${extractedText.length} chars.`);
           } else {
             throw new Error(ocrResult.reason);
           }
         } catch (ocrErr) {
-          console.error('[Image->OpenAI] OCR failed:', ocrErr.message);
+          console.error('[Image->OpenAI] OCR Error:', ocrErr.message);
           return res.status(422).json({
             error: 'image_ocr_failed',
             message: 'OCR processing failed for this image. Please paste your resume text instead.',
           });
         }
       } else {
-        // Try to read as plain text
+        // Plain text fallback
         try { 
-          let rawText = fs.readFileSync(file.path, 'utf8').trim();
-          // If it looks like HTML, extract text content
-          if (rawText.includes('<') && rawText.includes('>')) {
-            const $ = cheerio.load(rawText);
-            extractedText = $('body').text() || $.text() || rawText;
-            // Clean up extra whitespace
-            extractedText = extractedText.replace(/\s+/g, ' ').trim();
-          } else {
-            extractedText = rawText;
+          extractedText = fs.readFileSync(file.path, 'utf8').trim();
+          if (extractedText.includes('<') && extractedText.includes('>')) {
+            const $ = cheerio.load(extractedText);
+            extractedText = normalizeText($('body').text() || $.text() || extractedText);
           }
         } catch (_) {}
       }
@@ -156,25 +156,24 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
       // Clean up file
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     } else {
-      return res.status(400).json({ error: 'No file uploaded or text provided.' });
+      return res.status(400).json({ error: 'No file or text provided.' });
     }
 
-    const cleanedText = normalizeText(extractedText);
+    const cleanedText  = normalizeText(extractedText);
     const cleanedWords = wordCount(cleanedText);
     
-    // If we have text, but it's very short, check if we should still try analysis
-    if (!cleanedText || (cleanedWords < 5 && !extractedText.includes('via OCR'))) {
+    // Final sanity check: Allow low word count ONLY if OCR was used (stricter for manual uploads/pastes)
+    if (!cleanedText || (cleanedWords < 5 && !isOcr)) {
       return res.status(422).json({
         error: 'text_extraction_failed',
-        message: 'Could not extract enough text from this document. If this is a scanned resume, please ensure the file is clear or paste the text directly.',
+        message: 'Could not extract enough text to analyze. Please ensure your document contains resume content.',
       });
     }
-    extractedText = cleanedText;
 
-    console.log(`[Resume Analyzer] Proceeding with ${extractedText.length} characters of text.`);
-
-    // Send for analysis (analyzeResume will provide analysis)
-    let analysis = await analyzeResume(extractedText);
+    console.log(`[Resume Analyzer] Ready for ${isOcr ? 'OCR' : 'Native'} analysis (${cleanedText.length} chars).`);
+    
+    // Perform analysis
+    let analysis = await analyzeResume(cleanedText);
 
     // Always use the analysis - no rejection for "not a resume"
     const { userId } = req.body;
