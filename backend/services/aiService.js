@@ -40,26 +40,82 @@ const analyzeResume = async (resumeText) => {
   if (USE_AI) {
     try {
       return await ask(
-        `You are an expert technical recruiter. Analyze the resume and return JSON with keys:
-score (0-100), grade (A/B/C/D), ats_score (0-100), target_companies (array of 5 strings),
-keyword_gaps (array of 3 missing keywords), formatting_fixes (array of 3 actionable tips),
-strengths (array of 2 genuine strengths).`,
-        `Resume:\n${resumeText}`
+        `You are an expert technical recruiter and resume analyst.
+
+FIRST: Determine if the text is actually a resume/CV. A resume contains personal info, education, work experience, skills, or projects.
+If it is NOT a resume (e.g. random text, book pages, invoices, class notes, garbled text):
+  return ONLY: { "not_a_resume": true, "reason": "one-sentence description of what this document actually is" }
+
+If it IS a resume, return JSON with ALL these keys:
+- score: integer 0-100 (honest assessment of this specific resume's quality)
+- grade: "A", "B", "C", or "D"
+- ats_score: integer 0-100 (keyword/ATS compatibility score)
+- target_companies: array of 5 company names that match THIS candidate's actual profile
+- keyword_gaps: array of 3-4 high-value missing keywords for their target role
+- formatting_fixes: array of 3-4 specific, actionable tips referencing the actual content found
+- strengths: array of 2-3 genuine strengths found in THIS document
+- role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
+- experience_years: estimated years of experience as a number
+- top_skills: array of 5-6 actual skills listed in this resume`,
+        `Resume text:\n${resumeText.slice(0, 4000)}`,
+        900
       );
     } catch (e) { console.error('Agent 1 error:', e.message); }
   }
-  const score = Math.floor(Math.random() * 25 + 72);
+
+  // Smart mock: vary results based on actual content so it's never identical
+  const textLower = resumeText.toLowerCase();
+  const hasReact   = textLower.includes('react');
+  const hasPython  = textLower.includes('python');
+  const hasML      = textLower.includes('machine learning') || textLower.includes(' ml ') || textLower.includes('neural');
+  const wordCount  = resumeText.split(/\s+/).filter(Boolean).length;
+
+  // Flag non-resumes even in mock mode
+  if (wordCount < 20) {
+    return { not_a_resume: true, reason: 'This document contains insufficient text to be a resume.' };
+  }
+
+  // Score varies meaningfully by content richness (not always 87)
+  const baseScore = Math.min(95, Math.max(42, 52 + Math.floor(resumeText.length / 80)));
+  const score = Math.min(98, Math.max(40, baseScore + Math.floor(Math.random() * 10 - 5)));
+
+  const companies = hasML
+    ? ['Google DeepMind', 'OpenAI', 'NVIDIA', 'Hugging Face', 'Databricks']
+    : hasReact
+    ? ['Meta', 'Vercel', 'Shopify', 'Airbnb', 'Stripe']
+    : hasPython
+    ? ['Databricks', 'Snowflake', 'Palantir', 'Confluent', 'MongoDB']
+    : ['Microsoft', 'Amazon', 'Atlassian', 'Figma', 'Notion'];
+
+  const gaps = hasML
+    ? ['MLOps pipelines', 'LLM Fine-tuning', 'Vector Databases', 'A/B Testing frameworks']
+    : hasReact
+    ? ['TypeScript', 'System Design', 'GraphQL', 'CI/CD pipelines']
+    : ['Cloud Infrastructure (AWS/GCP)', 'Docker/Kubernetes', 'API Design', 'SQL optimization'];
+
   return {
-    score, grade: score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D',
-    ats_score: Math.floor(Math.random() * 20 + 75),
-    target_companies: ['Google', 'Microsoft', 'Stripe', 'Atlassian', 'Figma'],
-    keyword_gaps: ['Kubernetes', 'GraphQL', 'System Design'],
+    score,
+    grade: score >= 88 ? 'A' : score >= 75 ? 'B' : score >= 62 ? 'C' : 'D',
+    ats_score: Math.min(98, Math.max(40, score - 5 + Math.floor(Math.random() * 10))),
+    target_companies: companies,
+    keyword_gaps: gaps,
     formatting_fixes: [
-      'Use bullet points for experience instead of paragraphs.',
-      "Highlight 'React' and 'Node.js' in a dedicated skills section.",
-      "Add quantifiable achievements (e.g., 'Reduced load time by 40%').",
+      score < 65 ? 'Add quantifiable achievements (e.g., "Reduced API latency by 40%").' : 'Strengthen impact statements with specific metrics and percentages.',
+      'Move your most impressive project to the top of the Projects section.',
+      'Add a 2–3 sentence professional summary tailored to your target role.',
+      'Ensure consistent date formatting (e.g., "Jan 2023 – Mar 2024") throughout.',
     ],
-    strengths: ['Strong technical stack coverage.', 'Clear project descriptions with tech stack listed.'],
+    strengths: [
+      hasReact || hasPython || hasML ? 'Relevant modern tech stack well-aligned with current industry demand.' : 'Solid foundational skill set.',
+      resumeText.length > 500 ? 'Detailed project descriptions with clear technical scope.' : 'Concise, easily scannable format.',
+    ],
+    role_detected: hasML ? 'Machine Learning / AI Engineer' : hasReact ? 'Frontend / Full-Stack Developer' : hasPython ? 'Backend / Data Engineer' : 'Software Engineer',
+    experience_years: Math.max(0, Math.floor(resumeText.length / 700)),
+    top_skills: hasReact
+      ? ['React', 'JavaScript', 'Node.js', 'CSS', 'REST APIs']
+      : hasPython
+      ? ['Python', 'SQL', 'Data Analysis', 'Machine Learning', 'APIs']
+      : ['Java', 'Algorithms', 'Data Structures', 'Git', 'Agile'],
   };
 };
 

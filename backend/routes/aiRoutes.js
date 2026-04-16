@@ -2,6 +2,9 @@ const express = require('express');
 const router  = express.Router();
 const multer  = require('multer');
 const fs      = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const OpenAI  = require('openai');
 const { PrismaClient } = require('@prisma/client');
 const {
   analyzeResume,
@@ -13,13 +16,145 @@ const {
 } = require('../services/aiService');
 
 const prisma = new PrismaClient();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
+const execFileAsync = promisify(execFile);
+
+// ── Helper: Extract text from PDF ─────────────────────────────────────────────
+async function extractPdfText(filePath) {
+  try {
+    const pdfParse = require('pdf-parse');
+    const dataBuffer = fs.readFileSync(filePath);
+    const data = await pdfParse(dataBuffer);
+    return data.text?.trim() || '';
+  } catch (e) {
+    console.error('PDF parse error:', e.message);
+    return '';
+  }
+}
+
+// ── Helper: Extract text from image via Groq Vision ───────────────────────────
+async function extractImageTextViaGroq(filePath, mimeType) {
+  try {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return {
+        unavailable: true,
+        reason: 'Cloud image OCR is not configured right now.',
+      };
+    }
+
+    const client = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+
+    const imageData = fs.readFileSync(filePath).toString('base64');
+    const response = await client.responses.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: 'Extract all text from this image exactly as it appears. If this is a resume or CV, extract every word. Output only the raw text with no commentary.',
+            },
+            {
+              type: 'input_image',
+              detail: 'auto',
+              image_url: `data:${mimeType};base64,${imageData}`,
+            },
+          ],
+        },
+      ],
+    });
+
+    return { unavailable: false, text: response.output_text?.trim() || '' };
+  } catch (e) {
+    console.error('Groq Vision error:', e.message);
+    return {
+      unavailable: true,
+      reason: 'Cloud image OCR is temporarily unavailable.',
+    };
+  }
+}
+
+async function extractImageTextLocally(filePath) {
+  try {
+    const { stdout } = await execFileAsync('/opt/homebrew/bin/tesseract', [
+      filePath,
+      'stdout',
+      '-l',
+      'eng',
+      '--psm',
+      '6',
+    ], {
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    return { unavailable: false, text: stdout.trim() };
+  } catch (e) {
+    console.error('Local OCR error:', e.message);
+    const reason = e.code === 'ENOENT'
+      ? 'Local OCR is not installed on this server. Install Tesseract or configure GROQ_API_KEY for image resume analysis.'
+      : 'Local OCR is temporarily unavailable on this server. Please upload a PDF resume or try again later.';
+    return {
+      unavailable: true,
+      reason,
+    };
+  }
+}
 
 // ── Agent 1: Resume Analyzer ─────────────────────────────────────────────────
 router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
   try {
-    const mockText = 'I have 2 years of experience in React and Node.js. Built scalable microservices.';
-    const analysis = await analyzeResume(mockText);
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    const originalName = (req.file.originalname || '').toLowerCase();
+    const mimeType     = req.file.mimetype || '';
+    const isPdf        = mimeType === 'application/pdf' || originalName.endsWith('.pdf');
+    const isImage      = mimeType.startsWith('image/');
+
+    let extractedText = '';
+
+    if (isPdf) {
+      extractedText = await extractPdfText(req.file.path);
+    } else if (isImage) {
+      let imageResult = await extractImageTextViaGroq(req.file.path, mimeType);
+      if (imageResult.unavailable) {
+        imageResult = await extractImageTextLocally(req.file.path);
+      }
+      if (imageResult.unavailable) {
+        return res.status(503).json({
+          error: 'image_analysis_unavailable',
+          message: imageResult.reason || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.',
+        });
+      }
+      extractedText = imageResult.text;
+    } else {
+      // Try to read as plain text
+      try { extractedText = fs.readFileSync(req.file.path, 'utf8').trim(); } catch (_) {}
+    }
+
+    if (!extractedText || extractedText.length < 30) {
+      return res.status(422).json({
+        error: 'not_a_resume',
+        message: 'Could not extract readable text from this file. Please upload a PDF resume or a clear image of your resume.',
+      });
+    }
+
+    // Send for analysis (analyzeResume will also validate if it's actually a resume)
+    const analysis = await analyzeResume(extractedText);
+
+    // If the AI flagged it as not a resume
+    if (analysis.not_a_resume) {
+      return res.status(422).json({
+        error: 'not_a_resume',
+        message: analysis.reason || 'This document does not appear to be a resume. Please upload your actual resume/CV.',
+      });
+    }
 
     const { userId } = req.body;
     if (userId) {
@@ -30,10 +165,27 @@ router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
 
     res.json({ message: 'Resume analyzed successfully', analysis });
   } catch (e) {
-    res.status(500).json({ error: 'Failed to analyze resume.' });
+    console.error('Resume analyze error:', e);
+    res.status(500).json({ error: 'Failed to analyze resume. Please try again.' });
   } finally {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
   }
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        error: 'file_too_large',
+        message: 'File too large. Maximum size is 10 MB.',
+      });
+    }
+    return res.status(400).json({
+      error: 'upload_error',
+      message: err.message,
+    });
+  }
+  return next(err);
 });
 
 // ── Agent 3: Post-Interview Analytics ────────────────────────────────────────

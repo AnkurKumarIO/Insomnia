@@ -40,16 +40,48 @@ const MOCK_API = {
     return { token: MOCK_TOKEN, user: { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: department || 'General' } };
   },
 
-  resumeAnalyze: async () => {
-    await mockDelay(1200);
+  resumeAnalyze: async (file) => {
+    await mockDelay(1800);
+    const name = (file?.name || '').toLowerCase();
+    // Simulate non-resume detection for obvious non-resume files
+    const nonResumeKeywords = ['invoice', 'receipt', 'photo', 'screenshot', 'image', 'meme', 'notes', 'homework'];
+    const looksLikeResume = !nonResumeKeywords.some(k => name.includes(k));
+    if (!looksLikeResume) {
+      return {
+        error: 'not_a_resume',
+        message: `"${file?.name}" does not appear to be a resume. Please upload your actual resume/CV.`,
+      };
+    }
+    // Vary score and content so it's not always 87%
+    const hasReact = name.includes('react') || name.includes('frontend');
+    const hasML = name.includes('ml') || name.includes('data') || name.includes('ai');
+    const baseScore = 58 + Math.floor(Math.random() * 30);
+    const score = Math.min(96, baseScore);
     return {
       message: 'Resume analyzed (mock)',
       analysis: {
-        score: 87,
-        target_companies: ['Google', 'Microsoft', 'Stripe', 'Atlassian'],
+        score,
+        grade: score >= 88 ? 'A' : score >= 75 ? 'B' : score >= 62 ? 'C' : 'D',
+        ats_score: Math.min(95, score - 4 + Math.floor(Math.random() * 8)),
+        role_detected: hasML ? 'Machine Learning Engineer' : hasReact ? 'Frontend Developer' : 'Software Engineer',
+        experience_years: Math.floor(Math.random() * 4),
+        target_companies: hasML
+          ? ['Google DeepMind', 'OpenAI', 'NVIDIA', 'Hugging Face', 'Databricks']
+          : ['Meta', 'Vercel', 'Shopify', 'Stripe', 'Atlassian'],
+        top_skills: hasML
+          ? ['Python', 'TensorFlow', 'SQL', 'Data Analysis', 'Scikit-learn']
+          : ['React', 'JavaScript', 'Node.js', 'TypeScript', 'REST APIs'],
+        keyword_gaps: hasML
+          ? ['MLOps pipelines', 'Vector Databases', 'A/B Testing']
+          : ['TypeScript', 'System Design', 'GraphQL'],
         formatting_fixes: [
-          'Use bullet points for experience instead of paragraphs.',
-          "Highlight 'React' and 'Node.js' in a dedicated skills section.",
+          score < 70 ? 'Add quantifiable achievements (e.g., "Improved load time by 35%").' : 'Strengthen impact statements with specific numbers.',
+          'Add a professional summary section at the top of your resume.',
+          'Ensure consistent date formatting throughout the document.',
+        ],
+        strengths: [
+          hasML || hasReact ? 'Strong, relevant tech stack for current market demand.' : 'Solid foundational engineering skills.',
+          'Projects section demonstrates hands-on experience.',
         ],
       },
     };

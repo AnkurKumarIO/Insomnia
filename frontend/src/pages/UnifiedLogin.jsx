@@ -1,5 +1,5 @@
-﻿import React, { useState, useContext } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import React, { useState, useContext } from "react";
+import { useNavigate, Navigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import AlumNexLogo from "../AlumNexLogo";
 import { supabase } from "../lib/supabaseClient";
@@ -126,8 +126,24 @@ export default function UnifiedLogin() {
                 {DEMO_HINTS[role]}
               </p>
             </div>
-            {role === "STUDENT" && <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>Don&apos;t have an account?{" "}<a href="/auth/student/register" style={{ color: "#c3c0ff", textDecoration: "none", fontWeight: 600 }}>Register here</a></p>}
-            {role === "ALUMNI" && <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>New alumni mentor?{" "}<a href="/alumni/register" style={{ color: "#4edea3", textDecoration: "none", fontWeight: 600 }}>Create account</a></p>}
+            {role === "STUDENT" && (
+              <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>
+                Don&apos;t have an account?{" "}
+                <Link to="/student/register" style={{ color: "#c3c0ff", textDecoration: "none", fontWeight: 600 }}>Register here</Link>
+              </p>
+            )}
+            {role === "ALUMNI" && (
+              <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>
+                New alumni mentor?{" "}
+                <Link to="/alumni/register" style={{ color: "#4edea3", textDecoration: "none", fontWeight: 600 }}>Create account</Link>
+              </p>
+            )}
+            {role === "TNP" && (
+              <p style={{ textAlign: "center", fontSize: "0.75rem", color: "#9b98b8", marginTop: "1.25rem", lineHeight: 1.5 }}>
+                TNP Admin accounts are created by your institution admin.{" "}
+                <span style={{ color: "#ffb95f" }}>Contact your system administrator</span> to get access.
+              </p>
+            )}
           </div>
         </div>
       </div>

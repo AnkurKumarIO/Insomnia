@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import AlumNexLogo from '../AlumNexLogo';
 import { supabase } from '../lib/supabaseClient';
 
@@ -149,7 +149,7 @@ export default function StudentRegistration() {
           Continue to Login <span className="material-symbols-outlined" style={{ fontSize:18 }}>arrow_forward</span>
         </button>
         <p style={{ textAlign:'center', fontSize:'0.8rem', color:'#c7c4d8', marginTop:'1.5rem' }}>
-          Already have an account? <a href="/login" style={{ color:'#c3c0ff', textDecoration:'none', fontWeight:600 }}>Sign in</a>
+          Already have an account? <Link to="/login" style={{ color:'#c3c0ff', textDecoration:'none', fontWeight:600 }}>Sign in</Link>
         </p>
       </div>
     </div>
@@ -266,7 +266,7 @@ export default function StudentRegistration() {
         )}
 
         <p style={{ textAlign:'center', fontSize:'0.8rem', color:'#c7c4d8', marginTop:'1.5rem' }}>
-          Already have an account? <a href="/login" style={{ color:'#c3c0ff', textDecoration:'none', fontWeight:600 }}>Sign in</a>
+          Already have an account? <Link to="/login" style={{ color:'#c3c0ff', textDecoration:'none', fontWeight:600 }}>Sign in</Link>
         </p>
       </div>
     </div>
