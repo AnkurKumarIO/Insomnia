@@ -86,8 +86,7 @@ export default function UnifiedLogin() {
       <div style={{ width: "100%", maxWidth: 460 }}>
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: "0.75rem" }}>
-            <AlumNexLogo size={40} />
-            <span style={{ fontSize: "1.75rem", fontWeight: 900, letterSpacing: "-0.03em", color: "#fff" }}>Alum<span style={{ color: "#60a5fa" }}>NEX</span></span>
+            <AlumNexLogo size={40} showText textSize="1.75rem" />
           </div>
           <p style={{ fontSize: "0.875rem", color: "#c7c4d8" }}>Sign in with your credentials</p>
         </div>

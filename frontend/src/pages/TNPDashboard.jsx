@@ -357,7 +357,7 @@ export default function TNPDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
           <AlumNexLogo size={32} />
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff', letterSpacing: '-0.02em' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#f5e9ff', letterSpacing: '-0.02em' }}>Alum<span style={{ color: '#a855f7' }}>NEX</span></div>
             <div style={{ fontSize: '0.55rem', color: '#c7c4d8', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>Master Control</div>
           </div>
         </div>

@@ -161,7 +161,7 @@ export default function StudentRegistration() {
       <div style={{ background:'#171f33', borderRadius:20, padding:'2.5rem', width:'100%', maxWidth:500, border:'1px solid rgba(70,69,85,0.15)', boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:'0.5rem' }}>
           <AlumNexLogo size={32} />
-          <span style={{ fontSize:'1.25rem', fontWeight:900, color:'#fff' }}>Alum<span style={{ color:'#60a5fa' }}>NEX</span></span>
+          <span style={{ fontSize:'1.25rem', fontWeight:900, color:'#f5e9ff' }}>Alum<span style={{ color:'#a855f7' }}>NEX</span></span>
           <span style={{ marginLeft:'auto', fontSize:'0.6rem', fontWeight:700, color:'#c3c0ff', textTransform:'uppercase', letterSpacing:'0.15em', background:'rgba(195,192,255,0.1)', border:'1px solid rgba(195,192,255,0.25)', borderRadius:6, padding:'2px 8px' }}>Student Portal</span>
         </div>
         <p style={{ fontSize:'0.8rem', color:'#c7c4d8', marginBottom:'1.75rem' }}>Student Registration — Step {step} of 3</p>

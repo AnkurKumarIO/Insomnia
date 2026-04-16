@@ -15,7 +15,7 @@ export default function LandingPage() {
             <AlumNexLogo size={52} />
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: '#fff' }}>
-                Alum<span style={{ color: '#60a5fa' }}>NEX</span>
+                Alum<span style={{ color: '#a855f7' }}>NEX</span>
               </div>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#c7c4d8', marginTop: 2 }}>Intelligence Platform</div>
             </div>
@@ -70,7 +70,7 @@ export default function LandingPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlumNexLogo size={22} />
-            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#dae2fd' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#f5e9ff' }}>Alum<span style={{ color: '#a855f7' }}>NEX</span></span>
           </div>
           <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7c4d8', opacity: 0.8 }}>© 2026 AlumNex. The Intelligence Platform.</p>
           <p style={{ fontSize: '0.65rem', color: '#c7c4d8', opacity: 0.6 }}>Developed by <strong style={{ color: '#c3c0ff', opacity: 1 }}>The Tesseract</strong></p>

@@ -494,7 +494,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlumNexLogo size={28} />
             <div>
-          <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff' }}>Alum<span style={{ color: '#60a5fa' }}>NEX</span></div>
+          <div style={{ fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#f5e9ff' }}>Alum<span style={{ color: '#a855f7' }}>NEX</span></div>
               <div style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginTop: 1 }}>Intelligence Suite</div>
             </div>
           </div>

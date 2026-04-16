@@ -351,7 +351,7 @@ export default function GoogleMeetInterviewRoom() {
       {/* ── Top bar ── */}
       <nav style={{ height:60, background:'rgba(11,19,38,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(195,192,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 1.5rem', flexShrink:0, zIndex:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:'1.25rem' }}>
-          <span style={{ fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#c3c0ff' }}>AlumNEX AI + Google Meet</span>
+          <span style={{ fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#f5e9ff' }}>AlumNEX AI + Google Meet</span>
           <div style={{ display:'flex', alignItems:'center', gap:7, background:'#222a3d', padding:'0.25rem 0.65rem', borderRadius:999, border:'1px solid rgba(70,69,85,0.3)' }}>
             <div style={{ width:7, height:7, borderRadius:'50%', background: isConnected ? '#4edea3' : '#ffb4ab', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
             <span style={{ fontSize:'0.6rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color: isConnected ? '#4edea3' : '#ffb4ab' }}>
