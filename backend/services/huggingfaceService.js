@@ -37,7 +37,7 @@ async function extractTextViaHuggingFace(fileBuffer, mimeType = 'image/jpeg') {
   }
 
   try {
-    // Use a vision-capable model for OCR - TrOCR is better for OCR than BLIP
+    // Use TrOCR model for OCR - this should work with HF Inference API
     const response = await hf.imageToText({
       model: 'microsoft/trocr-base-printed',
       data: fileBuffer,
@@ -50,6 +50,21 @@ async function extractTextViaHuggingFace(fileBuffer, mimeType = 'image/jpeg') {
     return { unavailable: true, reason: 'No text extracted from image' };
   } catch (error) {
     console.error('Hugging Face OCR Error:', error.message);
+    // If TrOCR fails, try a fallback captioning model
+    try {
+      console.log('Trying fallback captioning model for OCR...');
+      const fallbackResponse = await hf.imageToText({
+        model: 'Salesforce/blip-image-captioning-large',
+        data: fileBuffer,
+      });
+
+      if (fallbackResponse && fallbackResponse.generated_text) {
+        return { text: fallbackResponse.generated_text };
+      }
+    } catch (fallbackError) {
+      console.error('Hugging Face fallback OCR Error:', fallbackError.message);
+    }
+
     return { unavailable: true, reason: error.message };
   }
 }

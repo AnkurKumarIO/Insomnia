@@ -131,13 +131,20 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
           if (!ocrSuccess && process.env.HUGGINGFACE_API_KEY) {
             try {
               console.log('[PDF] Trying Hugging Face OCR fallback...');
-              const fileBuffer = fs.readFileSync(file.path);
-              const hfOcrResult = await extractTextViaHuggingFace(fileBuffer, 'application/pdf');
-              if (!hfOcrResult.unavailable && hfOcrResult.text) {
-                extractedText = normalizeText(hfOcrResult.text);
-                isOcr = true;
-                ocrSuccess = true;
-                console.log(`[PDF->HuggingFace] OCR Success: ${extractedText.length} chars.`);
+              // Convert PDF to images first, then OCR each page
+              if (pdfImgConvert) {
+                const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
+                if (pdfImages && pdfImages.length > 0) {
+                  const hfOcrResult = await extractTextViaHuggingFace(pdfImages[0], 'image/png');
+                  if (!hfOcrResult.unavailable && hfOcrResult.text) {
+                    extractedText = normalizeText(hfOcrResult.text);
+                    isOcr = true;
+                    ocrSuccess = true;
+                    console.log(`[PDF->HuggingFace] OCR Success: ${extractedText.length} chars.`);
+                  }
+                }
+              } else {
+                console.log('[PDF->HuggingFace] PDF conversion not available, skipping HF OCR');
               }
             } catch (hfErr) {
               console.error('[PDF->HuggingFace] OCR Error:', hfErr.message);
@@ -146,9 +153,13 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
           
           // If all OCR methods failed and we have no text
           if (!ocrSuccess && (!extractedText || extractedWords < 10)) {
+            const availableMethods = [];
+            if (pdfImgConvert && process.env.OPENAI_API_KEY) availableMethods.push('OpenAI OCR');
+            if (process.env.HUGGINGFACE_API_KEY) availableMethods.push('Hugging Face OCR');
+
             return res.status(422).json({
               error: 'scanned_pdf_detected',
-              message: 'This appears to be a scanned PDF and OCR processing failed. Please upload a text-based resume or paste text directly.',
+              message: `This appears to be a scanned PDF. ${availableMethods.length > 0 ? `OCR processing failed using available methods (${availableMethods.join(', ')}).` : 'No OCR services are configured for scanned PDFs.'} Please upload a text-based PDF or paste your resume text directly.`,
             });
           }
         }
