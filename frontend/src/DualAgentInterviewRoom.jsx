@@ -430,9 +430,9 @@ export default function DualAgentInterviewRoom() {
       });
       socket.on('speech_coaching', (result) => {
         setCoachingTip(result.coaching_tip || '');
-        if (result.confidence) setConfT(result.confidence);
-        if (result.clarity)    setClarT(result.clarity);
-        if (result.energy)     setEnergyT(result.energy);
+        if (result.confidence !== undefined) setConfT(result.confidence);
+        if (result.clarity    !== undefined) setClarT(result.clarity);
+        if (result.energy     !== undefined) setEnergyT(result.energy);
       });
       socket.on('fact_check_result', ({ claim, result }) => {
         setFactChecks(p => [{ claim, status: result.verified ? 'confirmed' : 'disputed', pct: `${result.confidence}%`, note: result.note }, ...p.slice(0, 4)]);
@@ -598,7 +598,7 @@ export default function DualAgentInterviewRoom() {
       });
       setAnalytics(data.analytics);
       try {
-        const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
+        const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
         const HISTORY_KEY = 'alumnex_interview_history';
         const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         const score = Math.round((confidence + clarity + energy) / 3);

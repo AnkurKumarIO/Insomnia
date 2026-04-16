@@ -22,6 +22,7 @@ if (USE_AI) {
 
 // Core helper — sends a prompt, expects JSON back
 async function ask(systemPrompt, userPrompt, maxTokens = 512) {
+  if (!groq) throw new Error('Groq client not initialized — GROQ_API_KEY is missing');
   const res = await groq.chat.completions.create({
     model: MODEL,
     messages: [
@@ -285,7 +286,7 @@ next_session_focus (string).`,
     technical_depth: enrg >= 80 ? 'Strong' : enrg >= 60 ? 'Moderate' : 'Shallow',
     filler_word_count: Math.floor(Math.random() * 12 + 3),
     eye_contact_score: `${Math.floor(Math.random() * 20 + 72)}%`,
-    talk_listen_ratio: `${Math.floor(Math.random() * 20 + 55)}% / ${Math.floor(Math.random() * 20 + 25)}%`,
+    talk_listen_ratio: (() => { const talk = Math.floor(Math.random() * 20 + 55); return `${talk}% / ${100 - talk}%`; })(),
     actionable_insights: [
       conf < 75 ? 'Work on projecting confidence — slow down, pause before answering.' : 'Strong confidence. Maintain this in high-pressure rounds.',
       clar < 70 ? 'Reduce filler words. Practice the STAR method.' : 'Communication was clear and structured.',

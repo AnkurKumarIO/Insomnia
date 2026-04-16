@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const multer  = require('multer');
 const fs      = require('fs');
+const pdfParse = require('pdf-parse');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const OpenAI  = require('openai');
@@ -42,7 +43,6 @@ function looksLikeResume(text) {
 // ── Helper: Extract text from PDF ─────────────────────────────────────────────
 async function extractPdfText(filePath) {
   try {
-    const pdfParse = require('pdf-parse');
     const dataBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(dataBuffer);
     return data.text?.trim() || '';
@@ -69,27 +69,31 @@ async function extractImageTextViaGroq(filePath, mimeType) {
     });
 
     const imageData = fs.readFileSync(filePath).toString('base64');
-    const response = await client.responses.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      input: [
+    const response = await client.chat.completions.create({
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'input_text',
+              type: 'text',
               text: 'Extract all text from this image exactly as it appears. If this is a resume or CV, extract every word. Output only the raw text with no commentary.',
             },
             {
-              type: 'input_image',
-              detail: 'auto',
-              image_url: `data:${mimeType};base64,${imageData}`,
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageData}`,
+                detail: 'auto',
+              },
             },
           ],
         },
       ],
+      max_tokens: 2048,
     });
 
-    return { unavailable: false, text: response.output_text?.trim() || '' };
+    const text = response.choices?.[0]?.message?.content?.trim() || '';
+    return { unavailable: false, text };
   } catch (e) {
     console.error('Groq Vision error:', e.message);
     return {

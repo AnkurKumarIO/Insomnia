@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../api';
 import { subscribeRealtimeSync } from '../lib/realtimeSync';
@@ -150,6 +150,13 @@ export default function ProgressAnalytics() {
                 {chartPoints.map(([x, y], i) => (
                   <circle key={i} cx={x} cy={y} r="6" fill={i < 2 ? '#4f46e5' : '#c3c0ff'} stroke="#0b1326" strokeWidth="2" />
                 ))}
+              </svg>
+            ) : chartPoints.length === 1 ? (
+              <svg width="100%" height="260" viewBox="0 0 1200 260" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0 }}>
+                <circle cx={600} cy={chartPoints[0][1]} r="8" fill="#c3c0ff" stroke="#0b1326" strokeWidth="2">
+                  <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <text x={600} y={chartPoints[0][1] - 18} textAnchor="middle" fill="#c3c0ff" fontSize="14" fontWeight="700">{chartScores[0]}%</text>
               </svg>
             ) : (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c7c4d8', fontSize: '0.875rem', opacity: 0.5 }}>

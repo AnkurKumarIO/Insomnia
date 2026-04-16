@@ -376,10 +376,14 @@ export default function ResumeAnalyzer() {
         setNotResume({ message: data.message });
       } else if (data.error === 'text_extraction_failed') {
         setError(data.message || 'Could not read text from this file. Please try a clearer resume PDF or image.');
+      } else if (data.error === 'image_analysis_unavailable') {
+        setError(data.message || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.');
+      } else if (data.error === 'file_too_large') {
+        setError(data.message || 'File too large. Maximum size is 10 MB.');
       } else if (data.analysis) {
         setResult(data.analysis);
       } else {
-        setError(data.error || 'Unexpected response from server. Please try again.');
+        setError(data.message || data.error || 'Unexpected response from server. Please try again.');
       }
     } catch (err) {
       setError('Failed to reach the server. Is the backend running?');

@@ -121,6 +121,14 @@ export default function GoogleMeetInterviewRoom() {
       socket.emit('join-room', roomId, myId);
     });
 
+    socket.on('room-users', (users) => {
+      if (users.length > 0) {
+        setPeerName(users[0]);
+        setPeerPresent(true);
+        console.log('[Socket] Room already has users:', users);
+      }
+    });
+
     socket.on('user-connected', (uid) => {
       console.log('[Socket] Peer joined:', uid);
       setPeerName(uid);
@@ -141,9 +149,9 @@ export default function GoogleMeetInterviewRoom() {
 
     socket.on('speech_coaching', (result) => {
       setCoachingTip(result.coaching_tip || '');
-      if (result.confidence) setConfT(result.confidence);
-      if (result.clarity) setClarT(result.clarity);
-      if (result.energy) setEnergyT(result.energy);
+      if (result.confidence !== undefined) setConfT(result.confidence);
+      if (result.clarity !== undefined) setClarT(result.clarity);
+      if (result.energy !== undefined) setEnergyT(result.energy);
     });
 
     socket.on('fact_check_result', ({ claim, result }) => {
@@ -175,11 +183,15 @@ export default function GoogleMeetInterviewRoom() {
 
     // Timers
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-    metricsRef.current = setInterval(() => {
-      const wpm = Math.floor(Math.random() * 80 + 100);
-      const fillers = Math.floor(Math.random() * 5);
-      socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
-    }, 3000);
+    // Speech metrics — only send from candidate side (not interviewer)
+    const isInterviewerUser = (user?.role === 'ALUMNI');
+    if (!isInterviewerUser) {
+      metricsRef.current = setInterval(() => {
+        const wpm = Math.floor(Math.random() * 80 + 100);
+        const fillers = Math.floor(Math.random() * 5);
+        socket.emit('speech_metrics', roomId, { wordsPerMinute: wpm, fillerCount: fillers, pauseCount: 2 });
+      }, 3000);
+    }
     suggestionRef.current = setInterval(() => {
       setSuggestionIdx(i => {
         const next = (i + 1) % WHISPERER_POOL.length;
@@ -258,7 +270,7 @@ export default function GoogleMeetInterviewRoom() {
 
       // Save to localStorage for ProgressAnalytics
       try {
-        const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || localStorage.getItem('alumnex_user') || '{}');
+        const authUser = JSON.parse(localStorage.getItem('alumnex_user') || '{}');
         const HISTORY_KEY = 'alumnex_interview_history';
         const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         const score = Math.round((confidence + clarity + energy) / 3);
