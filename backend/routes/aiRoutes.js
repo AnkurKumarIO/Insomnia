@@ -176,21 +176,14 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
             }
           }
 
-          // If all OCR methods failed but we have some text from native extraction, proceed with limited analysis
-          if (!ocrSuccess && extractedText && extractedWords >= 10 && extractedWords < 40) {
-            console.log(`[PDF] OCR failed but proceeding with ${extractedWords} words from native extraction`);
-            // Continue with the analysis using the limited text
-          } else if (!ocrSuccess && (!extractedText || extractedWords < 10)) {
-            const availableMethods = [];
-            if (hasOpenAIOCR) availableMethods.push('OpenAI OCR');
-            if (hasHuggingFaceOCR) availableMethods.push('Hugging Face OCR');
-
-            console.error(`[PDF] All OCR methods failed. Available: ${availableMethods.join(', ')}, extracted text: ${extractedWords} words`);
-
-            return res.status(422).json({
-              error: 'scanned_pdf_ocr_failed',
-              message: `This appears to be a scanned PDF. OCR processing failed using all available methods (${availableMethods.join(', ')}). This could be due to API limits, network issues, or unsupported image quality. Please try uploading a text-based PDF or paste your resume text directly.`,
-            });
+          // Always proceed with analysis - even if OCR fails, we might have some text or can provide feedback
+          if (!ocrSuccess) {
+            if (extractedText && extractedWords > 0) {
+              console.log(`[PDF] OCR failed but proceeding with ${extractedWords} words from native extraction`);
+            } else {
+              console.log(`[PDF] OCR failed and no native text extracted - proceeding with empty text for analysis`);
+              extractedText = ""; // Ensure we have a string
+            }
           }
         }
       } else if (isImage) {
@@ -273,15 +266,16 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
     const cleanedText  = normalizeText(extractedText);
     const cleanedWords = wordCount(cleanedText);
     
-    // Final sanity check: Allow low word count ONLY if OCR was used (stricter for manual uploads/pastes)
-    if (!cleanedText || (cleanedWords < 5 && !isOcr)) {
+    // For PDFs, be more permissive - accept any text extraction result and provide feedback
+    // Only reject if absolutely no text was extracted at all
+    if (!cleanedText || cleanedText.trim().length === 0) {
       return res.status(422).json({
         error: 'text_extraction_failed',
-        message: 'Could not extract enough text to analyze. Please ensure your document contains resume content.',
+        message: 'Could not extract any text from the document. Please ensure your file contains readable content.',
       });
     }
 
-    console.log(`[Resume Analyzer] Ready for ${isOcr ? 'OCR' : 'Native'} analysis (${cleanedText.length} chars).`);
+    console.log(`[Resume Analyzer] Ready for analysis (${cleanedText.length} chars, ${cleanedWords} words, ${isOcr ? 'OCR' : 'Native'}).`);
     
     // Perform analysis
     let analysis = await analyzeResume(cleanedText);
