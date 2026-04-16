@@ -110,17 +110,14 @@ async function extractTextFromPdfUsingOcr(filePath) {
   let combinedText = '';
   for (const imagePath of imagePaths) {
     try {
-      let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
-      if (imageResult.unavailable) {
-        imageResult = await extractImageTextLocally(imagePath);
-      }
+      const imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
       if (!imageResult.unavailable && imageResult.text) {
         combinedText += ` ${imageResult.text}`;
       } else {
-        console.warn('OCR returned no text for image:', imagePath, imageResult.reason);
+        console.warn('Groq OCR returned no text for image:', imagePath, imageResult.reason);
       }
     } catch (e) {
-      console.warn('OCR failed for image:', imagePath, e.message);
+      console.warn('Groq OCR failed for image:', imagePath, e.message);
     } finally {
       if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     }
@@ -130,7 +127,7 @@ async function extractTextFromPdfUsingOcr(filePath) {
   if (!text) {
     return {
       unavailable: true,
-      reason: 'OCR extracted no readable text from the scanned PDF images.',
+      reason: 'Groq OCR extracted no readable text from the scanned PDF images.',
     };
   }
 
@@ -233,26 +230,10 @@ async function extractImageTextViaGroq(filePath, mimeType) {
 }
 
 async function extractImageTextLocally(filePath) {
-  try {
-    const { stdout } = await runCommand(
-      ['tesseract', '/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract'],
-      [filePath, 'stdout', '-l', 'eng', '--psm', '6'],
-      {
-        maxBuffer: 10 * 1024 * 1024,
-      }
-    );
-
-    return { unavailable: false, text: stdout.trim() };
-  } catch (e) {
-    console.error('Local OCR error:', e.message);
-    const reason = e.code === 'ENOENT'
-      ? 'Local OCR is not installed on this server. Install Tesseract or configure GROQ_API_KEY for image resume analysis.'
-      : 'Local OCR is temporarily unavailable on this server. Please upload a PDF resume or try again later.';
-    return {
-      unavailable: true,
-      reason,
-    };
-  }
+  return {
+    unavailable: true,
+    reason: 'Local OCR has been removed. Please configure GROQ_API_KEY for image resume analysis.',
+  };
 }
 
 // ── Agent 1: Resume Analyzer ─────────────────────────────────────────────────
@@ -287,14 +268,11 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
           }
         }
       } else if (isImage) {
-        let imageResult = await extractImageTextViaGroq(file.path, mimeType);
-        if (imageResult.unavailable) {
-          imageResult = await extractImageTextLocally(file.path);
-        }
+        const imageResult = await extractImageTextViaGroq(file.path, mimeType);
         if (imageResult.unavailable) {
           return res.status(503).json({
             error: 'image_analysis_unavailable',
-            message: imageResult.reason || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.',
+            message: imageResult.reason || 'Image resume analysis is temporarily unavailable. Please configure GROQ_API_KEY or upload a PDF resume instead.',
           });
         }
         extractedText = imageResult.text;
