@@ -13,13 +13,15 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const API_KEY        = process.env.GROQ_API_KEY;
 const RESUME_API_KEY = process.env.GROQ_API_KEY_RESUME || API_KEY;
-const USE_AI         = !!API_KEY;
+const USE_GROQ       = !!API_KEY;
+const USE_OPENAI     = !!process.env.OPENAI_API_KEY;
+const USE_AI         = USE_GROQ || USE_OPENAI;
 const MODEL          = 'llama-3.3-70b-versatile';
 
 let groq       = null;
 let groqResume = null;
 
-if (USE_AI) {
+if (USE_GROQ) {
   groq = new Groq({ apiKey: API_KEY });
   console.log('✅ Groq Primary AI connected');
   
@@ -30,8 +32,10 @@ if (USE_AI) {
   } else {
     groqResume = groq;
   }
+} else if (USE_OPENAI) {
+  console.log('⚠️  GROQ_API_KEY not set — using OpenAI fallback for AI agents');
 } else {
-  console.log('⚠️  GROQ_API_KEY not set — agents running in mock mode');
+  console.log('⚠️  GROQ_API_KEY and OPENAI_API_KEY not set — agents running in mock mode');
 }
 
 /**
@@ -75,6 +79,45 @@ const extractTextViaOpenAI = async (fileBuffer, mimeType = 'image/jpeg') => {
   }
 };
 
+async function askOpenAI(systemPrompt, userPrompt, maxTokens = 900) {
+  if (!USE_OPENAI) throw new Error('OpenAI API key missing');
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.2,
+  });
+
+  return response.choices?.[0]?.message?.content || '';
+}
+
+function parseJsonResponse(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const jsonMatch = rawText.match(/\{[\s\S]*\}$/m);
+  if (!jsonMatch) return null;
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    return null;
+  }
+}
+
+function normalizeResult(result) {
+  if (!result || typeof result !== 'object') return null;
+  if (result.analysis && typeof result.analysis === 'object') result = result.analysis;
+  if (result.resume && typeof result.resume === 'object') result = result.resume;
+  return result;
+}
+
+function ensureArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+}
+
 // Core helper — sends a prompt, expects JSON back
 async function ask(systemPrompt, userPrompt, maxTokens = 512, clientOverride = null) {
   const client = clientOverride || groq;
@@ -93,70 +136,70 @@ async function ask(systemPrompt, userPrompt, maxTokens = 512, clientOverride = n
   return JSON.parse(res.choices[0].message.content);
 }
 
+function extractResumeSection(label, resumeText) {
+  const regex = new RegExp(`${label}\s*[:\-]?\s*([\s\S]{20,300})`, 'i');
+  const match = resumeText.match(regex);
+  if (!match) return [];
+  return match[1]
+    .split(/[\n,•;•]/)
+    .map((piece) => piece.trim())
+    .filter((piece) => piece && piece.length < 60)
+    .slice(0, 6);
+}
+
+function extractCompaniesFromText(resumeText) {
+  const found = new Set();
+  const companyRegex = /\bat\s+([A-Z][A-Za-z0-9&.\- ]{2,})(?=[\.,\n]|$)/g;
+  for (const match of resumeText.matchAll(companyRegex)) {
+    found.add(match[1].trim());
+  }
+  return Array.from(found).slice(0, 5);
+}
+
 function buildResumeAnalysisFromText(resumeText) {
-  // Smart mock: vary results based on actual content so it's never identical
-  const textLower = resumeText.toLowerCase();
-  const hasReact   = textLower.includes('react');
-  const hasPython  = textLower.includes('python');
-  const hasML      = textLower.includes('machine learning') || textLower.includes(' ml ') || textLower.includes('neural');
-  const wordCount  = resumeText.split(/\s+/).filter(Boolean).length;
-
-  // No longer rejecting short resumes. We'll analyze whatever we get.
-  const isTooShort = wordCount < 10;
-
-
-  // Score varies meaningfully by content richness (not always 87)
-  const baseScore = Math.min(95, Math.max(42, 52 + Math.floor(resumeText.length / 80)));
-  const score = Math.min(98, Math.max(40, baseScore + Math.floor(Math.random() * 10 - 5)));
-
-  const companies = hasML
-    ? ['OpenAI', 'NVIDIA', 'Hugging Face', 'Databricks', 'Anthropic']
-    : hasReact
-    ? ['Vercel', 'Shopify', 'Airbnb', 'Stripe', 'Notion']
-    : hasPython
-    ? ['Snowflake', 'Palantir', 'Confluent', 'MongoDB', 'Databricks']
-    : ['Microsoft', 'Amazon', 'Atlassian', 'Figma', 'Notion'];
-
-  const gaps = hasML
-    ? ['MLOps pipelines', 'LLM fine-tuning', 'vector databases', 'A/B testing frameworks']
-    : hasReact
-    ? ['TypeScript', 'System design', 'GraphQL', 'CI/CD pipelines']
-    : ['Cloud infrastructure (AWS/GCP)', 'Docker/Kubernetes', 'API design', 'SQL optimization'];
+  const normalizedText = resumeText.replace(/\s+/g, ' ').trim();
+  const wordCount = normalizedText.split(/\s+/).filter(Boolean).length;
+  const score = Math.min(88, Math.max(45, Math.floor(wordCount * 1.2) + 10));
+  const companies = extractCompaniesFromText(resumeText);
+  const skills = extractResumeSection('skills', resumeText);
+  const roleHints = [];
+  if (/machine learning|artificial intelligence|deep learning|neural network/i.test(resumeText)) roleHints.push('Machine Learning Engineer');
+  if (/react\b|vue\b|angular\b|frontend\b/i.test(resumeText)) roleHints.push('Frontend / Full-Stack Developer');
+  if (/python\b|django\b|flask\b|backend\b/i.test(resumeText)) roleHints.push('Backend / Data Engineer');
+  if (/data science|data analyst|analytics/i.test(resumeText)) roleHints.push('Data Analyst / Scientist');
 
   return {
     score,
-    grade: score >= 88 ? 'A' : score >= 75 ? 'B' : score >= 62 ? 'C' : 'D',
-    ats_score: Math.min(98, Math.max(40, score - 5 + Math.floor(Math.random() * 10))),
-    target_companies: companies,
-    keyword_gaps: gaps,
+    grade: score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D',
+    ats_score: Math.min(90, Math.max(40, score - 5)),
+    target_companies: companies.length > 0 ? companies : ['Industry-relevant companies'],
+    keyword_gaps: [
+      skills.length > 0 ? `Add more role-specific keywords around ${skills[0]}` : 'Add domain-specific keywords aligned to your target role.',
+      'Use stronger impact language for achievements, including metrics where possible.',
+      'Include a concise summary highlighting your top strengths and role focus.',
+      'Ensure consistent formatting for dates, headings, and bullets.',
+    ].slice(0, 4),
     formatting_fixes: [
-      resumeText.length < 100 ? 'This document is very short. Add more detailed descriptions of your experience and projects.' : (score < 65 ? 'Add quantifiable achievements (e.g., "Reduced API latency by 40%").' : 'Strengthen impact statements with specific metrics and percentages.'),
-      'Move your most impressive project to the top of the Projects section.',
-      'Add a 2–3 sentence professional summary tailored to your target role.',
-      'Ensure consistent date formatting (e.g., "Jan 2023 – Mar 2024") throughout.',
+      wordCount < 150 ? 'Expand your resume with more experience and project details.' : 'Prioritize the most relevant experience at the top of the document.',
+      'Add a brief professional summary or headline to frame your target role.',
+      'Use bullet points for achievements and technical contributions.',
+      'Keep section headings consistent and easy to scan.',
     ],
     strengths: [
-      hasReact || hasPython || hasML ? 'Relevant modern tech stack well-aligned with current industry demand.' : 'Solid foundational skill set.',
-      resumeText.length > 500 ? 'Detailed project descriptions with clear technical scope.' : 'Concise, easily scannable format.',
-    ],
-    role_detected: hasML ? 'Machine Learning / AI Engineer' : hasReact ? 'Frontend / Full-Stack Developer' : hasPython ? 'Backend / Data Engineer' : 'Software Engineer',
-    experience_years: Math.min(15, Math.max(0, Math.floor(resumeText.length / 1500))),
-    top_skills: hasReact
-      ? ['React', 'JavaScript', 'Node.js', 'CSS', 'REST APIs']
-      : hasPython
-      ? ['Python', 'SQL', 'Data Analysis', 'Machine Learning', 'APIs']
-      : ['Java', 'Algorithms', 'Data Structures', 'Git', 'Agile'],
+      skills.length > 0 ? `Listed skills include ${skills.slice(0, 3).join(', ')}.` : 'The resume contains a clear focus on career experience and accomplishments.',
+      wordCount > 300 ? 'Sufficient detail is present to evaluate experience and technical ability.' : 'A concise format can be easier to read, but more detail may improve accuracy.',
+    ].slice(0, 3),
+    role_detected: roleHints[0] || 'Software Engineer',
+    experience_years: Math.min(15, Math.max(0, Math.floor(wordCount / 100))),
+    top_skills: skills.length > 0 ? skills.slice(0, 6) : ['Resume content needs more explicit skills'],
     is_mock: true,
-    fallback_reason: 'AI service unconfigured or failed at runtime.',
+    fallback_reason: 'AI service unavailable; using deterministic text extraction.',
   };
 }
 
 // ─── Agent 1: Resume Analyzer ────────────────────────────────────────────────
 const analyzeResume = async (resumeText) => {
-  if (USE_AI) {
-    try {
-      const rawResult = await ask(
-        `You are an expert technical recruiter and resume analyst.
+  const aiPrompt = `You are an expert technical recruiter and resume analyst.
 
 ALWAYS analyze this text as a resume/CV, even if it seems incomplete or unusual. Return JSON with ALL these keys:
 - score: integer 0-100 (honest assessment of this specific resume's quality)
@@ -165,67 +208,75 @@ ALWAYS analyze this text as a resume/CV, even if it seems incomplete or unusual.
 - target_companies: array of 5 company names that match THIS candidate's actual profile
 - keyword_gaps: array of 3-4 high-value missing keywords for their target role
 - formatting_fixes: array of 3-4 specific, actionable tips referencing the actual content found
-- strengths: array of 2-3 genuine strengths found in THIS document
+- strengths: array of 2-3 genuine strengths found in this document
 - role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
 - experience_years: total count of years of experience as a number (NOT the start or end year)
 - top_skills: array of 5-6 actual skills listed in this resume
 
-Only include companies and skills that are realistic based on the resume text. Do NOT invent companies or skills unrelated to the candidate's experience, industry, education, or projects. If the resume contains domain-specific clues, choose companies with hiring profiles aligned to that domain rather than generic FAANG-style lists.
+Use ONLY the content in the resume text to infer companies and skills. If the resume mentions specific employers, include those in target_companies. If no explicit employer is present, choose companies that are a strong hiring match for the candidate's domain and role based on the resume details.
 
-If the resume text does not contain enough explicit evidence for a field, return a conservative placeholder that reflects the lack of information rather than making up details.
+For top_skills, list the 5-6 most relevant skills actually present or clearly implied by the resume. Do not invent unrelated skills.
 
-Do not refuse to analyze or return not_a_resume. Analyze any text that mentions work, skills, education, or projects as a resume.`,
-        `Resume text:\n${resumeText.slice(0, 4000)}`,
-        900,
-        groqResume
-      );
+If the resume text does not contain enough explicit evidence for a field, return a conservative placeholder that reflects the lack of information rather than fabricating details.
 
-      // Normalize possible wrapper from LLM
-      let result = rawResult;
+Do not refuse to analyze or return not_a_resume. Analyze any text that mentions work, skills, education, or projects as a resume.`;
+
+  const normalize = (result) => {
+    result = normalizeResult(result);
+    if (!result) return null;
+
+    let exp = parseInt(result.experience_years);
+    if (isNaN(exp)) exp = 0;
+    if (exp >= 1900 && exp <= 2100) exp = 1;
+    else if (exp > 50) exp = 50;
+
+    return {
+      score: Math.min(100, Math.max(0, parseInt(result.score) || 60)),
+      grade: result.grade || 'C',
+      ats_score: Math.min(100, Math.max(0, parseInt(result.ats_score) || 55)),
+      target_companies: ensureArray(result.target_companies).slice(0, 5),
+      keyword_gaps: ensureArray(result.keyword_gaps).slice(0, 4),
+      formatting_fixes: ensureArray(result.formatting_fixes).slice(0, 4),
+      strengths: ensureArray(result.strengths).slice(0, 3),
+      role_detected: String(result.role_detected || 'Software Engineer'),
+      experience_years: exp,
+      top_skills: ensureArray(result.top_skills).slice(0, 6),
+    };
+  };
+
+  if (USE_GROQ) {
+    try {
+      const rawResult = await ask(aiPrompt, `Resume text:\n${resumeText.slice(0, 4000)}`, 900, groqResume);
       console.log('AI Raw Result:', JSON.stringify(rawResult, null, 2));
-      
-      if (result && typeof result.analysis === 'object') result = result.analysis;
-      if (result && typeof result.resume === 'object') result = result.resume;
-
-      // Always proceed with analysis, ignore not_a_resume flag
-      // if (result.not_a_resume) {
-      //   console.log('AI flagged as not resume, but proceeding with analysis anyway:', result.reason);
-      //   return buildResumeAnalysisFromText(resumeText);
-      // }
-
-      // Robust extraction
-      const toArray = (v) => Array.isArray(v) ? v : (typeof v === 'string' ? [v] : []);
-      
-      let exp = parseInt(result.experience_years);
-      if (isNaN(exp)) exp = 0;
-      // If the AI returns a year like 2024 or 2018, it's likely a mistake. 
-      // Most students/alumni using this won't have 1900+ years of experience.
-      if (exp >= 1900 && exp <= 2100) {
-        exp = 1; 
-      } else if (exp > 50) {
-        // Cap at 50 to avoid hallucinated high numbers or non-year glitches
-        exp = 50;
+      const normalized = normalize(rawResult);
+      if (normalized) {
+        normalized.is_mock = false;
+        return normalized;
       }
-
-      const finalResult = {
-        score: parseInt(result.score) || 70,
-        grade: result.grade || 'C',
-        ats_score: parseInt(result.ats_score) || 60,
-        target_companies: toArray(result.target_companies).slice(0, 5),
-        keyword_gaps: toArray(result.keyword_gaps).slice(0, 4),
-        formatting_fixes: toArray(result.formatting_fixes).slice(0, 4),
-        strengths: toArray(result.strengths).slice(0, 3),
-        role_detected: String(result.role_detected || 'Software Engineer'),
-        experience_years: exp,
-        top_skills: toArray(result.top_skills).slice(0, 6)
-      };
-
-      // Tag as real AI result
-      finalResult.is_mock = false;
-      return finalResult;
-
+      throw new Error('Failed to normalize Groq response');
     } catch (e) {
-      console.error('Agent 1 (Resume) error:', e.message);
+      console.error('Groq resume analyzer failed:', e.message);
+      if (!USE_OPENAI) {
+        const mockResult = buildResumeAnalysisFromText(resumeText);
+        mockResult.is_mock = true;
+        mockResult.fallback_reason = `AI Analysis failed: ${e.message}`;
+        return mockResult;
+      }
+    }
+  }
+
+  if (USE_OPENAI) {
+    try {
+      const rawText = await askOpenAI(aiPrompt, `Resume text:\n${resumeText.slice(0, 4000)}`, 1200);
+      const parsed = parseJsonResponse(rawText);
+      const normalized = normalize(parsed);
+      if (normalized) {
+        normalized.is_mock = false;
+        return normalized;
+      }
+      throw new Error('Failed to parse OpenAI response');
+    } catch (e) {
+      console.error('OpenAI resume analyzer failed:', e.message);
       const mockResult = buildResumeAnalysisFromText(resumeText);
       mockResult.is_mock = true;
       mockResult.fallback_reason = `AI Analysis failed: ${e.message}`;
@@ -233,9 +284,9 @@ Do not refuse to analyze or return not_a_resume. Analyze any text that mentions 
     }
   }
 
-  // If USE_AI is false
   const mockResult = buildResumeAnalysisFromText(resumeText);
-  mockResult.fallback_reason = 'GROQ_API_KEY not found in environment. Running in Mock Mode.';
+  mockResult.is_mock = true;
+  mockResult.fallback_reason = 'GROQ_API_KEY and OPENAI_API_KEY not found. Running deterministic fallback.';
   return mockResult;
 };
 
