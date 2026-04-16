@@ -8,22 +8,35 @@
 
 const Groq = require('groq-sdk');
 
-const API_KEY = process.env.GROQ_API_KEY;
-const USE_AI  = !!API_KEY;
-const MODEL   = 'llama-3.3-70b-versatile';
+const API_KEY        = process.env.GROQ_API_KEY;
+const RESUME_API_KEY = process.env.GROQ_API_KEY_RESUME || API_KEY;
+const USE_AI         = !!API_KEY;
+const MODEL          = 'llama-3.3-70b-versatile';
 
-let groq = null;
+let groq       = null;
+let groqResume = null;
+
 if (USE_AI) {
   groq = new Groq({ apiKey: API_KEY });
-  console.log('✅ Groq AI connected — all 7 agents using llama-3.3-70b-versatile');
+  console.log('✅ Groq Primary AI connected');
+  
+  // Use dedicated resume key if present, otherwise fallback to primary
+  if (process.env.GROQ_API_KEY_RESUME) {
+    groqResume = new Groq({ apiKey: RESUME_API_KEY });
+    console.log('✅ Groq Resume-Specific AI connected');
+  } else {
+    groqResume = groq;
+  }
 } else {
   console.log('⚠️  GROQ_API_KEY not set — agents running in mock mode');
 }
 
 // Core helper — sends a prompt, expects JSON back
-async function ask(systemPrompt, userPrompt, maxTokens = 512) {
-  if (!groq) throw new Error('Groq client not initialized — GROQ_API_KEY is missing');
-  const res = await groq.chat.completions.create({
+async function ask(systemPrompt, userPrompt, maxTokens = 512, clientOverride = null) {
+  const client = clientOverride || groq;
+  if (!client) throw new Error('Groq client not initialized — key is missing');
+  
+  const res = await client.chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -113,7 +126,8 @@ ALWAYS analyze this text as a resume/CV, even if it seems incomplete or unusual.
 
 Do not refuse to analyze or return not_a_resume. Analyze any text that mentions work, skills, education, or projects as a resume.`,
         `Resume text:\n${resumeText.slice(0, 4000)}`,
-        900
+        900,
+        groqResume
       );
 
       // Normalize possible wrapper from LLM

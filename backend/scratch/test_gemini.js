@@ -16,6 +16,10 @@ async function testGemini() {
 
   // Use a dummy text to test connectivity and basic response
   try {
+    console.log('Listing available models...');
+    const models = await genAI.listModels();
+    console.log('Available Models:', JSON.stringify(models, null, 2));
+
     const result = await model.generateContent('Hi, can you confirm you are Gemini 1.5 Flash?');
     console.log('Gemini Response:', result.response.text());
   } catch (e) {
