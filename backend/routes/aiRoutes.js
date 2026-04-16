@@ -92,6 +92,7 @@ async function extractTextFromPdfUsingOcr(filePath) {
   let imagePaths = [];
   try {
     imagePaths = await convertPdfToImages(filePath, tempDir, outputBase);
+    console.log(`[PDF OCR] Converted PDF to ${imagePaths.length} images`);
   } catch (e) {
     console.warn('PDF-to-image conversion failed:', e.message);
     return {
@@ -114,16 +115,17 @@ async function extractTextFromPdfUsingOcr(filePath) {
       if (!imageResult.unavailable && imageResult.text) {
         combinedText += ` ${imageResult.text}`;
       } else {
-        console.warn('Groq OCR returned no text for image:', imagePath, imageResult.reason);
+        console.warn('[PDF OCR] Groq OCR returned no text for image:', imagePath, imageResult.reason);
       }
     } catch (e) {
-      console.warn('Groq OCR failed for image:', imagePath, e.message);
+      console.warn('[PDF OCR] Groq OCR failed for image:', imagePath, e.message);
     } finally {
       if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     }
   }
 
   const text = normalizeText(combinedText);
+  console.log(`[PDF OCR] Combined extracted text length: ${text.length}, word count: ${wordCount(text)}`);
   if (!text) {
     return {
       unavailable: true,
@@ -183,6 +185,7 @@ async function extractImageTextViaGroq(filePath, mimeType) {
   try {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
+      console.log('[Groq OCR] No API key configured');
       return {
         unavailable: true,
         reason: 'Cloud image OCR is not configured right now.',
@@ -195,6 +198,7 @@ async function extractImageTextViaGroq(filePath, mimeType) {
     });
 
     const imageData = fs.readFileSync(filePath).toString('base64');
+    console.log(`[Groq OCR] Sending image (${mimeType}) to Groq Vision, size: ${imageData.length} chars`);
     const response = await client.chat.completions.create({
       model: 'llama-3.2-11b-vision-preview',
       messages: [
@@ -219,13 +223,10 @@ async function extractImageTextViaGroq(filePath, mimeType) {
     });
 
     const text = response.choices?.[0]?.message?.content?.trim() || '';
+    console.log(`[Groq OCR] Extracted text length: ${text.length}, preview: ${text.substring(0, 100)}`);
     return { unavailable: false, text };
   } catch (e) {
-    console.error('Groq Vision error:', e.message);
-    return {
-      unavailable: true,
-      reason: 'Cloud image OCR is temporarily unavailable.',
-    };
+    console.error('[Groq OCR] Error:', e.message);
   }
 }
 
