@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import AlumNexLogo from '../AlumNexLogo';
 import { getRequests, acceptRequestOnly, bookSlot, rescheduleSlot, declineRequest, formatScheduledTime } from '../interviewRequests';
 import { api } from '../api';
-import { getAllAlumni, getRequestsForAlumni } from '../lib/db';
+import { getAllAlumni, getRequestsForAlumni, getUserById } from '../lib/db';
 import { useInterviewRequests } from '../hooks/useInterviewRequests';
 import { useNotifications } from '../hooks/useNotifications';
 import SettingsPage from './SettingsPage';
@@ -13,12 +13,30 @@ import LogoutConfirmModal from '../components/LogoutConfirmModal';
 // â”€â”€ Student Detail + Accept Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StudentDetailModal({ request, onClose, onAccept }) {
   const rawProfile = request.studentProfile;
-  const p = typeof rawProfile === 'string' ? (() => {
+  const initialProfile = typeof rawProfile === 'string' ? (() => {
     try { return JSON.parse(rawProfile); } catch { return {}; }
   })() : (rawProfile || {});
+  const [p, setP] = useState(initialProfile);
   const resumeHref = p.resumeUrl || p.resume_url || '';
   const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLatestProfile = async () => {
+      const sid = request?.studentId;
+      if (!sid || String(sid).startsWith('stu-') || String(sid).startsWith('alm-')) return;
+      try {
+        const user = await getUserById(sid);
+        const dbProfile = user?.profile_data || {};
+        if (!cancelled && dbProfile && Object.keys(dbProfile).length > 0) {
+          setP(prev => ({ ...dbProfile, ...prev }));
+        }
+      } catch {}
+    };
+    loadLatestProfile();
+    return () => { cancelled = true; };
+  }, [request?.studentId]);
 
   const handleAccept = () => {
     setAccepting(true);
@@ -1207,11 +1225,11 @@ export default function AlumniDashboard() {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button onClick={() => setViewingRequest(r)} style={{ padding: '0.45rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span> View Profile
+                </button>
                 {r.status === 'pending' && (
                   <>
-                    <button onClick={() => setViewingRequest(r)} style={{ padding: '0.45rem 0.875rem', background: 'rgba(79,70,229,0.2)', color: '#c3c0ff', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span> View & Accept
-                    </button>
                     <button onClick={() => { handleDeclineRequest(r.id); }} style={{ padding: '0.45rem 0.75rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.65rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                       Decline
                     </button>

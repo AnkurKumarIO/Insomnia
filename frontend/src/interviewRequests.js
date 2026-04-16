@@ -65,6 +65,16 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
     }
   } catch {}
 
+  let mergedStudentProfile = studentProfile || null;
+  try {
+    if (realStudentId && !String(realStudentId).startsWith('stu-') && !String(realStudentId).startsWith('alm-')) {
+      const { getUserById } = await import('./lib/db');
+      const user = await getUserById(realStudentId);
+      const dbProfile = user?.profile_data || {};
+      mergedStudentProfile = { ...dbProfile, ...(studentProfile || {}) };
+    }
+  } catch {}
+
   const hasRealIds = realStudentId && alumniId &&
     !String(realStudentId).startsWith('stu-') && !String(alumniId).startsWith('alm-');
 
@@ -75,7 +85,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
         alumniId,
         topic:    topic   || 'Mock Interview',
         message:  message || '',
-        studentProfileSnapshot: studentProfile || null,
+        studentProfileSnapshot: mergedStudentProfile || null,
       });
 
       if (result?.request_id) {
@@ -92,7 +102,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
           scheduledTime: null,
           roomId:        null,
           createdAt:     result.created_at || new Date().toISOString(),
-          studentProfile,
+          studentProfile: mergedStudentProfile,
         });
         saveLocal(local);
         return result;
@@ -119,7 +129,7 @@ export async function sendRequest({ studentName, studentId, alumniName, alumniRo
     scheduledTime: null,
     roomId:        null,
     createdAt:     new Date().toISOString(),
-    studentProfile: studentProfile || null,
+    studentProfile: mergedStudentProfile || null,
   };
   local.push(req);
   saveLocal(local);
