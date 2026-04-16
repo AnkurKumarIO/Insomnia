@@ -51,12 +51,12 @@ const MOCK_API = {
       name = (input?.name || '').toLowerCase();
     }
     // Simulate non-resume detection
-    const nonResumeKeywords = ['invoice', 'receipt', 'photo', 'screenshot', 'image', 'meme', 'notes', 'homework'];
-    const looksLikeResume = !nonResumeKeywords.some(k => name.includes(k)) && (text.includes('experience') || text.includes('skills') || text.length > 100);
+    // Very lenient check for mock mode
+    const looksLikeResume = text.trim().length > 20 || name.length > 5;
     if (!looksLikeResume) {
       return {
         error: 'not_a_resume',
-        message: `"${name}" does not appear to be a resume. Please provide your actual resume content.`,
+        message: `"${name || 'The file'}" contains too little content to be analyzed as a resume. Please provide your actual resume content.`,
       };
     }
     // Vary score and content

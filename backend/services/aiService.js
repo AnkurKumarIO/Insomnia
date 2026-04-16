@@ -44,10 +44,9 @@ function buildResumeAnalysisFromText(resumeText) {
   const hasML      = textLower.includes('machine learning') || textLower.includes(' ml ') || textLower.includes('neural');
   const wordCount  = resumeText.split(/\s+/).filter(Boolean).length;
 
-  // Flag non-resumes even in mock mode
-  if (wordCount < 10) {
-    return { not_a_resume: true, reason: 'This document contains insufficient text to be a resume.' };
-  }
+  // No longer rejecting short resumes. We'll analyze whatever we get.
+  const isTooShort = wordCount < 10;
+
 
   // Score varies meaningfully by content richness (not always 87)
   const baseScore = Math.min(95, Math.max(42, 52 + Math.floor(resumeText.length / 80)));
@@ -74,7 +73,7 @@ function buildResumeAnalysisFromText(resumeText) {
     target_companies: companies,
     keyword_gaps: gaps,
     formatting_fixes: [
-      score < 65 ? 'Add quantifiable achievements (e.g., "Reduced API latency by 40%").' : 'Strengthen impact statements with specific metrics and percentages.',
+      resumeText.length < 100 ? 'This document is very short. Add more detailed descriptions of your experience and projects.' : (score < 65 ? 'Add quantifiable achievements (e.g., "Reduced API latency by 40%").' : 'Strengthen impact statements with specific metrics and percentages.'),
       'Move your most impressive project to the top of the Projects section.',
       'Add a 2–3 sentence professional summary tailored to your target role.',
       'Ensure consistent date formatting (e.g., "Jan 2023 – Mar 2024") throughout.',
