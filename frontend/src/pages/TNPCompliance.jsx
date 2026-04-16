@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { emitRealtimeSync, subscribeRealtimeSync } from '../lib/realtimeSync';
 
 // ── Logging utility functions ──────────────────────────────────────────────────
 export function logUserAction(user, role, action, detail) {
@@ -20,6 +21,7 @@ export function logUserAction(user, role, action, detail) {
     // Keep only last 50 logs to avoid excessive storage
     if (logs.length > 50) logs.pop();
     localStorage.setItem('alumnex_audit_logs', JSON.stringify(logs));
+    emitRealtimeSync({ type: 'audit_logs_updated' });
   } catch (err) {
     console.error('Failed to log action:', err);
   }
@@ -42,6 +44,7 @@ function initializeDemoLogs() {
       { id: 8, user: 'priya.sharma', role: 'ALUMNI', action: 'Profile Update', detail: 'Updated experience field', timestamp: '2026-04-16 11:00:15', status: 'success' },
     ];
     localStorage.setItem('alumnex_audit_logs', JSON.stringify(demoLogs));
+    emitRealtimeSync({ type: 'audit_logs_updated' });
   } catch (err) {
     console.error('Failed to initialize demo logs:', err);
   }
@@ -74,8 +77,12 @@ export default function ComplianceTab({ logRole, setLogRole, logAction, setLogAc
       loadLogs();
       setRefreshKey(k => k + 1);
     }, 2000);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadLogs();
+      setRefreshKey(k => k + 1);
+    });
 
-    return () => clearInterval(interval);
+    return () => { unsubscribe(); clearInterval(interval); };
   }, []);
 
   const loadLogs = () => {

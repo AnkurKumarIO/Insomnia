@@ -50,7 +50,7 @@ export default function UnifiedLogin() {
       if (localCred.role !== role) { setError(`These credentials belong to a ${localCred.role.toLowerCase()} account.`); setLoading(false); return; }
       const userData = { id: localCred.id || `${localCred.role.toLowerCase()}-${Date.now()}`, name: localCred.name, role: localCred.role, department: localCred.department };
       login(userData, `token-${Date.now()}`);
-      if (localCred.role === "STUDENT" && !localStorage.getItem("alumniconnect_profile")) { navigate("/profile-setup"); } else { navigate("/dashboard"); }
+      if (localCred.role === "STUDENT" && !localStorage.getItem("alumnex_profile") && !localStorage.getItem("alumniconnect_profile")) { navigate("/profile-setup"); } else { navigate("/dashboard"); }
       setLoading(false);
       return;
     }
@@ -64,7 +64,7 @@ export default function UnifiedLogin() {
       if (authErr) { setError("Invalid username or password."); setLoading(false); return; }
       const userData = { id: userRows.id, name: userRows.name, role: userRows.role, department: userRows.department, email: userRows.email };
       login(userData, authData.session?.access_token || `token-${Date.now()}`);
-      if (userRows.role === "STUDENT" && !localStorage.getItem("alumniconnect_profile")) { navigate("/profile-setup"); } else { navigate("/dashboard"); }
+      if (userRows.role === "STUDENT" && !localStorage.getItem("alumnex_profile") && !localStorage.getItem("alumniconnect_profile")) { navigate("/profile-setup"); } else { navigate("/dashboard"); }
     } catch (err) { setError("Login failed. Please try again."); }
     setLoading(false);
   };

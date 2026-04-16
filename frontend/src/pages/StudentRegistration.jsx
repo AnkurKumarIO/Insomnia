@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AlumNexLogo from '../AlumNexLogo';
 import { supabase } from '../lib/supabaseClient';
+import { emitRealtimeSync } from '../lib/realtimeSync';
 
 const inp = { width:'100%', background:'#222a3d', border:'1px solid rgba(70,69,85,0.4)', borderRadius:10, padding:'0.7rem 0.875rem', color:'#dae2fd', fontSize:'0.875rem', outline:'none', boxSizing:'border-box', fontFamily:'Inter, sans-serif' };
 const lbl = { fontSize:'0.7rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#c7c4d8', display:'block', marginBottom:6 };
@@ -97,7 +98,10 @@ export default function StudentRegistration() {
         profile_data: { username: creds.username, college: form.college, year: form.year, studentId: form.studentId },
       });
 
-      localStorage.setItem('alumniconnect_pending_profile', JSON.stringify({ ...form, username: creds.username, password: creds.password, role: 'STUDENT', id: userId }));
+      const pendingProfile = { ...form, username: creds.username, password: creds.password, role: 'STUDENT', id: userId };
+      localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(pendingProfile));
+      localStorage.setItem('alumnex_pending_profile', JSON.stringify(pendingProfile));
+      emitRealtimeSync({ type: 'tnp_notifications_updated' });
       setCreatedUsername(creds.username);
       setStep(3);
     } catch (err) {

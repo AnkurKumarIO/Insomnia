@@ -84,23 +84,9 @@ export function useInterviewRequests(userId, userRole) {
           table: 'interview_requests',
           filter,
         },
-        (payload) => {
-          console.log('[Realtime] New interview request:', payload.new);
-          const normalized = {
-            id: payload.new.request_id,
-            studentName: payload.new.student_name || '',
-            studentId: payload.new.student_id,
-            alumniName: payload.new.alumni_name || '',
-            alumniId: payload.new.alumni_id,
-            topic: payload.new.topic,
-            message: payload.new.message || '',
-            status: (payload.new.status || 'PENDING').toLowerCase(),
-            scheduledTime: payload.new.scheduled_time || null,
-            roomId: payload.new.room_id || null,
-            createdAt: payload.new.created_at,
-            studentProfile: payload.new.student_profile_snapshot || null,
-          };
-          setRequests(prev => [normalized, ...prev]);
+        () => {
+          console.log('[Realtime] New interview request');
+          loadInitialRequests();
         }
       )
       .subscribe();
@@ -116,20 +102,9 @@ export function useInterviewRequests(userId, userRole) {
           table: 'interview_requests',
           filter,
         },
-        (payload) => {
-          console.log('[Realtime] Interview request updated:', payload.new);
-          setRequests(prev =>
-            prev.map(r => 
-              r.id === payload.new.request_id 
-                ? {
-                    ...r,
-                    status: (payload.new.status || 'PENDING').toLowerCase(),
-                    scheduledTime: payload.new.scheduled_time || null,
-                    roomId: payload.new.room_id || null,
-                  }
-                : r
-            )
-          );
+        () => {
+          console.log('[Realtime] Interview request updated');
+          loadInitialRequests();
         }
       )
       .subscribe();

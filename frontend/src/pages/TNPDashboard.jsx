@@ -6,6 +6,7 @@ import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import AnalyticsTab from './TNPAnalytics';
 import SystemSettingsTab from './TNPSettings';
 import ComplianceTab from './TNPCompliance';
+import { subscribeRealtimeSync } from '../lib/realtimeSync';
 
 // ── Review Modal Component ────────────────────────────────────────────────────
 function ReviewModal({ item, onClose, onApprove, onDeny }) {
@@ -237,7 +238,7 @@ export default function TNPDashboard() {
     try { return JSON.parse(localStorage.getItem('tnp_seen_notifs') || '[]'); } catch { return []; }
   });
 
-  // Poll for new approval requests every 3s
+  // Rebuild notifications immediately when related local data changes
   useEffect(() => {
     const buildNotifs = () => {
       const notifs = [];
@@ -282,8 +283,12 @@ export default function TNPDashboard() {
       setTnpNotifs(all);
     };
     buildNotifs();
+    const unsubscribe = subscribeRealtimeSync(buildNotifs);
     const interval = setInterval(buildNotifs, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   const unreadCount = tnpNotifs.filter(n => !seenNotifIds.includes(n.id)).length;
@@ -829,4 +834,3 @@ export default function TNPDashboard() {
     </div>
   );
 }
-

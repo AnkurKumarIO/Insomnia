@@ -12,6 +12,7 @@ import { api } from '../api';
 import { getAllAlumni, getUserById } from '../lib/db';
 import { useNotifications } from '../hooks/useNotifications';
 import { useInterviewRequests } from '../hooks/useInterviewRequests';
+import { subscribeRealtimeSync } from '../lib/realtimeSync';
 
 // â”€â”€ Inline BookModal for Recommended Mentor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOPICS = [
@@ -28,8 +29,8 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
   if (!mentor) return null;
 
   const handleSend = () => {
-    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
-    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    const profile = JSON.parse(localStorage.getItem('alumnex_profile') || localStorage.getItem('alumniconnect_profile') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumnex_user') || localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
       studentId: authUser.id || studentName,
@@ -133,11 +134,15 @@ export default function Dashboard() {
   const [profileData, setProfileData] = useState({});
   const [aiProfileStrength, setAiProfileStrength] = useState(null);
 
+  const hasRealUserId = user?.id && !String(user.id).startsWith('stu-') && !String(user.id).startsWith('alm-');
+
   // ── Real-time notifications using Supabase subscriptions ──────────────────
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
+  const { requests: syncedRequests } = useInterviewRequests(hasRealUserId ? user?.id : null, hasRealUserId ? user?.role : null);
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   // Convert DB notifications to display format
-  const studentNotifs = (notifications || []).map(n => ({
+  const dbStudentNotifs = (notifications || []).map(n => ({
     id: n.id,
     studentName: user?.name,
     type: n.type?.toLowerCase() || 'default',
@@ -148,6 +153,10 @@ export default function Dashboard() {
     createdAt: n.created_at,
     roomId: n.request_id ? `room-${String(n.request_id).replace(/[^a-z0-9]/gi, '').slice(-16).toLowerCase()}` : null,
   }));
+  const fallbackStudentNotifs = getStudentNotifications(user?.name || '');
+  const studentNotifs = hasRealUserId
+    ? dbStudentNotifs
+    : [...dbStudentNotifs, ...fallbackStudentNotifs.filter(local => !dbStudentNotifs.find(db => db.requestId === local.requestId && db.type === local.type))];
 
   // Push tab to browser history so back button works within dashboard
   const isFirstRender = useRef(true);
@@ -168,6 +177,8 @@ export default function Dashboard() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  useEffect(() => subscribeRealtimeSync(() => setLocalRefresh(v => v + 1)), []);
 
   if (!user) return <Navigate to="/" replace />;
   const firstName = (user?.name || user?.role || 'Student').split(' ')[0];
@@ -224,7 +235,7 @@ export default function Dashboard() {
     : (profileData.skills || []).slice(0, 3);
 
   const SKILL_COLORS = ['#c3c0ff', '#4edea3', '#ffb95f'];
-  const myRequests     = getRequestsByStudent(user?.name || '');
+  const myRequests     = hasRealUserId && syncedRequests.length > 0 ? syncedRequests : getRequestsByStudent(user?.name || '');
   const pendingCount   = myRequests.filter(r => r.status === 'pending').length;
   const interviewCount = myRequests.filter(r => r.status === 'slot_booked' || r.status === 'accepted').length;
   const CIRC   = 2 * Math.PI * 70;
@@ -245,7 +256,7 @@ export default function Dashboard() {
               <p style={{ fontSize: '0.875rem', color: '#c7c4d8' }}>Updates from your interview requests and scheduled sessions</p>
             </div>
             {allNotifs.some(n => !n.read) && (
-              <button onClick={() => markStudentNotifsRead(user.name)} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => hasRealUserId ? markAllAsRead() : markStudentNotifsRead(user.name, user?.id)} style={{ padding: '0.4rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 8, color: '#c3c0ff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}>
                 Mark all read
               </button>
             )}
@@ -260,7 +271,7 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {allNotifs.map(n => {
-                const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                const req = myRequests.find(r => r.id === n.requestId);
                 const isLive = n.type === 'live';
                 const canJoin = (n.type === 'slot_booked' || isLive) && req?.roomId && req?.scheduledTime &&
                   Date.now() >= new Date(req.scheduledTime).getTime() - 5 * 60 * 1000;
@@ -556,7 +567,7 @@ export default function Dashboard() {
 
             {/* Student notification bell */}
             <div style={{ position: 'relative' }}>
-              <button onClick={() => { setShowNotifs(v => !v); setShowProfile(false); if (!showNotifs) markStudentNotifsRead(user.name); }} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => { setShowNotifs(v => !v); setShowProfile(false); if (!showNotifs) { hasRealUserId ? markAllAsRead() : markStudentNotifsRead(user.name, user?.id); } }} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-symbols-outlined" style={{ color: showNotifs ? '#c3c0ff' : '#c7c4d8', fontSize: 22, fontVariationSettings: showNotifs ? "'FILL' 1" : "'FILL' 0" }}>notifications</span>
                 {unreadNotifCount > 0 && (
                   <div style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ff4444', border: '1.5px solid #0b1326' }} />
@@ -597,7 +608,7 @@ export default function Dashboard() {
                             )}
                             {/* Join Now button for slot_booked notifications */}
                             {n.type === 'slot_booked' && (() => {
-                              const req = getRequestsByStudent(user.name).find(r => r.id === n.requestId);
+                              const req = myRequests.find(r => r.id === n.requestId);
                               const joinRoomId = n.roomId || req?.roomId;
                               const scheduledTime = req?.scheduledTime;
                               if (!joinRoomId) return null;
@@ -735,6 +746,4 @@ const glass = { background: 'rgba(23,31,51,0.7)', backdropFilter: 'blur(20px)', 
 const label = { fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', fontWeight: 700, marginBottom: '1rem' };
 const btnOutline = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c3c0ff', border: '1px solid rgba(195,192,255,0.2)', background: 'transparent', borderRadius: 8, cursor: 'pointer' };
 const btnPrimary = { padding: '0.5rem 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer' };
-
-
 

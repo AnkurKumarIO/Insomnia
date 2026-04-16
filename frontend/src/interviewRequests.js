@@ -2,6 +2,7 @@
 // Falls back to localStorage when Supabase is unreachable
 
 import { createRequest as dbCreateRequest, getRequestsForAlumni as dbGetRequestsForAlumni, getRequestsForStudent, updateRequest as dbUpdateRequest, createNotification } from './lib/db';
+import { emitRealtimeSync } from './lib/realtimeSync';
 
 const STORAGE_KEY = 'alumnex_interview_requests';
 const NOTIF_KEY   = 'alumniconnect_student_notifications';
@@ -12,12 +13,14 @@ function loadLocal() {
 }
 function saveLocal(requests) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+  emitRealtimeSync({ type: 'requests_updated' });
 }
 function pushLocalNotif({ studentName, type, title, message, requestId, roomId }) {
   try {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
     all.unshift({ id: `notif-${Date.now()}`, studentName, type, title, message, requestId, roomId: roomId || null, read: false, createdAt: new Date().toISOString() });
     localStorage.setItem(NOTIF_KEY, JSON.stringify(all));
+    emitRealtimeSync({ type: 'student_notifications_updated', studentName });
   } catch {}
 }
 
@@ -35,6 +38,7 @@ export async function markStudentNotifsRead(studentName, studentId) {
     const all = JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]');
     const updated = all.map(n => n.studentName === studentName ? { ...n, read: true } : n);
     localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+    emitRealtimeSync({ type: 'student_notifications_updated', studentName });
     
     // Also sync to DB if we have the ID
     let realStudentId = studentId;

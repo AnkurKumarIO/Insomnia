@@ -53,8 +53,8 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
   const [sent, setSent] = useState(false);
 
   const handleSend = () => {
-    const profile = JSON.parse(localStorage.getItem('alumniconnect_profile') || '{}');
-    const authUser = JSON.parse(localStorage.getItem('alumniconnect_user') || '{}');
+    const profile = JSON.parse(localStorage.getItem('alumnex_profile') || localStorage.getItem('alumniconnect_profile') || '{}');
+    const authUser = JSON.parse(localStorage.getItem('alumnex_user') || localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
       studentId: authUser.id || studentName,

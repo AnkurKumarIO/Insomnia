@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { api } from './api';
 import { AuthContext } from './context/AuthContext';
+import { emitRealtimeSync } from './lib/realtimeSync';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 
@@ -275,6 +276,7 @@ export default function GoogleMeetInterviewRoom() {
         };
         existing.unshift(report);
         localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+        emitRealtimeSync({ type: 'interview_history_updated', userId: authUser.id, studentName: authUser.name });
       } catch (saveErr) {
         console.warn('Could not save interview report:', saveErr);
       }

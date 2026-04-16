@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { updateUserProfile } from '../lib/db';
+import { emitRealtimeSync } from '../lib/realtimeSync';
 
 const STEPS = ['Personal Info', 'Skills & Academics', 'Resume & Projects', 'Career Goals', 'Review'];
 const DEPTS = ['Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'MBA', 'Other'];
@@ -206,9 +207,10 @@ export default function ProfileSetup() {
   ];
 
   const handleComplete = async () => {
-    const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || '{}');
+    const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || localStorage.getItem('alumniconnect_pending_profile') || '{}');
     const fullProfile = { ...pending, ...profile, photoPreview, profileComplete: true };
     localStorage.setItem('alumnex_profile', JSON.stringify(fullProfile));
+    localStorage.setItem('alumniconnect_profile', JSON.stringify(fullProfile));
 
     const userId = pending.id;
     const profilePayload = {
@@ -236,7 +238,10 @@ export default function ProfileSetup() {
     };
 
     // Update pending profile to mark as complete
-    localStorage.setItem('alumnex_pending_profile', JSON.stringify({ ...pending, profileComplete: true }));
+    const updatedPending = { ...pending, profileComplete: true };
+    localStorage.setItem('alumnex_pending_profile', JSON.stringify(updatedPending));
+    localStorage.setItem('alumniconnect_pending_profile', JSON.stringify(updatedPending));
+    emitRealtimeSync({ type: 'tnp_notifications_updated' });
 
     login(userData, `token-${Date.now()}`);
     navigate('/dashboard');

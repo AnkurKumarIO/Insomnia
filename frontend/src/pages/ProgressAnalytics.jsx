@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../api';
+import { subscribeRealtimeSync } from '../lib/realtimeSync';
 
 const INSIGHTS = [
   { icon: 'record_voice_over', color: '#4edea3', title: 'Vocal Clarity',   text: "Focus on pacing and ending sentences with conviction to improve clarity scores." },
@@ -58,6 +59,8 @@ export default function ProgressAnalytics() {
   };
 
   useEffect(() => { loadInterviews(); }, [user?.id, user?.name]);
+
+  useEffect(() => subscribeRealtimeSync(() => loadInterviews()), [user?.id, user?.name]);
 
   // Derived stats
   const scores      = interviews.filter(i => i.score > 0).map(i => i.score);
@@ -282,4 +285,3 @@ export default function ProgressAnalytics() {
     </div>
   );
 }
-

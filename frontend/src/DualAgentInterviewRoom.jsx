@@ -6,6 +6,7 @@ import { AuthContext } from './context/AuthContext';
 import { upsertInterviewRecord } from './lib/db';
 import { supabase } from './lib/supabaseClient';
 import VideoStreamManager from './utils/VideoStreamManager';
+import { emitRealtimeSync } from './lib/realtimeSync';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 const API_URL    = import.meta.env.VITE_API_URL    || 'http://localhost:5001';
@@ -610,6 +611,7 @@ export default function DualAgentInterviewRoom() {
         };
         existing.unshift(report);
         localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0, 50)));
+        emitRealtimeSync({ type: 'interview_history_updated', userId: authUser.id, studentName: authUser.name });
       } catch (saveErr) { console.warn('Could not save report:', saveErr); }
     } catch (e) { console.error(e); }
     setAnalyticsLoading(false);
@@ -643,6 +645,7 @@ export default function DualAgentInterviewRoom() {
       if (!profileRatings[peerName]) profileRatings[peerName] = [];
       profileRatings[peerName].unshift({ rating, feedback: ratingFeedback, by: myId, date: new Date().toISOString(), roomId });
       localStorage.setItem(profileKey, JSON.stringify(profileRatings));
+      emitRealtimeSync({ type: 'candidate_ratings_updated', candidateName: peerName });
 
       // POST to backend API
       try {
