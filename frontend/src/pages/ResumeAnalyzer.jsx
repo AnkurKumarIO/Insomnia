@@ -374,6 +374,8 @@ export default function ResumeAnalyzer() {
       const data = await api.resumeAnalyze(file, user?.id);
       if (data.error === 'not_a_resume') {
         setNotResume({ message: data.message });
+      } else if (data.error === 'text_extraction_failed') {
+        setError(data.message || 'Could not read text from this file. Please try a clearer resume PDF or image.');
       } else if (data.analysis) {
         setResult(data.analysis);
       } else {

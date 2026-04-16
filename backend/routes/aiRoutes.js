@@ -8,6 +8,7 @@ const OpenAI  = require('openai');
 const { PrismaClient } = require('@prisma/client');
 const {
   analyzeResume,
+  buildResumeAnalysisFromText,
   generatePostInterviewAnalytics,
   verifyDocument,
   summarizeStudentProfile,
@@ -18,6 +19,25 @@ const {
 const prisma = new PrismaClient();
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 const execFileAsync = promisify(execFile);
+
+function looksLikeResume(text) {
+  const lower = text.toLowerCase();
+  const indicators = [
+    /\bexperience\b/,
+    /\beducation\b/,
+    /\bskills\b/,
+    /\bprojects?\b/,
+    /\bsummary\b/,
+    /\bobjective\b/,
+    /\bwork history\b/,
+    /\bintern(ship)?\b/,
+    /\blinkedin\b/,
+    /@[a-z0-9.-]+\.[a-z]{2,}/,
+    /\bphone\b/,
+  ];
+  const matches = indicators.filter((pattern) => pattern.test(lower)).length;
+  return matches >= 2 || (matches >= 1 && text.split(/\s+/).filter(Boolean).length >= 80);
+}
 
 // ── Helper: Extract text from PDF ─────────────────────────────────────────────
 async function extractPdfText(filePath) {
@@ -140,20 +160,26 @@ router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
 
     if (!extractedText || extractedText.length < 30) {
       return res.status(422).json({
-        error: 'not_a_resume',
-        message: 'Could not extract readable text from this file. Please upload a PDF resume or a clear image of your resume.',
+        error: 'text_extraction_failed',
+        message: isPdf
+          ? 'Could not extract enough readable text from this PDF. If it is a scanned PDF, try uploading a clearer PDF or an image version.'
+          : 'Could not extract enough readable text from this file. Please upload a clearer resume image or PDF.',
       });
     }
 
     // Send for analysis (analyzeResume will also validate if it's actually a resume)
-    const analysis = await analyzeResume(extractedText);
+    let analysis = await analyzeResume(extractedText);
 
     // If the AI flagged it as not a resume
     if (analysis.not_a_resume) {
-      return res.status(422).json({
-        error: 'not_a_resume',
-        message: analysis.reason || 'This document does not appear to be a resume. Please upload your actual resume/CV.',
-      });
+      if (looksLikeResume(extractedText)) {
+        analysis = buildResumeAnalysisFromText(extractedText);
+      } else {
+        return res.status(422).json({
+          error: 'not_a_resume',
+          message: analysis.reason || 'This document does not appear to be a resume. Please upload your actual resume/CV.',
+        });
+      }
     }
 
     const { userId } = req.body;

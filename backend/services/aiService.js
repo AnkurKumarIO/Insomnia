@@ -35,34 +35,7 @@ async function ask(systemPrompt, userPrompt, maxTokens = 512) {
   return JSON.parse(res.choices[0].message.content);
 }
 
-// ─── Agent 1: Resume Analyzer ────────────────────────────────────────────────
-const analyzeResume = async (resumeText) => {
-  if (USE_AI) {
-    try {
-      return await ask(
-        `You are an expert technical recruiter and resume analyst.
-
-FIRST: Determine if the text is actually a resume/CV. A resume contains personal info, education, work experience, skills, or projects.
-If it is NOT a resume (e.g. random text, book pages, invoices, class notes, garbled text):
-  return ONLY: { "not_a_resume": true, "reason": "one-sentence description of what this document actually is" }
-
-If it IS a resume, return JSON with ALL these keys:
-- score: integer 0-100 (honest assessment of this specific resume's quality)
-- grade: "A", "B", "C", or "D"
-- ats_score: integer 0-100 (keyword/ATS compatibility score)
-- target_companies: array of 5 company names that match THIS candidate's actual profile
-- keyword_gaps: array of 3-4 high-value missing keywords for their target role
-- formatting_fixes: array of 3-4 specific, actionable tips referencing the actual content found
-- strengths: array of 2-3 genuine strengths found in THIS document
-- role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
-- experience_years: estimated years of experience as a number
-- top_skills: array of 5-6 actual skills listed in this resume`,
-        `Resume text:\n${resumeText.slice(0, 4000)}`,
-        900
-      );
-    } catch (e) { console.error('Agent 1 error:', e.message); }
-  }
-
+function buildResumeAnalysisFromText(resumeText) {
   // Smart mock: vary results based on actual content so it's never identical
   const textLower = resumeText.toLowerCase();
   const hasReact   = textLower.includes('react');
@@ -117,6 +90,37 @@ If it IS a resume, return JSON with ALL these keys:
       ? ['Python', 'SQL', 'Data Analysis', 'Machine Learning', 'APIs']
       : ['Java', 'Algorithms', 'Data Structures', 'Git', 'Agile'],
   };
+}
+
+// ─── Agent 1: Resume Analyzer ────────────────────────────────────────────────
+const analyzeResume = async (resumeText) => {
+  if (USE_AI) {
+    try {
+      return await ask(
+        `You are an expert technical recruiter and resume analyst.
+
+FIRST: Determine if the text is actually a resume/CV. A resume contains personal info, education, work experience, skills, or projects.
+If it is NOT a resume (e.g. random text, book pages, invoices, class notes, garbled text):
+  return ONLY: { "not_a_resume": true, "reason": "one-sentence description of what this document actually is" }
+
+If it IS a resume, return JSON with ALL these keys:
+- score: integer 0-100 (honest assessment of this specific resume's quality)
+- grade: "A", "B", "C", or "D"
+- ats_score: integer 0-100 (keyword/ATS compatibility score)
+- target_companies: array of 5 company names that match THIS candidate's actual profile
+- keyword_gaps: array of 3-4 high-value missing keywords for their target role
+- formatting_fixes: array of 3-4 specific, actionable tips referencing the actual content found
+- strengths: array of 2-3 genuine strengths found in THIS document
+- role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
+- experience_years: estimated years of experience as a number
+- top_skills: array of 5-6 actual skills listed in this resume`,
+        `Resume text:\n${resumeText.slice(0, 4000)}`,
+        900
+      );
+    } catch (e) { console.error('Agent 1 error:', e.message); }
+  }
+
+  return buildResumeAnalysisFromText(resumeText);
 };
 
 // ─── Agent 2: Socratic Whisperer ─────────────────────────────────────────────
@@ -381,4 +385,4 @@ note (one sentence: what is accurate or inaccurate about this claim).`,
   return { verified: Math.random() > 0.2, confidence: Math.floor(Math.random() * 20 + 78), note: 'Claim is plausible — no contradicting data found.' };
 };
 
-module.exports = { analyzeResume, generateSocraticHint, generatePostInterviewAnalytics, verifyDocument, summarizeStudentProfile, analyzeSpokenChunk, factCheck };
+module.exports = { analyzeResume, buildResumeAnalysisFromText, generateSocraticHint, generatePostInterviewAnalytics, verifyDocument, summarizeStudentProfile, analyzeSpokenChunk, factCheck };
