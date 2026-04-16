@@ -8,7 +8,7 @@
 
 const Groq = require('groq-sdk');
 const { OpenAI } = require('openai');
-const { analyzeResumeWithHuggingFace } = require('./huggingfaceService');
+const { analyzeResumeWithHuggingFace, extractTextViaHuggingFace } = require('./huggingfaceService');
 
 const USE_OPENAI     = !!process.env.OPENAI_API_KEY;
 const openai = USE_OPENAI ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;

@@ -31,4 +31,27 @@ async function analyzeResumeWithHuggingFace(prompt) {
   return response.generated_text || response?.text || '';
 }
 
-module.exports = { analyzeResumeWithHuggingFace };
+async function extractTextViaHuggingFace(fileBuffer, mimeType = 'image/jpeg') {
+  if (!process.env.HUGGINGFACE_API_KEY) {
+    return { unavailable: true, reason: 'Hugging Face API key missing' };
+  }
+
+  try {
+    // Use a vision-capable model for OCR - TrOCR is better for OCR than BLIP
+    const response = await hf.imageToText({
+      model: 'microsoft/trocr-base-printed',
+      data: fileBuffer,
+    });
+
+    if (response && response.generated_text) {
+      return { text: response.generated_text };
+    }
+
+    return { unavailable: true, reason: 'No text extracted from image' };
+  } catch (error) {
+    console.error('Hugging Face OCR Error:', error.message);
+    return { unavailable: true, reason: error.message };
+  }
+}
+
+module.exports = { analyzeResumeWithHuggingFace, extractTextViaHuggingFace };
