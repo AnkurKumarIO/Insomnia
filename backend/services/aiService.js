@@ -84,7 +84,7 @@ function buildResumeAnalysisFromText(resumeText) {
       resumeText.length > 500 ? 'Detailed project descriptions with clear technical scope.' : 'Concise, easily scannable format.',
     ],
     role_detected: hasML ? 'Machine Learning / AI Engineer' : hasReact ? 'Frontend / Full-Stack Developer' : hasPython ? 'Backend / Data Engineer' : 'Software Engineer',
-    experience_years: Math.max(0, Math.floor(resumeText.length / 700)),
+    experience_years: Math.min(15, Math.max(0, Math.floor(resumeText.length / 1500))),
     top_skills: hasReact
       ? ['React', 'JavaScript', 'Node.js', 'CSS', 'REST APIs']
       : hasPython
@@ -113,7 +113,7 @@ If it IS a resume, return JSON with ALL these keys:
 - formatting_fixes: array of 3-4 specific, actionable tips referencing the actual content found
 - strengths: array of 2-3 genuine strengths found in THIS document
 - role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
-- experience_years: estimated years of experience as a number
+- experience_years: total count of years of experience as a number (NOT the start or end year)
 - top_skills: array of 5-6 actual skills listed in this resume`,
         `Resume text:\n${resumeText.slice(0, 4000)}`,
         900
@@ -130,6 +130,17 @@ If it IS a resume, return JSON with ALL these keys:
 
       // Robust extraction
       const toArray = (v) => Array.isArray(v) ? v : (typeof v === 'string' ? [v] : []);
+      
+      let exp = parseInt(result.experience_years);
+      if (isNaN(exp)) exp = 0;
+      // If the AI returns a year like 2024 or 2018, it's likely a mistake. 
+      // Most students/alumni using this won't have 1900+ years of experience.
+      if (exp >= 1900 && exp <= 2100) {
+        exp = 1; 
+      } else if (exp > 50) {
+        // Cap at 50 to avoid hallucinated high numbers or non-year glitches
+        exp = 50;
+      }
 
       return {
         score: parseInt(result.score) || 70,
@@ -140,7 +151,7 @@ If it IS a resume, return JSON with ALL these keys:
         formatting_fixes: toArray(result.formatting_fixes).slice(0, 4),
         strengths: toArray(result.strengths).slice(0, 3),
         role_detected: String(result.role_detected || 'Software Engineer'),
-        experience_years: parseInt(result.experience_years) || 0,
+        experience_years: exp,
         top_skills: toArray(result.top_skills).slice(0, 6)
       };
 

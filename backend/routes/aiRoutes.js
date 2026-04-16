@@ -145,24 +145,30 @@ router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
 
     if (isPdf) {
       extractedText = await extractPdfText(req.file.path);
+      console.log(`[PDF] Extracted ${extractedText.length} characters from native PDF parse.`);
       
       // Fallback for scanned/image-based PDFs: Convert first page to image and run OCR
-      if (!extractedText || extractedText.length < 30) {
-        console.log('PDF text extraction yielded too little text. Falling back to Image OCR via sips...');
+      // Increased threshold to 150 chars to catch PDFs that only have metadata/garbage text
+      if (!extractedText || extractedText.length < 150) {
+        console.log('[PDF] text extraction yielded too little text (or failed). Falling back to Image OCR via sips...');
         const imagePath = `${req.file.path}.jpg`;
         try {
+          // Native macOS conversion: sips is usually faster than heavy libraries
           await execFileAsync('sips', ['-s', 'format', 'jpeg', req.file.path, '--out', imagePath]);
           if (fs.existsSync(imagePath)) {
             let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
             if (imageResult.unavailable) {
               imageResult = await extractImageTextLocally(imagePath);
             }
-            if (!imageResult.unavailable && imageResult.text.length > 30) {
+            if (!imageResult.unavailable && imageResult.text.length > 50) {
+              console.log(`[PDF->OCR] Successfully extracted ${imageResult.text.length} characters via fallback.`);
               extractedText = imageResult.text;
+            } else {
+              console.warn('[PDF->OCR] Fallback also yielded insufficient text.');
             }
           }
         } catch (fallbackError) {
-          console.error('PDF to Image fallback error:', fallbackError.message);
+          console.error('[PDF->OCR] PDF to Image fallback error:', fallbackError.message);
         } finally {
           if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         }
