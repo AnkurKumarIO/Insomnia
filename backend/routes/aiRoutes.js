@@ -2,8 +2,11 @@ const express = require('express');
 const router  = express.Router();
 const multer  = require('multer');
 const fs      = require('fs');
+const path    = require('path');
 const pdfParsePkg = require('pdf-parse');
-const pdfParse = pdfParsePkg.default || pdfParsePkg;
+const pdfParse = typeof pdfParsePkg === 'function'
+  ? pdfParsePkg
+  : pdfParsePkg?.default || pdfParsePkg?.pdfParse || pdfParsePkg;
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const OpenAI  = require('openai');
@@ -37,6 +40,101 @@ async function runCommand(paths, args, options = {}) {
     }
   }
   throw lastError || new Error(`Command not found: ${paths.join(', ')}`);
+}
+
+async function convertPdfToImages(pdfPath, outputDir, outputBase) {
+  const outputPrefix = path.join(outputDir, outputBase);
+  const converters = [
+    {
+      names: ['pdftoppm', '/usr/bin/pdftoppm', '/usr/local/bin/pdftoppm'],
+      args: ['-jpeg', '-jpegopt', 'quality=90', pdfPath, outputPrefix],
+    },
+    {
+      names: ['magick', '/usr/bin/magick', '/usr/local/bin/magick'],
+      args: [pdfPath, `${outputPrefix}-%03d.jpg`],
+    },
+    {
+      names: ['convert', '/usr/bin/convert', '/usr/local/bin/convert'],
+      args: [pdfPath, `${outputPrefix}-%03d.jpg`],
+    },
+    {
+      names: ['gs', '/usr/bin/gs', '/usr/local/bin/gs'],
+      args: ['-q', '-dNOPAUSE', '-dBATCH', '-sDEVICE=jpeg', '-dJPEGQ=90', `-sOutputFile=${outputPrefix}-%03d.jpg`, pdfPath],
+    },
+    {
+      names: ['sips', '/usr/bin/sips'],
+      args: ['-s', 'format', 'jpeg', pdfPath, '--out', `${outputPrefix}.jpg`],
+    },
+  ];
+
+  for (const converter of converters) {
+    try {
+      await runCommand(converter.names, converter.args, {
+        maxBuffer: 50 * 1024 * 1024,
+      });
+      const files = fs.readdirSync(outputDir)
+        .filter((file) => file.startsWith(outputBase) && /\.(jpg|jpeg|png)$/i.test(file))
+        .map((file) => path.join(outputDir, file))
+        .sort();
+      if (files.length) return files;
+    } catch (e) {
+      console.warn(`PDF conversion attempt failed with ${converter.names[0]}:`, e.message);
+      continue;
+    }
+  }
+
+  throw new Error('No PDF-to-image converter available (pdftoppm or convert).');
+}
+
+async function extractTextFromPdfUsingOcr(filePath) {
+  const tempDir = path.dirname(filePath);
+  const outputBase = `${path.basename(filePath, path.extname(filePath))}-ocr`;
+  let imagePaths = [];
+  try {
+    imagePaths = await convertPdfToImages(filePath, tempDir, outputBase);
+  } catch (e) {
+    console.warn('PDF-to-image conversion failed:', e.message);
+    return {
+      unavailable: true,
+      reason: 'Unable to convert scanned PDF to images for OCR. Install pdftoppm or ImageMagick, or upload a text-based PDF.',
+    };
+  }
+
+  if (!imagePaths.length) {
+    return {
+      unavailable: true,
+      reason: 'No images were generated from the scanned PDF for OCR processing.',
+    };
+  }
+
+  let combinedText = '';
+  for (const imagePath of imagePaths) {
+    try {
+      let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
+      if (imageResult.unavailable) {
+        imageResult = await extractImageTextLocally(imagePath);
+      }
+      if (!imageResult.unavailable && imageResult.text) {
+        combinedText += ` ${imageResult.text}`;
+      } else {
+        console.warn('OCR returned no text for image:', imagePath, imageResult.reason);
+      }
+    } catch (e) {
+      console.warn('OCR failed for image:', imagePath, e.message);
+    } finally {
+      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+    }
+  }
+
+  const text = normalizeText(combinedText);
+  if (!text) {
+    return {
+      unavailable: true,
+      reason: 'OCR extracted no readable text from the scanned PDF images.',
+    };
+  }
+
+  return { unavailable: false, text };
 }
 
 function looksLikeResume(text) {
@@ -178,28 +276,14 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
         
         // Fallback for scanned/image-based PDFs based on actual word count rather than raw char length
         if (!extractedText || extractedWords < 20) {
-          console.log('[PDF] text extraction yielded too little usable text. Falling back to Image OCR via sips...');
-          const imagePath = `${file.path}.jpg`;
-          try {
-            // Native macOS conversion: sips is usually available on macOS systems
-            await runCommand(['sips', '/usr/bin/sips'], ['-s', 'format', 'jpeg', file.path, '--out', imagePath]);
-            if (fs.existsSync(imagePath)) {
-              let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
-              if (imageResult.unavailable) {
-                imageResult = await extractImageTextLocally(imagePath);
-              }
-              if (!imageResult.unavailable) {
-                extractedText = normalizeText(imageResult.text);
-                const ocrWords = wordCount(extractedText);
-                console.log(`[PDF->OCR] Extracted ${extractedText.length} chars and ${ocrWords} words via fallback.`);
-              } else {
-                console.warn('[PDF->OCR] Fallback unavailable:', imageResult.reason);
-              }
-            }
-          } catch (fallbackError) {
-            console.error('[PDF->OCR] PDF to Image fallback error:', fallbackError.message);
-          } finally {
-            if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+          console.log('[PDF] native text extraction returned too little usable text. Falling back to scanned PDF OCR.');
+          const pdfOcrResult = await extractTextFromPdfUsingOcr(file.path);
+          if (!pdfOcrResult.unavailable) {
+            extractedText = normalizeText(pdfOcrResult.text);
+            const ocrWords = wordCount(extractedText);
+            console.log(`[PDF->OCR] Extracted ${extractedText.length} chars and ${ocrWords} words via scanned PDF OCR fallback.`);
+          } else {
+            console.warn('[PDF->OCR] scanned PDF OCR unavailable:', pdfOcrResult.reason);
           }
         }
       } else if (isImage) {
