@@ -110,18 +110,18 @@ function buildResumeAnalysisFromText(resumeText) {
   const score = Math.min(98, Math.max(40, baseScore + Math.floor(Math.random() * 10 - 5)));
 
   const companies = hasML
-    ? ['Google DeepMind', 'OpenAI', 'NVIDIA', 'Hugging Face', 'Databricks']
+    ? ['OpenAI', 'NVIDIA', 'Hugging Face', 'Databricks', 'Anthropic']
     : hasReact
-    ? ['Meta', 'Vercel', 'Shopify', 'Airbnb', 'Stripe']
+    ? ['Vercel', 'Shopify', 'Airbnb', 'Stripe', 'Notion']
     : hasPython
-    ? ['Databricks', 'Snowflake', 'Palantir', 'Confluent', 'MongoDB']
+    ? ['Snowflake', 'Palantir', 'Confluent', 'MongoDB', 'Databricks']
     : ['Microsoft', 'Amazon', 'Atlassian', 'Figma', 'Notion'];
 
   const gaps = hasML
-    ? ['MLOps pipelines', 'LLM Fine-tuning', 'Vector Databases', 'A/B Testing frameworks']
+    ? ['MLOps pipelines', 'LLM fine-tuning', 'vector databases', 'A/B testing frameworks']
     : hasReact
-    ? ['TypeScript', 'System Design', 'GraphQL', 'CI/CD pipelines']
-    : ['Cloud Infrastructure (AWS/GCP)', 'Docker/Kubernetes', 'API Design', 'SQL optimization'];
+    ? ['TypeScript', 'System design', 'GraphQL', 'CI/CD pipelines']
+    : ['Cloud infrastructure (AWS/GCP)', 'Docker/Kubernetes', 'API design', 'SQL optimization'];
 
   return {
     score,
@@ -169,6 +169,10 @@ ALWAYS analyze this text as a resume/CV, even if it seems incomplete or unusual.
 - role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
 - experience_years: total count of years of experience as a number (NOT the start or end year)
 - top_skills: array of 5-6 actual skills listed in this resume
+
+Only include companies and skills that are realistic based on the resume text. Do NOT invent companies or skills unrelated to the candidate's experience, industry, education, or projects. If the resume contains domain-specific clues, choose companies with hiring profiles aligned to that domain rather than generic FAANG-style lists.
+
+If the resume text does not contain enough explicit evidence for a field, return a conservative placeholder that reflects the lack of information rather than making up details.
 
 Do not refuse to analyze or return not_a_resume. Analyze any text that mentions work, skills, education, or projects as a resume.`,
         `Resume text:\n${resumeText.slice(0, 4000)}`,
