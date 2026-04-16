@@ -12,7 +12,14 @@ const { promisify } = require('util');
 const OpenAI  = require('openai');
 const cheerio = require('cheerio');
 const { PrismaClient } = require('@prisma/client');
-const pdfImgConvert = require('pdf-img-convert');
+
+let pdfImgConvert = null;
+try {
+  pdfImgConvert = require('pdf-img-convert');
+  console.log('✅ PDF Image Conversion helper loaded');
+} catch (e) {
+  console.warn('⚠️  PDF Image Conversion helper NOT loaded (likely missing native dependencies). Scanned PDF support will be limited.');
+}
 const {
   analyzeResume,
   buildResumeAnalysisFromText,
@@ -98,6 +105,15 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
         // If native extract fails or is very sparse (likely a scanned PDF), fallback to OpenAI OCR
         if (!extractedText || extractedWords < 40) {
           console.log('[PDF] Triggering OpenAI OCR fallback (sparse native text)...');
+          
+          if (!pdfImgConvert) {
+            console.error('[PDF] OCR fallback failed: pdf-img-convert not loaded.');
+            return res.status(422).json({
+              error: 'scanned_pdf_detected',
+              message: 'This document appears to be scanned. Support for scanned PDFs is currently limited in this environment. Please upload a text-based PDF or paste text directly.',
+            });
+          }
+
           try {
             const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
             if (pdfImages && pdfImages.length > 0) {
