@@ -45,7 +45,7 @@ function buildResumeAnalysisFromText(resumeText) {
   const wordCount  = resumeText.split(/\s+/).filter(Boolean).length;
 
   // Flag non-resumes even in mock mode
-  if (wordCount < 20) {
+  if (wordCount < 10) {
     return { not_a_resume: true, reason: 'This document contains insufficient text to be a resume.' };
   }
 
@@ -100,11 +100,7 @@ const analyzeResume = async (resumeText) => {
       const rawResult = await ask(
         `You are an expert technical recruiter and resume analyst.
 
-FIRST: Determine if the text is actually a resume/CV. A resume contains personal info, education, work experience, skills, or projects.
-If it is NOT a resume (e.g. random text, book pages, invoices, class notes, garbled text):
-  return ONLY: { "not_a_resume": true, "reason": "one-sentence description of what this document actually is" }
-
-If it IS a resume, return JSON with ALL these keys:
+ALWAYS analyze this text as a resume/CV and return JSON with ALL these keys:
 - score: integer 0-100 (honest assessment of this specific resume's quality)
 - grade: "A", "B", "C", or "D"
 - ats_score: integer 0-100 (keyword/ATS compatibility score)
@@ -114,18 +110,24 @@ If it IS a resume, return JSON with ALL these keys:
 - strengths: array of 2-3 genuine strengths found in THIS document
 - role_detected: the most likely job role this resume targets (e.g. "Frontend Developer", "Data Scientist")
 - experience_years: total count of years of experience as a number (NOT the start or end year)
-- top_skills: array of 5-6 actual skills listed in this resume`,
+- top_skills: array of 5-6 actual skills listed in this resume
+
+Only return not_a_resume if the text is completely unrelated to employment (like a novel, poem, or invoice). For any text that mentions work, skills, education, or projects, analyze it as a resume.`,
         `Resume text:\n${resumeText.slice(0, 4000)}`,
         900
       );
 
       // Normalize possible wrapper from LLM
       let result = rawResult;
+      console.log('AI Raw Result:', JSON.stringify(rawResult, null, 2));
+      
       if (result && typeof result.analysis === 'object') result = result.analysis;
       if (result && typeof result.resume === 'object') result = result.resume;
 
       if (result.not_a_resume) {
-        return { not_a_resume: true, reason: result.reason || 'This document does not contain valid resume text.' };
+        console.log('AI flagged as not resume, but proceeding with analysis anyway:', result.reason);
+        // Don't return not_a_resume - just proceed with fallback
+        return buildResumeAnalysisFromText(resumeText);
       }
 
       // Robust extraction

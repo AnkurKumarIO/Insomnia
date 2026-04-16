@@ -40,21 +40,28 @@ const MOCK_API = {
     return { token: MOCK_TOKEN, user: { id: 'alm-' + Date.now(), name, role: 'ALUMNI', department: department || 'General' } };
   },
 
-  resumeAnalyze: async (file) => {
+  resumeAnalyze: async (input) => {
     await mockDelay(1800);
-    const name = (file?.name || '').toLowerCase();
-    // Simulate non-resume detection for obvious non-resume files
+    let name = '';
+    let text = '';
+    if (typeof input === 'string') {
+      text = input;
+      name = 'pasted text';
+    } else {
+      name = (input?.name || '').toLowerCase();
+    }
+    // Simulate non-resume detection
     const nonResumeKeywords = ['invoice', 'receipt', 'photo', 'screenshot', 'image', 'meme', 'notes', 'homework'];
-    const looksLikeResume = !nonResumeKeywords.some(k => name.includes(k));
+    const looksLikeResume = !nonResumeKeywords.some(k => name.includes(k)) && (text.includes('experience') || text.includes('skills') || text.length > 100);
     if (!looksLikeResume) {
       return {
         error: 'not_a_resume',
-        message: `"${file?.name}" does not appear to be a resume. Please upload your actual resume/CV.`,
+        message: `"${name}" does not appear to be a resume. Please provide your actual resume content.`,
       };
     }
-    // Vary score and content so it's not always 87%
-    const hasReact = name.includes('react') || name.includes('frontend');
-    const hasML = name.includes('ml') || name.includes('data') || name.includes('ai');
+    // Vary score and content
+    const hasReact = name.includes('react') || name.includes('frontend') || text.toLowerCase().includes('react');
+    const hasML = name.includes('ml') || name.includes('data') || name.includes('ai') || text.toLowerCase().includes('machine learning');
     const baseScore = 58 + Math.floor(Math.random() * 30);
     const score = Math.min(96, baseScore);
     return {
@@ -215,14 +222,24 @@ export const api = {
     async () => { await mockDelay(); return { token: MOCK_TOKEN, user: MOCK_USERS.alumni[0] }; }
   ),
 
-  resumeAnalyze: (file, userId) => callOrMock(
+  resumeAnalyze: (input, userId) => callOrMock(
     () => {
-      const fd = new FormData();
-      fd.append('resume', file);
-      if (userId) fd.append('userId', userId);
-      return fetch(`${API_BASE}/ai/resume-analyze`, { method: 'POST', body: fd }).then(r => r.json());
+      if (typeof input === 'string') {
+        // Send text as JSON
+        return fetch(`${API_BASE}/ai/resume-analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: input, userId }),
+        }).then(r => r.json());
+      } else {
+        // Send file as FormData
+        const fd = new FormData();
+        fd.append('resume', input);
+        if (userId) fd.append('userId', userId);
+        return fetch(`${API_BASE}/ai/resume-analyze`, { method: 'POST', body: fd }).then(r => r.json());
+      }
     },
-    () => MOCK_API.resumeAnalyze(file)
+    () => MOCK_API.resumeAnalyze(input)
   ),
 
   interviewAnalytics: (data) => callOrMock(

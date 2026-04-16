@@ -340,6 +340,7 @@ export default function ResumeAnalyzer() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [file, setFile] = useState(null);
+  const [text, setText] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -366,12 +367,15 @@ export default function ResumeAnalyzer() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file && !text.trim()) return;
     setLoading(true);
     setError(null);
     setNotResume(null);
     try {
-      const data = await api.resumeAnalyze(file, user?.id);
+      const input = text.trim() ? text.trim() : file;
+      console.log('Submitting resume analysis:', { input: typeof input === 'string' ? input.substring(0, 100) + '...' : input?.name, userId: user?.id });
+      const data = await api.resumeAnalyze(input, user?.id);
+      console.log('API Response:', data);
       if (data.error === 'not_a_resume') {
         setNotResume({ message: data.message });
       } else if (data.error === 'text_extraction_failed') {
@@ -381,17 +385,19 @@ export default function ResumeAnalyzer() {
       } else if (data.error === 'file_too_large') {
         setError(data.message || 'File too large. Maximum size is 10 MB.');
       } else if (data.analysis) {
+        console.log('Setting result:', data.analysis);
         setResult(data.analysis);
       } else {
         setError(data.message || data.error || 'Unexpected response from server. Please try again.');
       }
     } catch (err) {
+      console.error('Frontend error:', err);
       setError('Failed to reach the server. Is the backend running?');
     }
     setLoading(false);
   };
 
-  const reset = () => { setFile(null); setResult(null); setError(null); setNotResume(null); };
+  const reset = () => { setFile(null); setText(''); setResult(null); setError(null); setNotResume(null); };
 
   if (loading) return <ProcessingScreen />;
   if (notResume) return <NotResumeScreen message={notResume.message} onReset={reset} />;
@@ -468,10 +474,27 @@ export default function ResumeAnalyzer() {
             <input type="file" accept=".pdf,image/*" style={{ display: 'none' }} onChange={e => handleFile(e.target.files[0])} />
           </label>
 
+          {/* Or paste text */}
+          <div style={{ textAlign: 'center', fontSize: '0.875rem', color: '#9b98b8', margin: '-0.5rem 0' }}>— or —</div>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Paste your resume text here..."
+            style={{
+              width: '100%', minHeight: 120, padding: '1rem',
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(70,69,85,0.3)',
+              borderRadius: 12, color: '#dae2fd', fontFamily: 'inherit', fontSize: '0.875rem',
+              resize: 'vertical', outline: 'none',
+              transition: 'border-color 0.2s ease',
+            }}
+            onFocus={e => e.target.style.borderColor = 'rgba(195,192,255,0.5)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(70,69,85,0.3)'}
+          />
+
           {/* Supported formats note */}
-          {!file && (
+          {!file && !text.trim() && (
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              {['PDF', 'JPG', 'PNG', 'WEBP'].map(f => (
+              {['PDF', 'JPG', 'PNG', 'WEBP', 'Text'].map(f => (
                 <span key={f} style={{ padding: '0.2rem 0.55rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(70,69,85,0.25)', borderRadius: 6, fontSize: '0.68rem', fontWeight: 600, color: '#9b98b8' }}>{f}</span>
               ))}
             </div>
@@ -487,21 +510,20 @@ export default function ResumeAnalyzer() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={!file}
+            disabled={!file && !text.trim()}
             style={{
               width: '100%', padding: '1rem',
-              background: !file ? '#222a3d' : 'linear-gradient(135deg,#4f46e5,#7c3aed)',
-              color: !file ? '#9b98b8' : '#fff',
+              background: (!file && !text.trim()) ? '#222a3d' : 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+              color: (!file && !text.trim()) ? '#9b98b8' : '#fff',
               border: 'none', borderRadius: 14,
               fontWeight: 800, fontSize: '0.95rem',
-              cursor: !file ? 'not-allowed' : 'pointer',
+              cursor: (!file && !text.trim()) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               transition: 'all 0.2s ease',
               fontFamily: 'inherit',
-              boxShadow: file ? '0 8px 30px rgba(79,70,229,0.4)' : 'none',
             }}
           >
-            🤖 Analyze My Resume
+            Analyze Resume
           </button>
         </form>
 

@@ -6,6 +6,7 @@ const pdfParse = require('pdf-parse');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const OpenAI  = require('openai');
+const cheerio = require('cheerio');
 const { PrismaClient } = require('@prisma/client');
 const {
   analyzeResume,
@@ -35,9 +36,14 @@ function looksLikeResume(text) {
     /\blinkedin\b/,
     /@[a-z0-9.-]+\.[a-z]{2,}/,
     /\bphone\b/,
+    /\bname\b/,
+    /\bcontact\b/,
+    /\bcv\b/,
+    /\bresume\b/,
   ];
   const matches = indicators.filter((pattern) => pattern.test(lower)).length;
-  return matches >= 2 || (matches >= 1 && text.split(/\s+/).filter(Boolean).length >= 80);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return matches >= 1 || wordCount >= 50; // More lenient: 1 indicator or 50 words
 }
 
 // ── Helper: Extract text from PDF ─────────────────────────────────────────────
@@ -130,91 +136,98 @@ async function extractImageTextLocally(filePath) {
 }
 
 // ── Agent 1: Resume Analyzer ─────────────────────────────────────────────────
-router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
+router.post('/resume-analyze', upload.any(), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
-    }
-
-    const originalName = (req.file.originalname || '').toLowerCase();
-    const mimeType     = req.file.mimetype || '';
-    const isPdf        = mimeType === 'application/pdf' || originalName.endsWith('.pdf');
-    const isImage      = mimeType.startsWith('image/');
-
     let extractedText = '';
 
-    if (isPdf) {
-      extractedText = await extractPdfText(req.file.path);
-      console.log(`[PDF] Extracted ${extractedText.length} characters from native PDF parse.`);
-      
-      // Fallback for scanned/image-based PDFs: Convert first page to image and run OCR
-      // Increased threshold to 150 chars to catch PDFs that only have metadata/garbage text
-      if (!extractedText || extractedText.length < 150) {
-        console.log('[PDF] text extraction yielded too little text (or failed). Falling back to Image OCR via sips...');
-        const imagePath = `${req.file.path}.jpg`;
-        try {
-          // Native macOS conversion: sips is usually faster than heavy libraries
-          await execFileAsync('sips', ['-s', 'format', 'jpeg', req.file.path, '--out', imagePath]);
-          if (fs.existsSync(imagePath)) {
-            let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
-            if (imageResult.unavailable) {
-              imageResult = await extractImageTextLocally(imagePath);
+    if (req.body.text) {
+      extractedText = req.body.text.trim();
+    } else if (req.files && req.files[0]) {
+      const file = req.files[0];
+      const originalName = (file.originalname || '').toLowerCase();
+      const mimeType     = file.mimetype || '';
+      const isPdf        = mimeType === 'application/pdf' || originalName.endsWith('.pdf');
+      const isImage      = mimeType.startsWith('image/');
+
+      if (isPdf) {
+        extractedText = await extractPdfText(file.path);
+        console.log(`[PDF] Extracted ${extractedText.length} characters from native PDF parse.`);
+        
+        // Fallback for scanned/image-based PDFs: Convert first page to image and run OCR
+        // Increased threshold to 150 chars to catch PDFs that only have metadata/garbage text
+        if (!extractedText || extractedText.length < 150) {
+          console.log('[PDF] text extraction yielded too little text (or failed). Falling back to Image OCR via sips...');
+          const imagePath = `${file.path}.jpg`;
+          try {
+            // Native macOS conversion: sips is usually faster than heavy libraries
+            await execFileAsync('sips', ['-s', 'format', 'jpeg', file.path, '--out', imagePath]);
+            if (fs.existsSync(imagePath)) {
+              let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
+              if (imageResult.unavailable) {
+                imageResult = await extractImageTextLocally(imagePath);
+              }
+              if (!imageResult.unavailable && imageResult.text.length > 50) {
+                console.log(`[PDF->OCR] Successfully extracted ${imageResult.text.length} characters via fallback.`);
+                extractedText = imageResult.text;
+              } else {
+                console.warn('[PDF->OCR] Fallback also yielded insufficient text.');
+              }
             }
-            if (!imageResult.unavailable && imageResult.text.length > 50) {
-              console.log(`[PDF->OCR] Successfully extracted ${imageResult.text.length} characters via fallback.`);
-              extractedText = imageResult.text;
-            } else {
-              console.warn('[PDF->OCR] Fallback also yielded insufficient text.');
-            }
+          } catch (fallbackError) {
+            console.error('[PDF->OCR] PDF to Image fallback error:', fallbackError.message);
+          } finally {
+            if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
           }
-        } catch (fallbackError) {
-          console.error('[PDF->OCR] PDF to Image fallback error:', fallbackError.message);
-        } finally {
-          if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         }
+        
+      } else if (isImage) {
+        let imageResult = await extractImageTextViaGroq(file.path, mimeType);
+        if (imageResult.unavailable) {
+          imageResult = await extractImageTextLocally(file.path);
+        }
+        if (imageResult.unavailable) {
+          return res.status(503).json({
+            error: 'image_analysis_unavailable',
+            message: imageResult.reason || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.',
+          });
+        }
+        extractedText = imageResult.text;
+      } else {
+        // Try to read as plain text
+        try { 
+          let rawText = fs.readFileSync(file.path, 'utf8').trim();
+          // If it looks like HTML, extract text content
+          if (rawText.includes('<') && rawText.includes('>')) {
+            const $ = cheerio.load(rawText);
+            extractedText = $('body').text() || $.text() || rawText;
+            // Clean up extra whitespace
+            extractedText = extractedText.replace(/\s+/g, ' ').trim();
+          } else {
+            extractedText = rawText;
+          }
+        } catch (_) {}
       }
-      
-    } else if (isImage) {
-      let imageResult = await extractImageTextViaGroq(req.file.path, mimeType);
-      if (imageResult.unavailable) {
-        imageResult = await extractImageTextLocally(req.file.path);
-      }
-      if (imageResult.unavailable) {
-        return res.status(503).json({
-          error: 'image_analysis_unavailable',
-          message: imageResult.reason || 'Image resume analysis is temporarily unavailable. Please upload a PDF resume instead.',
-        });
-      }
-      extractedText = imageResult.text;
+
+      // Clean up file
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     } else {
-      // Try to read as plain text
-      try { extractedText = fs.readFileSync(req.file.path, 'utf8').trim(); } catch (_) {}
+      return res.status(400).json({ error: 'No file uploaded or text provided.' });
     }
 
-    if (!extractedText || extractedText.length < 30) {
+    if (!extractedText || extractedText.length < 10) {
       return res.status(422).json({
         error: 'text_extraction_failed',
-        message: isPdf
-          ? 'Could not extract enough readable text from this PDF. If it is a scanned PDF, try uploading a clearer PDF or an image version.'
-          : 'Could not extract enough readable text from this file. Please upload a clearer resume image or PDF.',
+        message: 'Please provide more text content.',
       });
     }
 
-    // Send for analysis (analyzeResume will also validate if it's actually a resume)
+    console.log('Extracted text length:', extractedText.length);
+    console.log('Extracted text preview:', extractedText.substring(0, 200));
+
+    // Send for analysis (analyzeResume will provide analysis)
     let analysis = await analyzeResume(extractedText);
 
-    // If the AI flagged it as not a resume
-    if (analysis.not_a_resume) {
-      if (looksLikeResume(extractedText)) {
-        analysis = buildResumeAnalysisFromText(extractedText);
-      } else {
-        return res.status(422).json({
-          error: 'not_a_resume',
-          message: analysis.reason || 'This document does not appear to be a resume. Please upload your actual resume/CV.',
-        });
-      }
-    }
-
+    // Always use the analysis - no rejection for "not a resume"
     const { userId } = req.body;
     if (userId) {
       try {
@@ -226,8 +239,6 @@ router.post('/resume-analyze', upload.single('resume'), async (req, res) => {
   } catch (e) {
     console.error('Resume analyze error:', e);
     res.status(500).json({ error: 'Failed to analyze resume. Please try again.' });
-  } finally {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
   }
 });
 
