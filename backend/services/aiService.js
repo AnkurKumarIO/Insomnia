@@ -8,14 +8,16 @@
 
 const Groq = require('groq-sdk');
 const { OpenAI } = require('openai');
+const { analyzeResumeWithHuggingFace } = require('./huggingfaceService');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const USE_OPENAI     = !!process.env.OPENAI_API_KEY;
+const openai = USE_OPENAI ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 const API_KEY        = process.env.GROQ_API_KEY;
 const RESUME_API_KEY = process.env.GROQ_API_KEY_RESUME || API_KEY;
 const USE_GROQ       = !!API_KEY;
-const USE_OPENAI     = !!process.env.OPENAI_API_KEY;
-const USE_AI         = USE_GROQ || USE_OPENAI;
+const USE_HF         = !!process.env.HUGGINGFACE_API_KEY;
+const USE_AI         = USE_GROQ || USE_HF || USE_OPENAI;
 const MODEL          = 'llama-3.3-70b-versatile';
 
 let groq       = null;
@@ -32,10 +34,12 @@ if (USE_GROQ) {
   } else {
     groqResume = groq;
   }
+} else if (USE_HF) {
+  console.log('✅ Hugging Face AI connected for resume analysis');
 } else if (USE_OPENAI) {
   console.log('⚠️  GROQ_API_KEY not set — using OpenAI fallback for AI agents');
 } else {
-  console.log('⚠️  GROQ_API_KEY and OPENAI_API_KEY not set — agents running in mock mode');
+  console.log('⚠️  GROQ_API_KEY, HUGGINGFACE_API_KEY, and OPENAI_API_KEY not set — agents running in mock mode');
 }
 
 /**
@@ -244,6 +248,27 @@ Do not refuse to analyze or return not_a_resume. Analyze any text that mentions 
     };
   };
 
+  if (USE_HF) {
+    try {
+      const rawText = await analyzeResumeWithHuggingFace(`${aiPrompt}\n\nResume text:\n${resumeText.slice(0, 4000)}`);
+      const parsed = parseJsonResponse(rawText);
+      const normalized = normalize(parsed);
+      if (normalized) {
+        normalized.is_mock = false;
+        return normalized;
+      }
+      throw new Error('Failed to parse Hugging Face response');
+    } catch (e) {
+      console.error('Hugging Face resume analyzer failed:', e.message);
+      if (!USE_GROQ && !USE_OPENAI) {
+        const mockResult = buildResumeAnalysisFromText(resumeText);
+        mockResult.is_mock = true;
+        mockResult.fallback_reason = `AI Analysis failed: ${e.message}`;
+        return mockResult;
+      }
+    }
+  }
+
   if (USE_GROQ) {
     try {
       const rawResult = await ask(aiPrompt, `Resume text:\n${resumeText.slice(0, 4000)}`, 900, groqResume);
@@ -286,7 +311,7 @@ Do not refuse to analyze or return not_a_resume. Analyze any text that mentions 
 
   const mockResult = buildResumeAnalysisFromText(resumeText);
   mockResult.is_mock = true;
-  mockResult.fallback_reason = 'GROQ_API_KEY and OPENAI_API_KEY not found. Running deterministic fallback.';
+  mockResult.fallback_reason = 'GROQ_API_KEY, HUGGINGFACE_API_KEY, and OPENAI_API_KEY not found. Running deterministic fallback.';
   return mockResult;
 };
 
