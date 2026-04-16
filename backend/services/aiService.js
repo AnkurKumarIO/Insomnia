@@ -7,6 +7,9 @@
  */
 
 const Groq = require('groq-sdk');
+const { OpenAI } = require('openai');
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const API_KEY        = process.env.GROQ_API_KEY;
 const RESUME_API_KEY = process.env.GROQ_API_KEY_RESUME || API_KEY;
@@ -30,6 +33,44 @@ if (USE_AI) {
 } else {
   console.log('⚠️  GROQ_API_KEY not set — agents running in mock mode');
 }
+
+/**
+ * OCR Fallback via OpenAI GPT-4o-mini (Vision)
+ * Extracts text from an image buffer.
+ */
+const extractTextViaOpenAI = async (fileBuffer, mimeType = 'image/jpeg') => {
+  if (!process.env.OPENAI_API_KEY) {
+    return { unavailable: true, reason: 'OpenAI API key missing' };
+  }
+
+  try {
+    const base64Image = fileBuffer.toString('base64');
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Transcribe all the text from this resume image. Do not include any commentary." },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 1500,
+      temperature: 0.1,
+    });
+
+    return { text: response.choices[0].message.content };
+  } catch (error) {
+    console.error('OpenAI OCR Error:', error.message);
+    return { unavailable: true, reason: error.message };
+  }
+};
 
 // Core helper — sends a prompt, expects JSON back
 async function ask(systemPrompt, userPrompt, maxTokens = 512, clientOverride = null) {
@@ -440,4 +481,14 @@ note (one sentence: what is accurate or inaccurate about this claim).`,
   return { verified: Math.random() > 0.2, confidence: Math.floor(Math.random() * 20 + 78), note: 'Claim is plausible — no contradicting data found.' };
 };
 
-module.exports = { analyzeResume, buildResumeAnalysisFromText, generateSocraticHint, generatePostInterviewAnalytics, verifyDocument, summarizeStudentProfile, analyzeSpokenChunk, factCheck };
+module.exports = { 
+  analyzeResume, 
+  buildResumeAnalysisFromText, 
+  generateSocraticHint, 
+  generatePostInterviewAnalytics, 
+  verifyDocument, 
+  summarizeStudentProfile, 
+  analyzeSpokenChunk, 
+  factCheck,
+  extractTextViaOpenAI 
+};

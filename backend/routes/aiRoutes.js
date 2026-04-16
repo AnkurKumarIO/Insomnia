@@ -12,6 +12,7 @@ const { promisify } = require('util');
 const OpenAI  = require('openai');
 const cheerio = require('cheerio');
 const { PrismaClient } = require('@prisma/client');
+const pdfImgConvert = require('pdf-img-convert');
 const {
   analyzeResume,
   buildResumeAnalysisFromText,
@@ -20,65 +21,13 @@ const {
   summarizeStudentProfile,
   analyzeSpokenChunk,
   factCheck,
+  extractTextViaOpenAI
 } = require('../services/aiService');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const prisma = new PrismaClient();
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
-const execFileAsync = promisify(execFile);
 
-async function runCommand(paths, args, options = {}) {
-  let lastError;
-  for (const path of paths) {
-    try {
-      return await execFileAsync(path, args, options);
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        lastError = err;
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastError || new Error(`Command not found: ${paths.join(', ')}`);
-}
-
-// ── Helper: Extract text via Gemini 1.5 Flash (OCR for Scanned PDFs/Images) ───
-async function extractTextViaGemini(filePath, mimeType) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn('[Gemini OCR] No API key configured');
-      return { unavailable: true, reason: 'Gemini API key is not configured.' };
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const fileBuffer = fs.readFileSync(filePath);
-    const fileBase64 = fileBuffer.toString('base64');
-
-    console.log(`[Gemini OCR] Sending file (${mimeType}) to Gemini 1.5 Flash...`);
-    
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: fileBase64,
-          mimeType: mimeType
-        }
-      },
-      'Extract all text from this document faithfully. This is a resume. Ensure you extract the name, contact info, experiences, and skills. Output ONLY the extracted text content.'
-    ]);
-
-    const text = result.response.text()?.trim() || '';
-    console.log(`[Gemini OCR] Extracted text length: ${text.length}`);
-    
-    return { unavailable: false, text };
-  } catch (e) {
-    console.error('[Gemini OCR] Error:', e.message);
-    return { unavailable: true, reason: `Gemini OCR failed: ${e.message}` };
-  }
-}
+// ── OCR Helpers transitioned to OpenAI (in aiService.js) ───────────────────
 
 function looksLikeResume(text) {
   const lower = text.toLowerCase();
@@ -145,19 +94,49 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
         const extractedWords = wordCount(extractedText);
         console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native PDF parse.`);
         
-        // No longer using Gemini fallout. If native extract fails, it's likely a scanned PDF.
+        // If native extract fails (likely a scanned PDF), fallback to OpenAI OCR
         if (!extractedText || extractedWords < 15) {
-          return res.status(422).json({
-            error: 'scanned_pdf_detected',
-            message: 'This appears to be a scanned PDF or contains too little text. Please upload a text-based resume or paste the text directly.',
-          });
+          console.log('[PDF] native text extraction returned too little usable text. Falling back to OpenAI OCR.');
+          try {
+            // Convert first page to image buffer for OCR
+            const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
+            if (pdfImages && pdfImages.length > 0) {
+              const ocrResult = await extractTextViaOpenAI(pdfImages[0], 'image/png');
+              if (!ocrResult.unavailable) {
+                extractedText = normalizeText(ocrResult.text);
+                console.log(`[PDF->OpenAI] Extracted ${extractedText.length} chars via OCR.`);
+              } else {
+                throw new Error(ocrResult.reason);
+              }
+            } else {
+              throw new Error('Could not convert PDF to image for OCR.');
+            }
+          } catch (ocrErr) {
+            console.error('[PDF->OpenAI] OCR failed:', ocrErr.message);
+            return res.status(422).json({
+              error: 'scanned_pdf_detected',
+              message: 'This appears to be a scanned PDF and OCR processing failed. Please upload a text-based resume or paste the text directly.',
+            });
+          }
         }
       } else if (isImage) {
-        // As per request, Gemini is no longer used for resumes.
-        return res.status(422).json({
-          error: 'image_resume_unsupported',
-          message: 'Resume analysis currently supports text-based PDFs and direct text paste. Please paste your resume text instead of uploading an image.',
-        });
+        console.log('[Image] Processing via OpenAI OCR...');
+        try {
+          const fileBuffer = fs.readFileSync(file.path);
+          const ocrResult = await extractTextViaOpenAI(fileBuffer, mimeType);
+          if (!ocrResult.unavailable) {
+            extractedText = normalizeText(ocrResult.text);
+            console.log(`[Image->OpenAI] Extracted ${extractedText.length} chars via OCR.`);
+          } else {
+            throw new Error(ocrResult.reason);
+          }
+        } catch (ocrErr) {
+          console.error('[Image->OpenAI] OCR failed:', ocrErr.message);
+          return res.status(422).json({
+            error: 'image_ocr_failed',
+            message: 'OCR processing failed for this image. Please paste your resume text instead.',
+          });
+        }
       } else {
         // Try to read as plain text
         try { 
