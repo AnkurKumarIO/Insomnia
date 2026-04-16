@@ -14,6 +14,7 @@ function ReviewModal({ item, onClose, onApprove, onDeny }) {
   const [denying, setDenying] = useState(false);
 
   const isAlumni = item.sub?.toLowerCase().includes('alumni') || item.sub?.toLowerCase().includes('batch');
+  const detailEntries = Object.entries(item.details || {}).filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
 
   const handleApprove = () => {
     setApproving(true);
@@ -70,6 +71,12 @@ function ReviewModal({ item, onClose, onApprove, onDeny }) {
                 <div style={{ fontSize: '0.7rem', color: 'rgba(199,196,216,0.6)', marginBottom: 3 }}>Verification Step</div>
                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ffb95f' }}>{item.status}</div>
               </div>
+              {detailEntries.length > 0 && detailEntries.map(([key, value]) => (
+                <div key={key}>
+                  <div style={{ fontSize: '0.7rem', color: 'rgba(199,196,216,0.6)', marginBottom: 3 }}>{key}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#dae2fd' }}>{String(value)}</div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -244,7 +251,7 @@ export default function TNPDashboard() {
       const notifs = [];
       // Pending student registrations (awaiting TNP approval)
       try {
-        const pending = JSON.parse(localStorage.getItem('alumnex_pending_profile') || '{}');
+        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || localStorage.getItem('alumnex_pending_profile') || '{}');
         if (pending.username && pending.name) {
           notifs.push({
             id: `pending-${pending.username}`,
@@ -257,7 +264,7 @@ export default function TNPDashboard() {
           });
         }
       } catch {}
-      // Pending alumni applications (awaiting TNP approval)
+            const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || localStorage.getItem('alumnex_pending_alumni') || '[]');
       try {
         const pendingAlumni = JSON.parse(localStorage.getItem('alumnex_pending_alumni') || '[]');
         pendingAlumni.forEach(acc => {
@@ -333,7 +340,7 @@ export default function TNPDashboard() {
       const dynamic = [];
       try {
         // Pending alumni from 4-step registration
-        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || '[]');
+        const pendingAlumni = JSON.parse(localStorage.getItem('alumniconnect_pending_alumni') || localStorage.getItem('alumnex_pending_alumni') || '[]');
         pendingAlumni.filter(a => a.status === 'pending').forEach(a => {
           dynamic.push({
             name: a.name,
@@ -342,12 +349,20 @@ export default function TNPDashboard() {
             status: 'Document Submitted',
             color: '#4edea3',
             icon: 'psychology',
+            details: {
+              'Email': a.email || '',
+              'Company': a.company || '',
+              'Job Title': a.title || '',
+              'Department': a.department || '',
+              'Batch Year': a.batchYear || '',
+              'Membership No.': a.membershipNo || '',
+            },
           });
         });
       } catch {}
       try {
         // Pending student from 3-step registration
-        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || '{}');
+        const pending = JSON.parse(localStorage.getItem('alumniconnect_pending_profile') || localStorage.getItem('alumnex_pending_profile') || '{}');
         if (pending.name && pending.role === 'STUDENT') {
           dynamic.push({
             name: pending.name,
@@ -356,6 +371,14 @@ export default function TNPDashboard() {
             status: 'Awaiting Approval',
             color: '#c3c0ff',
             icon: 'school',
+            details: {
+              'Email': pending.email || '',
+              'College': pending.college || '',
+              'Department': pending.department || '',
+              'Year': pending.year || '',
+              'Student ID': pending.studentId || '',
+              'Username': pending.username || '',
+            },
           });
         }
       } catch {}
@@ -450,8 +473,8 @@ export default function TNPDashboard() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : highlight(item.status)}
+                  <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : st === 'denied' ? 'rgba(255,180,171,0.12)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : st === 'denied' ? '#ffb4ab' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : st === 'denied' ? '✗ Denied' : highlight(item.status)}
                   </span>
                   {!st && <>
                     <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
@@ -740,12 +763,12 @@ export default function TNPDashboard() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : hl(item.status)}
+                            <span style={{ background: st === 'approved' ? 'rgba(78,222,163,0.15)' : st === 'review' ? 'rgba(255,185,95,0.15)' : st === 'denied' ? 'rgba(255,180,171,0.12)' : '#2d3449', color: st === 'approved' ? '#4edea3' : st === 'review' ? '#ffb95f' : st === 'denied' ? '#ffb4ab' : '#c7c4d8', padding: '0.2rem 0.6rem', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {st === 'approved' ? '✓ Approved' : st === 'review' ? '⏳ Under Review' : st === 'denied' ? '✗ Denied' : hl(item.status)}
                             </span>
                             {!st && <>
                               <button onClick={() => handleApprove(item)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(0,165,114,0.15)', color: '#4edea3', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: 'pointer' }}>Approve</button>
-                              <button onClick={() => handleReview(item.name)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
+                              <button onClick={() => handleReview(item)} style={{ padding: '0.4rem 0.8rem', background: '#222a3d', color: '#c7c4d8', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(70,69,85,0.3)', cursor: 'pointer' }}>Review</button>
                             </>}
                           </div>
                         </div>

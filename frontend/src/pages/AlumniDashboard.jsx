@@ -12,7 +12,11 @@ import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 // â”€â”€ Student Detail + Accept Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StudentDetailModal({ request, onClose, onAccept }) {
-  const p = request.studentProfile || {};
+  const rawProfile = request.studentProfile;
+  const p = typeof rawProfile === 'string' ? (() => {
+    try { return JSON.parse(rawProfile); } catch { return {}; }
+  })() : (rawProfile || {});
+  const resumeHref = p.resumeUrl || p.resume_url || '';
   const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -89,7 +93,7 @@ function StudentDetailModal({ request, onClose, onAccept }) {
             )}
 
             {/* Links */}
-            {(p.linkedin || p.github || p.resumeName) && (
+            {(p.linkedin || p.github || p.portfolio || p.resumeName || resumeHref) && (
               <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
                 <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 10 }}>Links & Documents</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -105,12 +109,49 @@ function StudentDetailModal({ request, onClose, onAccept }) {
                       <span className="material-symbols-outlined" style={{ fontSize: 15 }}>code</span> GitHub
                     </a>
                   )}
-                  {p.resumeName && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, color: '#4edea3', fontSize: '0.75rem', fontWeight: 600 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>description</span> {p.resumeName}
+                  {p.portfolio && (
+                    <a href={p.portfolio.startsWith('http') ? p.portfolio : `https://${p.portfolio}`} target="_blank" rel="noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(255,185,95,0.12)', border: '1px solid rgba(255,185,95,0.25)', borderRadius: 8, color: '#ffb95f', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>language</span> Portfolio
+                    </a>
+                  )}
+                  {(p.resumeName || resumeHref) && (
+                    <a
+                      href={resumeHref || '#'}
+                      target={resumeHref ? '_blank' : undefined}
+                      rel={resumeHref ? 'noreferrer' : undefined}
+                      onClick={(e) => { if (!resumeHref) e.preventDefault(); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', background: 'rgba(78,222,163,0.1)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, color: '#4edea3', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', opacity: resumeHref ? 1 : 0.65, cursor: resumeHref ? 'pointer' : 'not-allowed' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>description</span>
+                      {resumeHref ? `View Resume${p.resumeName ? ` (${p.resumeName})` : ''}` : (p.resumeName || 'Resume uploaded')}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(p.targetRoles?.length > 0 || p.preferredCompanies?.length > 0 || p.openTo?.length > 0 || (p.gradMonth || p.gradYear)) && (
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(70,69,85,0.1)' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Career Preferences</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {p.targetRoles?.length > 0 && (
+                    <div style={{ background: '#131b2e', borderRadius: 10, padding: '0.6rem 0.875rem' }}>
+                      <div style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>Target Roles</div>
+                      <div style={{ fontSize: '0.72rem', color: '#dae2fd' }}>{p.targetRoles.slice(0, 3).join(', ')}</div>
+                    </div>
+                  )}
+                  {p.openTo?.length > 0 && (
+                    <div style={{ background: '#131b2e', borderRadius: 10, padding: '0.6rem 0.875rem' }}>
+                      <div style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 3 }}>Open To</div>
+                      <div style={{ fontSize: '0.72rem', color: '#dae2fd' }}>{p.openTo.join(', ')}</div>
                     </div>
                   )}
                 </div>
+                {(p.gradMonth || p.gradYear) && (
+                  <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#c7c4d8' }}>
+                    Graduation: <span style={{ color: '#dae2fd', fontWeight: 600 }}>{[p.gradMonth, p.gradYear].filter(Boolean).join(' ')}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1153,6 +1194,14 @@ export default function AlumniDashboard() {
                   </span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#c7c4d8' }}>{r.topic}</div>
+                {r.studentId && (
+                  <button
+                    onClick={() => setViewingRequest(r)}
+                    style={{ marginTop: 3, padding: 0, background: 'none', border: 'none', color: '#c3c0ff', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Student ID: {r.studentId}
+                  </button>
+                )}
                 {r.studentProfile?.college && <div style={{ fontSize: '0.68rem', color: 'rgba(199,196,216,0.5)', marginTop: 2 }}>{r.studentProfile.college} {r.studentProfile.department ? `• ${r.studentProfile.department}` : ''}</div>}
               </div>
 

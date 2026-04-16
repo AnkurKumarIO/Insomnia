@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { updateUserProfile } from '../lib/db';
 
@@ -12,6 +12,7 @@ const NOTIF_ITEMS = [
 
 export default function SettingsPage() {
   const { user, login } = useContext(AuthContext);
+  const resumeInputRef = useRef(null);
 
   // Load saved profile or fall back to user data
   const savedProfile = JSON.parse(localStorage.getItem('alumnex_profile') || '{}');
@@ -33,6 +34,8 @@ export default function SettingsPage() {
     cgpa:       savedProfile.cgpa       || '',
     college:    savedProfile.college    || '',
     year:       savedProfile.year       || '',
+    resumeName: savedProfile.resumeName || '',
+    resumeUrl:  savedProfile.resumeUrl  || '',
   });
 
   // Notifications state — default all ON
@@ -56,6 +59,30 @@ export default function SettingsPage() {
   };
 
   const removeSkill = (s) => setProfile(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
+
+  const toDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a PDF resume.');
+      return;
+    }
+    try {
+      const dataUrl = await toDataUrl(file);
+      setProfile(p => ({ ...p, resumeName: file.name, resumeUrl: dataUrl }));
+    } catch {
+      alert('Could not read resume file. Please try again.');
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  };
 
   const saveProfile = async () => {
     const updated = { ...savedProfile, ...profile };
@@ -185,6 +212,48 @@ export default function SettingsPage() {
                 <input value={skillInput} onChange={e => setSkillInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} placeholder="Add a skill and press Enter..." style={{ ...inp, flex: 1 }} />
                 <button onClick={addSkill} style={{ padding: '0.65rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 10, color: '#c3c0ff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Add</button>
               </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={lbl}>Resume (PDF)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => resumeInputRef.current?.click()}
+                  style={{ padding: '0.65rem 1rem', background: 'rgba(195,192,255,0.1)', border: '1px solid rgba(195,192,255,0.2)', borderRadius: 10, color: '#c3c0ff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Upload Resume
+                </button>
+                {profile.resumeUrl && (
+                  <a
+                    href={profile.resumeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ padding: '0.65rem 1rem', background: 'rgba(78,222,163,0.12)', border: '1px solid rgba(78,222,163,0.25)', borderRadius: 10, color: '#4edea3', fontSize: '0.8rem', fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    View Resume
+                  </a>
+                )}
+                {profile.resumeUrl && (
+                  <button
+                    onClick={() => setProfile(p => ({ ...p, resumeName: '', resumeUrl: '' }))}
+                    style={{ padding: '0.65rem 1rem', background: 'rgba(255,180,171,0.1)', border: '1px solid rgba(255,180,171,0.25)', borderRadius: 10, color: '#ffb4ab', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {profile.resumeName && (
+                <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#c7c4d8' }}>
+                  Current: {profile.resumeName}
+                </div>
+              )}
+              <input
+                ref={resumeInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handleResumeUpload}
+                style={{ display: 'none' }}
+              />
             </div>
 
             <button onClick={saveProfile} style={{ padding: '0.75rem 2rem', background: 'linear-gradient(135deg,#4f46e5,#c3c0ff)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>

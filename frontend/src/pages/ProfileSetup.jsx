@@ -41,7 +41,7 @@ export default function ProfileSetup() {
   const [profile, setProfile] = useState({
     bio: '', linkedin: '', github: '', portfolio: '',
     department: '', skills: [], cgpa: '',
-    resumeName: '', projects: [{ title: '', desc: '', stack: '', link: '' }],
+    resumeName: '', resumeUrl: '', projects: [{ title: '', desc: '', stack: '', link: '' }],
     targetRoles: [], preferredCompanies: [], openTo: [], gradMonth: '', gradYear: '',
   });
 
@@ -122,7 +122,20 @@ export default function ProfileSetup() {
           </button>
           {profile.resumeName && <span style={{ fontSize: '0.8rem', color: '#4edea3' }}>✓ {profile.resumeName}</span>}
         </div>
-        <input id="resume-input" type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { if (e.target.files[0]) set('resumeName', e.target.files[0].name); }} />
+        <input
+          id="resume-input"
+          type="file"
+          accept=".pdf,application/pdf"
+          style={{ display: 'none' }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            set('resumeName', file.name);
+            const reader = new FileReader();
+            reader.onload = () => set('resumeUrl', reader.result);
+            reader.readAsDataURL(file);
+          }}
+        />
       </div>
       <div>
         <label style={lbl}>Projects <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none' }}>(up to 3)</span></label>

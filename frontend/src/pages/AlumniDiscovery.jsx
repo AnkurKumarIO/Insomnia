@@ -71,9 +71,17 @@ function BookModal({ alumni, studentName, onClose, onSent }) {
         cgpa: profile.cgpa || '',
         linkedin: profile.linkedin || '',
         github: profile.github || '',
+        portfolio: profile.portfolio || '',
         resumeName: profile.resumeName || '',
+        resumeUrl: profile.resumeUrl || '',
         skills: profile.skills || [],
         bio: profile.bio || '',
+        projects: profile.projects || [],
+        targetRoles: profile.targetRoles || [],
+        preferredCompanies: profile.preferredCompanies || [],
+        openTo: profile.openTo || [],
+        gradMonth: profile.gradMonth || '',
+        gradYear: profile.gradYear || '',
       },
     });
     setSent(true);
