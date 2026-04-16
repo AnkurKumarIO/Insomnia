@@ -316,10 +316,12 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('10:00');
+  const [timeHH, setTimeHH] = useState('10');
+  const [timeMM, setTimeMM] = useState('00');
+  const [ampm, setAmpm] = useState('AM');
+  const [timeError, setTimeError] = useState('');
   const [done, setDone] = useState(false);
 
-  const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
@@ -329,14 +331,38 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
 
+  const to24h = () => {
+    let h = parseInt(timeHH, 10) || 12;
+    const m = parseInt(timeMM, 10) || 0;
+    if (ampm === 'AM') {
+      if (h === 12) h = 0;
+    } else if (h !== 12) {
+      h += 12;
+    }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
   const handleReschedule = () => {
-    const newTime = new Date(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}T${selectedTime}`).toISOString();
+    const h = parseInt(timeHH, 10);
+    const m = parseInt(timeMM, 10);
+    if (isNaN(h) || h < 1 || h > 12) { setTimeError('Hour must be 1-12'); return; }
+    if (isNaN(m) || m < 0 || m > 59) { setTimeError('Minutes must be 00-59'); return; }
+    setTimeError('');
+    const newTime = new Date(`${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}T${to24h()}`).toISOString();
     rescheduleSlot(request.id, newTime);
     setDone(true);
     setTimeout(() => { onRescheduled(newTime); onClose(); }, 1600);
   };
 
   const formattedSelected = selectedDate ? new Date(viewYear, viewMonth, selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : null;
+  const displayTime = () => `${String(timeHH).padStart(2, '0')}:${String(timeMM).padStart(2, '0')} ${ampm}`;
+
+  const inputStyle = {
+    background: '#222a3d', border: '1px solid rgba(70,69,85,0.4)', borderRadius: 10,
+    color: '#dae2fd', fontSize: '1.4rem', fontWeight: 700, textAlign: 'center',
+    width: '100%', padding: '0.6rem 0.25rem', outline: 'none', fontFamily: 'Inter, monospace',
+    boxSizing: 'border-box',
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -377,13 +403,34 @@ function RescheduleModal({ request, onClose, onRescheduled }) {
               </div>
               {selectedDate && (
                 <>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: 8 }}>Select New Time — {formattedSelected}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginBottom: '1.25rem' }}>
-                    {TIME_SLOTS.map(t => <button key={t} onClick={() => setSelectedTime(t)} style={{ padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, background: selectedTime === t ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: selectedTime === t ? '#1d00a5' : '#c7c4d8' }}>{t}</button>)}
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#c7c4d8', marginBottom: '0.75rem' }}>Select New Time — {formattedSelected}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: timeError ? 6 : '1.25rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hour</div>
+                      <input type="number" min="1" max="12" value={timeHH}
+                        onChange={e => { setTimeHH(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(12, Math.max(1, parseInt(e.target.value) || 1)); setTimeHH(String(v)); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ffb95f', paddingTop: 18 }}>:</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', color: '#c7c4d8', textAlign: 'center', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Min</div>
+                      <input type="number" min="0" max="59" value={timeMM}
+                        onChange={e => { setTimeMM(e.target.value); setTimeError(''); }}
+                        onBlur={e => { const v = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)); setTimeMM(String(v).padStart(2, '0')); }}
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 18 }}>
+                      {['AM', 'PM'].map(p => (
+                        <button key={p} onClick={() => setAmpm(p)} style={{ width: 52, padding: '0.4rem 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', background: ampm === p ? 'linear-gradient(135deg,#e07b00,#ffb95f)' : '#222a3d', color: ampm === p ? '#1d00a5' : '#c7c4d8', transition: 'all 0.15s' }}>{p}</button>
+                      ))}
+                    </div>
                   </div>
+                  {timeError && <div style={{ fontSize: '0.7rem', color: '#ffb4ab', marginBottom: '1rem' }}>⚠ {timeError}</div>}
                   <div style={{ background: 'rgba(255,185,95,0.08)', border: '1px solid rgba(255,185,95,0.2)', borderRadius: 12, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#ffb95f', marginBottom: 4 }}>New Slot</div>
-                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {selectedTime}</div>
+                    <div style={{ fontWeight: 700, color: '#dae2fd', fontSize: '0.9rem' }}>{formattedSelected} at {displayTime()}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#c7c4d8', marginTop: 3 }}>A notification will be sent to {request.studentName}</div>
                   </div>
                   <button onClick={handleReschedule} style={{ width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#e07b00,#ffb95f)', color: '#1d00a5', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_repeat</span> Confirm Reschedule & Notify Student
