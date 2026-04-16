@@ -103,14 +103,27 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
         const extractedWords = wordCount(extractedText);
         console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native parse.`);
         
-        // If native extract fails or is very sparse (likely a scanned PDF), fallback to OCR
+        // If native extract fails or is very sparse (likely a scanned PDF), check OCR availability
         if (!extractedText || extractedWords < 40) {
-          console.log('[PDF] Triggering OCR fallback (sparse native text)...');
-          
+          console.log('[PDF] Sparse native text detected, checking OCR availability...');
+
+          // Check what OCR services are actually available
+          const hasOpenAIOCR = pdfImgConvert && process.env.OPENAI_API_KEY;
+          const hasHuggingFaceOCR = process.env.HUGGINGFACE_API_KEY;
+
+          if (!hasOpenAIOCR && !hasHuggingFaceOCR) {
+            console.log('[PDF] No OCR services configured, rejecting scanned PDF');
+            return res.status(422).json({
+              error: 'scanned_pdf_no_ocr',
+              message: 'This appears to be a scanned PDF, but no OCR services are configured. Please upload a text-based PDF or paste your resume text directly.',
+            });
+          }
+
+          console.log('[PDF] OCR services available, attempting OCR...');
           let ocrSuccess = false;
-          
+
           // Try pdf-img-convert + OpenAI OCR first
-          if (pdfImgConvert) {
+          if (hasOpenAIOCR) {
             try {
               const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
               if (pdfImages && pdfImages.length > 0) {
@@ -126,9 +139,9 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
               console.error('[PDF->OpenAI] OCR Error:', ocrErr.message);
             }
           }
-          
+
           // If OpenAI OCR failed or not available, try Hugging Face OCR
-          if (!ocrSuccess && process.env.HUGGINGFACE_API_KEY) {
+          if (!ocrSuccess && hasHuggingFaceOCR) {
             try {
               console.log('[PDF] Trying Hugging Face OCR fallback...');
               // Convert PDF to images first, then OCR each page
@@ -150,39 +163,54 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
               console.error('[PDF->HuggingFace] OCR Error:', hfErr.message);
             }
           }
-          
+
           // If all OCR methods failed and we have no text
           if (!ocrSuccess && (!extractedText || extractedWords < 10)) {
             const availableMethods = [];
-            if (pdfImgConvert && process.env.OPENAI_API_KEY) availableMethods.push('OpenAI OCR');
-            if (process.env.HUGGINGFACE_API_KEY) availableMethods.push('Hugging Face OCR');
+            if (hasOpenAIOCR) availableMethods.push('OpenAI OCR');
+            if (hasHuggingFaceOCR) availableMethods.push('Hugging Face OCR');
 
             return res.status(422).json({
               error: 'scanned_pdf_detected',
-              message: `This appears to be a scanned PDF. ${availableMethods.length > 0 ? `OCR processing failed using available methods (${availableMethods.join(', ')}).` : 'No OCR services are configured for scanned PDFs.'} Please upload a text-based PDF or paste your resume text directly.`,
+              message: `This appears to be a scanned PDF. OCR processing failed using available methods (${availableMethods.join(', ')}). Please upload a text-based PDF or paste your resume text directly.`,
             });
           }
         }
       } else if (isImage) {
         console.log('[Image] Processing via OCR...');
-        let ocrSuccess = false;
-        
-        // Try OpenAI OCR first
-        try {
-          const fileBuffer = fs.readFileSync(file.path);
-          const ocrResult = await extractTextViaOpenAI(fileBuffer, mimeType);
-          if (!ocrResult.unavailable) {
-            extractedText = normalizeText(ocrResult.text);
-            isOcr = true;
-            ocrSuccess = true;
-            console.log(`[Image->OpenAI] OCR Success: ${extractedText.length} chars.`);
-          }
-        } catch (ocrErr) {
-          console.error('[Image->OpenAI] OCR Error:', ocrErr.message);
+
+        // Check what OCR services are actually available
+        const hasOpenAIOCR = process.env.OPENAI_API_KEY;
+        const hasHuggingFaceOCR = process.env.HUGGINGFACE_API_KEY;
+
+        if (!hasOpenAIOCR && !hasHuggingFaceOCR) {
+          console.log('[Image] No OCR services configured, rejecting image');
+          return res.status(422).json({
+            error: 'image_no_ocr',
+            message: 'Image processing requires OCR services, but none are configured. Please paste your resume text directly.',
+          });
         }
-        
+
+        let ocrSuccess = false;
+
+        // Try OpenAI OCR first
+        if (hasOpenAIOCR) {
+          try {
+            const fileBuffer = fs.readFileSync(file.path);
+            const ocrResult = await extractTextViaOpenAI(fileBuffer, mimeType);
+            if (!ocrResult.unavailable) {
+              extractedText = normalizeText(ocrResult.text);
+              isOcr = true;
+              ocrSuccess = true;
+              console.log(`[Image->OpenAI] OCR Success: ${extractedText.length} chars.`);
+            }
+          } catch (ocrErr) {
+            console.error('[Image->OpenAI] OCR Error:', ocrErr.message);
+          }
+        }
+
         // If OpenAI OCR failed, try Hugging Face OCR
-        if (!ocrSuccess && process.env.HUGGINGFACE_API_KEY) {
+        if (!ocrSuccess && hasHuggingFaceOCR) {
           try {
             console.log('[Image] Trying Hugging Face OCR fallback...');
             const fileBuffer = fs.readFileSync(file.path);
@@ -197,11 +225,15 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
             console.error('[Image->HuggingFace] OCR Error:', hfErr.message);
           }
         }
-        
+
         if (!ocrSuccess) {
+          const availableMethods = [];
+          if (hasOpenAIOCR) availableMethods.push('OpenAI OCR');
+          if (hasHuggingFaceOCR) availableMethods.push('Hugging Face OCR');
+
           return res.status(422).json({
             error: 'image_ocr_failed',
-            message: 'OCR processing failed for this image. Please paste your resume text instead.',
+            message: `OCR processing failed for this image using available methods (${availableMethods.join(', ')}). Please paste your resume text instead.`,
           });
         }
       } else {
