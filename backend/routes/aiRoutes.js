@@ -125,18 +125,30 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
           // Try pdf-img-convert + OpenAI OCR first
           if (hasOpenAIOCR) {
             try {
+              console.log('[PDF] Converting PDF to images for OpenAI OCR...');
               const pdfImages = await pdfImgConvert.convert(file.path, { width: 1000 });
               if (pdfImages && pdfImages.length > 0) {
+                console.log(`[PDF] Converted to ${pdfImages.length} images, first image size: ${pdfImages[0].length} bytes`);
                 const ocrResult = await extractTextViaOpenAI(pdfImages[0], 'image/png');
                 if (!ocrResult.unavailable) {
                   extractedText = normalizeText(ocrResult.text);
                   isOcr = true;
                   ocrSuccess = true;
-                  console.log(`[PDF->OpenAI] OCR Success: ${extractedText.length} chars.`);
+                  console.log(`[PDF->OpenAI] OCR Success: ${extractedText.length} chars, ${wordCount(extractedText)} words.`);
+                } else {
+                  console.error('[PDF->OpenAI] OCR returned unavailable:', ocrResult.reason);
                 }
+              } else {
+                console.error('[PDF->OpenAI] PDF conversion failed: no images generated');
               }
             } catch (ocrErr) {
               console.error('[PDF->OpenAI] OCR Error:', ocrErr.message);
+              // Check if it's a common error
+              if (ocrErr.message.includes('rate limit') || ocrErr.message.includes('429')) {
+                console.error('[PDF->OpenAI] Rate limit detected');
+              } else if (ocrErr.message.includes('401') || ocrErr.message.includes('unauthorized')) {
+                console.error('[PDF->OpenAI] API key issue detected');
+              }
             }
           }
 
@@ -164,15 +176,20 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
             }
           }
 
-          // If all OCR methods failed and we have no text
-          if (!ocrSuccess && (!extractedText || extractedWords < 10)) {
+          // If all OCR methods failed but we have some text from native extraction, proceed with limited analysis
+          if (!ocrSuccess && extractedText && extractedWords >= 10 && extractedWords < 40) {
+            console.log(`[PDF] OCR failed but proceeding with ${extractedWords} words from native extraction`);
+            // Continue with the analysis using the limited text
+          } else if (!ocrSuccess && (!extractedText || extractedWords < 10)) {
             const availableMethods = [];
             if (hasOpenAIOCR) availableMethods.push('OpenAI OCR');
             if (hasHuggingFaceOCR) availableMethods.push('Hugging Face OCR');
 
+            console.error(`[PDF] All OCR methods failed. Available: ${availableMethods.join(', ')}, extracted text: ${extractedWords} words`);
+
             return res.status(422).json({
-              error: 'scanned_pdf_detected',
-              message: `This appears to be a scanned PDF. OCR processing failed using available methods (${availableMethods.join(', ')}). Please upload a text-based PDF or paste your resume text directly.`,
+              error: 'scanned_pdf_ocr_failed',
+              message: `This appears to be a scanned PDF. OCR processing failed using all available methods (${availableMethods.join(', ')}). This could be due to API limits, network issues, or unsupported image quality. Please try uploading a text-based PDF or paste your resume text directly.`,
             });
           }
         }
