@@ -100,7 +100,7 @@ const analyzeResume = async (resumeText) => {
       const rawResult = await ask(
         `You are an expert technical recruiter and resume analyst.
 
-ALWAYS analyze this text as a resume/CV and return JSON with ALL these keys:
+ALWAYS analyze this text as a resume/CV, even if it seems incomplete or unusual. Return JSON with ALL these keys:
 - score: integer 0-100 (honest assessment of this specific resume's quality)
 - grade: "A", "B", "C", or "D"
 - ats_score: integer 0-100 (keyword/ATS compatibility score)
@@ -112,7 +112,7 @@ ALWAYS analyze this text as a resume/CV and return JSON with ALL these keys:
 - experience_years: total count of years of experience as a number (NOT the start or end year)
 - top_skills: array of 5-6 actual skills listed in this resume
 
-Only return not_a_resume if the text is completely unrelated to employment (like a novel, poem, or invoice). For any text that mentions work, skills, education, or projects, analyze it as a resume.`,
+Do not refuse to analyze or return not_a_resume. Analyze any text that mentions work, skills, education, or projects as a resume.`,
         `Resume text:\n${resumeText.slice(0, 4000)}`,
         900
       );
@@ -124,11 +124,11 @@ Only return not_a_resume if the text is completely unrelated to employment (like
       if (result && typeof result.analysis === 'object') result = result.analysis;
       if (result && typeof result.resume === 'object') result = result.resume;
 
-      if (result.not_a_resume) {
-        console.log('AI flagged as not resume, but proceeding with analysis anyway:', result.reason);
-        // Don't return not_a_resume - just proceed with fallback
-        return buildResumeAnalysisFromText(resumeText);
-      }
+      // Always proceed with analysis, ignore not_a_resume flag
+      // if (result.not_a_resume) {
+      //   console.log('AI flagged as not resume, but proceeding with analysis anyway:', result.reason);
+      //   return buildResumeAnalysisFromText(resumeText);
+      // }
 
       // Robust extraction
       const toArray = (v) => Array.isArray(v) ? v : (typeof v === 'string' ? [v] : []);
