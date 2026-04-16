@@ -97,7 +97,7 @@ function buildResumeAnalysisFromText(resumeText) {
 const analyzeResume = async (resumeText) => {
   if (USE_AI) {
     try {
-      return await ask(
+      const rawResult = await ask(
         `You are an expert technical recruiter and resume analyst.
 
 FIRST: Determine if the text is actually a resume/CV. A resume contains personal info, education, work experience, skills, or projects.
@@ -118,7 +118,35 @@ If it IS a resume, return JSON with ALL these keys:
         `Resume text:\n${resumeText.slice(0, 4000)}`,
         900
       );
-    } catch (e) { console.error('Agent 1 error:', e.message); }
+
+      // Normalize possible wrapper from LLM
+      let result = rawResult;
+      if (result && typeof result.analysis === 'object') result = result.analysis;
+      if (result && typeof result.resume === 'object') result = result.resume;
+
+      if (result.not_a_resume) {
+        return { not_a_resume: true, reason: result.reason || 'This document does not contain valid resume text.' };
+      }
+
+      // Robust extraction
+      const toArray = (v) => Array.isArray(v) ? v : (typeof v === 'string' ? [v] : []);
+
+      return {
+        score: parseInt(result.score) || 70,
+        grade: result.grade || 'C',
+        ats_score: parseInt(result.ats_score) || 60,
+        target_companies: toArray(result.target_companies).slice(0, 5),
+        keyword_gaps: toArray(result.keyword_gaps).slice(0, 4),
+        formatting_fixes: toArray(result.formatting_fixes).slice(0, 4),
+        strengths: toArray(result.strengths).slice(0, 3),
+        role_detected: String(result.role_detected || 'Software Engineer'),
+        experience_years: parseInt(result.experience_years) || 0,
+        top_skills: toArray(result.top_skills).slice(0, 6)
+      };
+
+    } catch (e) {
+      console.error('Agent 1 error:', e.message);
+    }
   }
 
   return buildResumeAnalysisFromText(resumeText);
