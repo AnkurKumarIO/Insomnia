@@ -146,6 +146,8 @@ function buildResumeAnalysisFromText(resumeText) {
       : hasPython
       ? ['Python', 'SQL', 'Data Analysis', 'Machine Learning', 'APIs']
       : ['Java', 'Algorithms', 'Data Structures', 'Git', 'Agile'],
+    is_mock: true,
+    fallback_reason: 'AI service unconfigured or failed at runtime.',
   };
 }
 
@@ -201,7 +203,7 @@ Do not refuse to analyze or return not_a_resume. Analyze any text that mentions 
         exp = 50;
       }
 
-      return {
+      const finalResult = {
         score: parseInt(result.score) || 70,
         grade: result.grade || 'C',
         ats_score: parseInt(result.ats_score) || 60,
@@ -214,12 +216,23 @@ Do not refuse to analyze or return not_a_resume. Analyze any text that mentions 
         top_skills: toArray(result.top_skills).slice(0, 6)
       };
 
+      // Tag as real AI result
+      finalResult.is_mock = false;
+      return finalResult;
+
     } catch (e) {
-      console.error('Agent 1 error:', e.message);
+      console.error('Agent 1 (Resume) error:', e.message);
+      const mockResult = buildResumeAnalysisFromText(resumeText);
+      mockResult.is_mock = true;
+      mockResult.fallback_reason = `AI Analysis failed: ${e.message}`;
+      return mockResult;
     }
   }
 
-  return buildResumeAnalysisFromText(resumeText);
+  // If USE_AI is false
+  const mockResult = buildResumeAnalysisFromText(resumeText);
+  mockResult.fallback_reason = 'GROQ_API_KEY not found in environment. Running in Mock Mode.';
+  return mockResult;
 };
 
 // ─── Agent 2: Socratic Whisperer ─────────────────────────────────────────────

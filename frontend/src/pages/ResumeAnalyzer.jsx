@@ -174,9 +174,41 @@ function ResultsView({ result, onReset, navigate }) {
     <div style={{ maxWidth: 800, margin: '2rem auto', padding: '0 1rem', fontFamily: 'Inter, sans-serif', color: '#dae2fd' }}>
 
       {/* Back */}
-      <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#9b98b8', cursor: 'pointer', fontSize: '0.85rem', marginBottom: '1.5rem', padding: 0, fontFamily: 'inherit' }}>
-        ← Analyze another resume
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#9b98b8', cursor: 'pointer', fontSize: '0.85rem', padding: 0, fontFamily: 'inherit' }}>
+          ← Analyze another resume
+        </button>
+
+        {/* AI Status Badge */}
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: 6, 
+          padding: '0.35rem 0.75rem', borderRadius: 99, 
+          background: result.is_mock ? 'rgba(255, 107, 107, 0.1)' : 'rgba(78, 222, 163, 0.1)',
+          border: `1px solid ${result.is_mock ? 'rgba(255, 107, 107, 0.2)' : 'rgba(78, 222, 163, 0.2)'}`,
+          fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em'
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: result.is_mock ? '#ff6b6b' : '#4edea3', boxShadow: `0 0 8px ${result.is_mock ? '#ff6b6b' : '#4edea3'}` }}></span>
+          <span style={{ color: result.is_mock ? '#ff8a80' : '#4edea3', textTransform: 'uppercase' }}>
+            {result.is_mock ? 'Simulation Mode' : 'Live AI Verified'}
+          </span>
+        </div>
+      </div>
+
+      {/* Fallback Warning */}
+      {result.is_mock && (
+        <div style={{ 
+          background: 'linear-gradient(90deg, rgba(255,107,107,0.1), rgba(255,185,95,0.05))', 
+          borderLeft: '4px solid #ff6b6b', 
+          padding: '1rem', borderRadius: '0 12px 12px 0', 
+          marginBottom: '1.5rem', display: 'flex', gap: 12, alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ff8a80', marginBottom: 2 }}>Analysis Fallback Active</div>
+            <div style={{ fontSize: '0.75rem', color: '#9b98b8' }}>Reason: {result.fallback_reason || 'API currently unavailable.'}</div>
+          </div>
+        </div>
+      )}
 
       {/* Hero card */}
       <div style={{
