@@ -58,10 +58,12 @@ function App() {
           <Route path="/"                      element={<LandingGuard />} />
           <Route path="/login"                 element={<UnifiedLogin />} />
           <Route path="/student/register"      element={<StudentRegistration />} />
+          <Route path="/auth/student/register"  element={<StudentRegistration />} />
           <Route path="/student/login"         element={<StudentLogin />} />
           <Route path="/profile-setup"         element={<ProfileSetup />} />
           <Route path="/alumni/login"          element={<AlumniLogin />} />
           <Route path="/alumni/register"       element={<AlumniRegistration />} />
+          <Route path="/auth/alumni/register"   element={<AlumniRegistration />} />
           <Route path="/tnp/login"             element={<TNPLogin />} />
           <Route path="/dashboard"             element={<DashboardRouter />} />
           <Route path="/interview/:roomId"     element={<InterviewRoom />} />

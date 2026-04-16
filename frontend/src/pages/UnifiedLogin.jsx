@@ -127,7 +127,7 @@ export default function UnifiedLogin() {
               </p>
             </div>
             {role === "STUDENT" && <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>Don&apos;t have an account?{" "}<a href="/auth/student/register" style={{ color: "#c3c0ff", textDecoration: "none", fontWeight: 600 }}>Register here</a></p>}
-            {role === "ALUMNI" && <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>New alumni mentor?{" "}<a href="/auth/alumni/register" style={{ color: "#4edea3", textDecoration: "none", fontWeight: 600 }}>Create account</a></p>}
+            {role === "ALUMNI" && <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#c7c4d8", marginTop: "1.25rem" }}>New alumni mentor?{" "}<a href="/alumni/register" style={{ color: "#4edea3", textDecoration: "none", fontWeight: 600 }}>Create account</a></p>}
           </div>
         </div>
       </div>
