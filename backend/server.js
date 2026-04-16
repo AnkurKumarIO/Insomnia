@@ -103,8 +103,10 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
-  console.log(`\n🚀 AlumNEX Backend running on http://localhost:${PORT}`);
-  console.log(`📡 Socket.io ready on ws://localhost:${PORT}/interview`);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const baseUrl = isProduction ? `https://alumnex-backend.onrender.com` : `http://localhost:${PORT}`;
+  console.log(`\n🚀 AlumNEX Backend running on ${baseUrl}`);
+  console.log(`📡 Socket.io ready on ${baseUrl.replace('http', 'ws')}/interview`);
   console.log(`🗄️  Database: Supabase (PostgreSQL)`);
   console.log(`🤖 Groq AI: ${process.env.GROQ_API_KEY ? '✅ connected' : '❌ missing key'}\n`);
 });

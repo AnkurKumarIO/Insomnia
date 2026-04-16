@@ -12,3 +12,11 @@ services:
         value: https://insomnia-roan.vercel.app
       - key: NODE_ENV
         value: production
+      - key: SUPABASE_URL
+        fromSecret: supabase_url
+      - key: SUPABASE_ANON_KEY
+        fromSecret: supabase_anon_key
+      - key: GROQ_API_KEY
+        fromSecret: groq_api_key
+      - key: JWT_SECRET
+        fromSecret: jwt_secret
