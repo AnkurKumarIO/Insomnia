@@ -2,7 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const multer  = require('multer');
 const fs      = require('fs');
-const pdfParse = require('pdf-parse');
+const pdfParsePkg = require('pdf-parse');
+const pdfParse = pdfParsePkg.default || pdfParsePkg;
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const OpenAI  = require('openai');
@@ -21,6 +22,22 @@ const {
 const prisma = new PrismaClient();
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 const execFileAsync = promisify(execFile);
+
+async function runCommand(paths, args, options = {}) {
+  let lastError;
+  for (const path of paths) {
+    try {
+      return await execFileAsync(path, args, options);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError || new Error(`Command not found: ${paths.join(', ')}`);
+}
 
 function looksLikeResume(text) {
   const lower = text.toLowerCase();
@@ -56,6 +73,14 @@ async function extractPdfText(filePath) {
     console.error('PDF parse error:', e.message);
     return '';
   }
+}
+
+function normalizeText(rawText) {
+  return String(rawText || '').replace(/\s+/g, ' ').trim();
+}
+
+function wordCount(text) {
+  return normalizeText(text).split(' ').filter(Boolean).length;
 }
 
 // ── Helper: Extract text from image via Groq Vision ───────────────────────────
@@ -111,16 +136,13 @@ async function extractImageTextViaGroq(filePath, mimeType) {
 
 async function extractImageTextLocally(filePath) {
   try {
-    const { stdout } = await execFileAsync('/opt/homebrew/bin/tesseract', [
-      filePath,
-      'stdout',
-      '-l',
-      'eng',
-      '--psm',
-      '6',
-    ], {
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const { stdout } = await runCommand(
+      ['tesseract', '/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract'],
+      [filePath, 'stdout', '-l', 'eng', '--psm', '6'],
+      {
+        maxBuffer: 10 * 1024 * 1024,
+      }
+    );
 
     return { unavailable: false, text: stdout.trim() };
   } catch (e) {
@@ -150,27 +172,28 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
       const isImage      = mimeType.startsWith('image/');
 
       if (isPdf) {
-        extractedText = await extractPdfText(file.path);
-        console.log(`[PDF] Extracted ${extractedText.length} characters from native PDF parse.`);
+        extractedText = normalizeText(await extractPdfText(file.path));
+        const extractedWords = wordCount(extractedText);
+        console.log(`[PDF] Extracted ${extractedText.length} characters and ${extractedWords} words from native PDF parse.`);
         
-        // Fallback for scanned/image-based PDFs: Convert first page to image and run OCR
-        // Increased threshold to 150 chars to catch PDFs that only have metadata/garbage text
-        if (!extractedText || extractedText.length < 150) {
-          console.log('[PDF] text extraction yielded too little text (or failed). Falling back to Image OCR via sips...');
+        // Fallback for scanned/image-based PDFs based on actual word count rather than raw char length
+        if (!extractedText || extractedWords < 20) {
+          console.log('[PDF] text extraction yielded too little usable text. Falling back to Image OCR via sips...');
           const imagePath = `${file.path}.jpg`;
           try {
-            // Native macOS conversion: sips is usually faster than heavy libraries
-            await execFileAsync('sips', ['-s', 'format', 'jpeg', file.path, '--out', imagePath]);
+            // Native macOS conversion: sips is usually available on macOS systems
+            await runCommand(['sips', '/usr/bin/sips'], ['-s', 'format', 'jpeg', file.path, '--out', imagePath]);
             if (fs.existsSync(imagePath)) {
               let imageResult = await extractImageTextViaGroq(imagePath, 'image/jpeg');
               if (imageResult.unavailable) {
                 imageResult = await extractImageTextLocally(imagePath);
               }
-              if (!imageResult.unavailable && imageResult.text.length > 50) {
-                console.log(`[PDF->OCR] Successfully extracted ${imageResult.text.length} characters via fallback.`);
-                extractedText = imageResult.text;
+              if (!imageResult.unavailable) {
+                extractedText = normalizeText(imageResult.text);
+                const ocrWords = wordCount(extractedText);
+                console.log(`[PDF->OCR] Extracted ${extractedText.length} chars and ${ocrWords} words via fallback.`);
               } else {
-                console.warn('[PDF->OCR] Fallback also yielded insufficient text.');
+                console.warn('[PDF->OCR] Fallback unavailable:', imageResult.reason);
               }
             }
           } catch (fallbackError) {
@@ -179,7 +202,6 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
             if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
           }
         }
-        
       } else if (isImage) {
         let imageResult = await extractImageTextViaGroq(file.path, mimeType);
         if (imageResult.unavailable) {
@@ -214,12 +236,15 @@ router.post('/resume-analyze', upload.any(), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded or text provided.' });
     }
 
-    if (!extractedText || extractedText.length < 10) {
+    const cleanedText = normalizeText(extractedText);
+    const cleanedWords = wordCount(cleanedText);
+    if (!cleanedText || cleanedWords < 10) {
       return res.status(422).json({
         error: 'text_extraction_failed',
-        message: 'Please provide more text content.',
+        message: 'Please provide more text content. If this is a scanned resume, upload a clearer PDF or paste the text directly.',
       });
     }
+    extractedText = cleanedText;
 
     console.log('Extracted text length:', extractedText.length);
     console.log('Extracted text preview:', extractedText.substring(0, 200));
