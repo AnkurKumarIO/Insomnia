@@ -29,7 +29,6 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
   if (!mentor) return null;
 
   const handleSend = () => {
-    const profile = JSON.parse(localStorage.getItem('alumnex_profile') || localStorage.getItem('alumniconnect_profile') || '{}');
     const authUser = JSON.parse(localStorage.getItem('alumnex_user') || localStorage.getItem('alumniconnect_user') || '{}');
     sendRequest({
       studentName,
@@ -39,26 +38,6 @@ function MentorBookModal({ mentor, studentName, onClose, onSent }) {
       alumniRole: `${mentor.title} • ${mentor.company}`,
       topic,
       message,
-      studentProfile: {
-        name: profile.name || studentName,
-        college: profile.college || '',
-        department: profile.department || '',
-        year: profile.year || '',
-        cgpa: profile.cgpa || '',
-        linkedin: profile.linkedin || '',
-        github: profile.github || '',
-        portfolio: profile.portfolio || '',
-        resumeName: profile.resumeName || '',
-        resumeUrl: profile.resumeUrl || '',
-        skills: profile.skills || [],
-        bio: profile.bio || '',
-        projects: profile.projects || [],
-        targetRoles: profile.targetRoles || [],
-        preferredCompanies: profile.preferredCompanies || [],
-        openTo: profile.openTo || [],
-        gradMonth: profile.gradMonth || '',
-        gradYear: profile.gradYear || '',
-      },
     });
     setSent(true);
     setTimeout(() => { onSent(); onClose(); }, 1800);
